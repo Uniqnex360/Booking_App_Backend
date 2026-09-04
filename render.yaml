@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: starter
     branch: main
-    rootDir: core-monolith
+    rootDir: backend/core-monolith
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
@@ -12,8 +12,7 @@ services:
       alembic upgrade head &&
       uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.10.13
+      
       - key: DATABASE_URL
         sync: false
       - key: SECRET_KEY
