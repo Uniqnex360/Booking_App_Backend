@@ -13,3 +13,4 @@ python-dotenv==1.0.1
 httpx==0.28.1
 psycopg2-binary
 requests==2.32.3
+slowapi
