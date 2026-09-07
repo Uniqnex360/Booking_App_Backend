@@ -5,6 +5,7 @@ from typing import List, Optional
 import secrets
 class Settings(BaseSettings):
     DATABASE_URL:PostgresDsn
+    CORS_ORIGINS: str 
     JWT_SECRET_KEY:str=secrets.token_urlsafe(32)
     JWT_ALGORITHM:str='HS256'
     ACCESS_TOKEN_EXPIRE_MINUTES:int=15 
