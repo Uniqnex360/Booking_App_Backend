@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI,Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -21,11 +22,11 @@ app = FastAPI(
     description="Core Monolith API with SOLID Auth Infrastructure",
     version="1.0.0"
 )
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        'http://localhost:5173'
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=['*']
