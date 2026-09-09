@@ -15,9 +15,9 @@ class  User(Base):
     __tablename__='users'
     id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
     full_name:Mapped[str]=mapped_column(String(255),nullable=False)
-    email:Mapped[str]=mapped_column(String(255),unique=True,nullable=False,index=True)
-    phone:Mapped[Optional[str]]=mapped_column(String(20),unique=True,nullable=True)
-    password_hash:Mapped[str]=mapped_column(String(255),nullable=False)
+    phone: Mapped[Optional[str]] = mapped_column(String(20), unique=True, nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True, index=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     role:Mapped[UserRole]=mapped_column(Enum(UserRole),default=UserRole.USER,nullable=False)
     is_verified:Mapped[bool]=mapped_column(Boolean,default=False)
     is_active:Mapped[bool]=mapped_column(Boolean,default=True)
