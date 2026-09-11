@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI,Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
@@ -8,7 +8,8 @@ from app.user.routes import router as user_router
 from app.partner.routes import router as partner_router
 from app.event.routes import router as event_router
 from app.admin.routes import router as admin_router
-
+from app.movie.routes import movie_router
+from app.booking.routes import router as booking_router
 
 from slowapi.errors import RateLimitExceeded
 from app.auth.exceptions import (
@@ -17,11 +18,13 @@ from app.auth.exceptions import (
     InvalidTokenError,
     TokenReuseError,
 )
+
 app = FastAPI(
     title="Booking Platform API",
     description="Core Monolith API with SOLID Auth Infrastructure",
     version="1.0.0"
 )
+
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
 
 app.add_middleware(
@@ -31,8 +34,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=['*']
 )
-app.state.limiter=limiter
-app.add_exception_handler(RateLimitExceeded,_rate_limit_exceeded_handler)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 @app.exception_handler(DuplicateEmailError)
 async def duplicate_email_exception_handler(request: Request, exc: DuplicateEmailError):
     return JSONResponse(status_code=409, content={"detail": str(exc.detail)})
@@ -48,11 +53,15 @@ async def invalid_token_exception_handler(request: Request, exc: InvalidTokenErr
 @app.exception_handler(TokenReuseError)
 async def token_reuse_exception_handler(request: Request, exc: TokenReuseError):
     return JSONResponse(status_code=401, content={"detail": str(exc.detail)})
+
 app.include_router(auth_router, prefix="/v1")
 app.include_router(user_router, prefix="/v1")
 app.include_router(partner_router, prefix="/v1")
 app.include_router(event_router, prefix="/v1")
-app.include_router(admin_router, prefix="/v1")   
+app.include_router(booking_router, prefix="/v1")
+app.include_router(movie_router, prefix="/v1")
+app.include_router(admin_router, prefix="/v1")
+
 @app.get("/")
 async def root():
     return {
