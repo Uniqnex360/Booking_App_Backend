@@ -30,9 +30,10 @@ cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:.*",
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=['*']
+    allow_headers=["*", "Idempotency-Key", "idempotency-key", "Authorization", "Content-Type"]
 )
 
 app.state.limiter = limiter
