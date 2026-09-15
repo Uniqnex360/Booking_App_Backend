@@ -52,6 +52,10 @@ logger = logging.getLogger(__name__)
 
 
 class BookingService:
+
+    async def get_user_bookings(self, user_id: UUID) -> list[Booking]:
+        return await self.booking_repo.get_user_bookings(user_id)
+
     def __init__(
         self,
         booking_repo: IBookingRepository,

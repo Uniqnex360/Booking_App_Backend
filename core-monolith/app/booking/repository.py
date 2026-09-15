@@ -23,6 +23,16 @@ from app.shared.timeutil import utcnow
 
 
 class BookingRepository(IBookingRepository):
+
+    async def get_user_bookings(self, user_id: UUID) -> list[Booking]:
+        res = await self.session.execute(
+            select(BookingModel)
+            .where(BookingModel.user_id == user_id)
+            .order_by(BookingModel.created_at.desc())
+        )
+        rows = res.scalars().all()
+        return [self._to_domain(r) for r in rows]
+
     def __init__(self, session: AsyncSession):
         self.session = session
 

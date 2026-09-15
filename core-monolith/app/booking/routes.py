@@ -328,3 +328,31 @@ async def cancel_legacy_booking(
     except BookingNotCancellableError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     return {"booking": {"id": str(booking.id), "status": "CANCELLED"}}
+
+@router.get("/bookings", status_code=status.HTTP_200_OK)
+async def list_my_bookings(
+    current_user: AuthUserDomain = Depends(get_current_user),
+    booking_service: BookingService = Depends(get_booking_service),
+):
+    bookings = await booking_service.get_user_bookings(current_user.id)
+    return success_response(
+        data=[
+            {
+                "id": str(b.id),
+                "user_id": str(b.user_id),
+                "status": b.status.value if hasattr(b.status, "value") else b.status,
+                "total_paise": b.total_paise,
+                "currency": b.currency,
+                "ref_code": b.ref_code,
+                "barcode": b.barcode,
+                "showtime_id": str(b.showtime_id) if b.showtime_id else None,
+                "event_id": str(b.event_id) if b.event_id else None,
+                "tier_id": str(b.tier_id) if b.tier_id else None,
+                "quantity": b.quantity,
+                "created_at": b.created_at.isoformat() if b.created_at else None,
+                "held_until": b.held_until.isoformat() if b.held_until else None,
+            }
+            for b in bookings
+        ],
+        message="User bookings fetched successfully",
+    )
