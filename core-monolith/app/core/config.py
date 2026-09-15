@@ -18,9 +18,11 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: Optional[str] = None
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: Optional[int] = None
-    SMTP_USER: Optional[str] = None
+    RESEND_FROM_EMAIL: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
     EMAILS_FROM: Optional[str] = None
+    RESEND_API_KEY: Optional[str] = None
+    RESEND_FROM_EMAIL: Optional[str] = "onboarding@resend.dev" 
     GOOGLE_PUBLIC_KEYS_URL: Optional[str] = None
 
     class Config:
