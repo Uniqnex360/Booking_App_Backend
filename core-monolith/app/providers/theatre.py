@@ -30,6 +30,17 @@ from app.providers.base import (
 logger = logging.getLogger(__name__)
 
 
+def _extract_price(item: dict, fallback: int = 0) -> int:
+    if not isinstance(item, dict):
+        return fallback
+    for k, v in item.items():
+        if isinstance(v, (int, float)) and v > 0:
+            k_lower = k.lower()
+            if any(term in k_lower for term in ("price", "total", "quote", "amount", "cost")):
+                return int(v)
+    return fallback
+
+
 class PVRProvider(ITheatreProvider):
     def __init__(
         self,
@@ -63,7 +74,7 @@ class PVRProvider(ITheatreProvider):
     async def _get_with_retry(self, path: str, params: dict | None = None) -> httpx.Response:
         client = self._get_client()
         last_exc: Exception | None = None
-        for attempt in range(3):  # initial + max 2 retries
+        for attempt in range(3):
             try:
                 resp = await client.get(
                     f"{self._base_url}{path}", params=params, headers=self._headers(), timeout=self._timeout
@@ -127,9 +138,9 @@ class PVRProvider(ITheatreProvider):
             seats: list[ProviderSeat] = []
             for row in data.get("rows", []):
                 row_label = row.get("label", "")
+                row_price = _extract_price(row, 0)
                 for s in row.get("seats", []):
-                    # Money is integer paise
-                    price_paise = int(s.get("price_paise", s.get("price_paise", row.get("price_paise", 0))))
+                    price_paise = _extract_price(s, row_price)
                     is_avail = s.get("status") == "AVAILABLE"
                     seats.append(
                         ProviderSeat(
@@ -190,11 +201,11 @@ class PVRProvider(ITheatreProvider):
                     ProviderHeldSeat(
                         seat_ref=str(s["seat_id"]),
                         seat_code=s.get("code", ""),
-                        price_paise=int(s.get("price_paise", s.get("price_paise", 0))),
+                        price_paise=_extract_price(s, 0),
                     )
                     for s in data.get("seats", [])
                 ]
-                total_paise = int(data.get("total", data.get("quote_total", 0)))
+                total_paise = _extract_price(data, 0)
                 return ProviderHold(
                     hold_id=str(data["hold_id"]),
                     expires_at=expires_at,
@@ -245,11 +256,11 @@ class PVRProvider(ITheatreProvider):
                     ProviderTicketSeat(
                         seat_ref=str(s.get("seat_id", "")),
                         seat_code=s.get("code", ""),
-                        price_paise=int(s.get("price_paise", s.get("price_paise", 0))),
+                        price_paise=_extract_price(s, 0),
                     )
                     for s in data.get("seats", [])
                 ]
-                total_paise = int(data.get("total_paise", data.get("total_paise", 0)))
+                total_paise = _extract_price(data, 0)
                 return ProviderTicket(
                     booking_id=str(data.get("id", data.get("booking_id", ""))),
                     ref_code=data.get("ref_code", ""),
@@ -312,7 +323,7 @@ class PVRProvider(ITheatreProvider):
                 ProviderHeldSeat(
                     seat_ref=str(s["seat_id"]),
                     seat_code=s.get("code", ""),
-                    price_paise=int(s.get("price_paise", s.get("price_paise", 0))),
+                    price_paise=_extract_price(s, 0),
                 )
                 for s in data.get("seats", [])
             ]
@@ -321,7 +332,7 @@ class PVRProvider(ITheatreProvider):
                 showtime_ref=str(data["showtime_id"]),
                 status=data["status"],
                 expires_at=expires_at,
-                quote_total_paise=int(data.get("quote_total", 0)),
+                quote_total_paise=_extract_price(data, 0),
                 currency=data.get("currency", "INR"),
                 seats=seats,
             )
@@ -331,6 +342,4 @@ class PVRProvider(ITheatreProvider):
     async def bookings_between(
         self, start: datetime, end: datetime
     ) -> list[ProviderTicket]:
-        # For reconciliation, list tickets/bookings from provider if available
-        # Default empty list or queries endpoint
         return []
