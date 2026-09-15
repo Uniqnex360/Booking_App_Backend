@@ -17,7 +17,7 @@ from app.auth.models import User
 from app.partner.models import PartnerORM
 from app.movie.models import Venue, Screen, Movie, Showtime
 from app.shared.providers.registry import ProviderRegistryModel
-from sqlalchemy import select, delete
+from sqlalchemy import select, update
 
 PVR_URL = os.getenv("PVR_BASE_URL", "https://pvr-backend-pejx.onrender.com").rstrip("/")
 PVR_EMAIL = os.getenv("PVR_ADMIN_EMAIL", "demo@pvr.local")
@@ -133,16 +133,19 @@ async def sync_production():
                 provider.auth_token_ref = pvr_token
             await session.flush()
 
-        # 6. Clean out stale showtimes that do not match current PVR IDs
+        # 6. Mark stale showtimes as CANCELLED instead of deleting to respect FK constraints
         current_pvr_ids = [st["id"] for st in pvr_showtimes]
         await session.execute(
-            delete(Showtime).where(
+            update(Showtime)
+            .where(
                 Showtime.provider_id == provider.id,
                 Showtime.provider_showtime_ref.notin_(current_pvr_ids),
             )
+            .values(status="CANCELLED")
         )
 
         # 7. Create or update showtimes linked to PVR
+        synced = 0
         for st in pvr_showtimes:
             title = st["movie_title"]
             movie_q = await session.execute(select(Movie).where(Movie.title == title))
@@ -182,13 +185,15 @@ async def sync_production():
                     provider_showtime_ref=st["id"],
                 )
                 session.add(new_st)
+                synced += 1
             else:
                 existing_st.starts_at = starts_at_dt
                 existing_st.provider_id = provider.id
                 existing_st.status = "ACTIVE"
+                synced += 1
 
         await session.commit()
-        print(f"3. Successfully synced {len(pvr_showtimes)} showtimes directly to PVR!")
+        print(f"3. Successfully synced {synced} showtime(s) with live PVR backend!")
 
 if __name__ == "__main__":
     asyncio.run(sync_production())
