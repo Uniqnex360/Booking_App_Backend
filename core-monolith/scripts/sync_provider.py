@@ -9,63 +9,46 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.core.database import AsyncSessionLocal
+import app.auth.models
+import app.partner.models
+import app.event.models
+import app.movie.models
 from app.auth.models import User
 from app.partner.models import PartnerORM
 from app.movie.models import Venue, Screen, Movie, Showtime
 from app.shared.providers.registry import ProviderRegistryModel
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
-PVR_URL = os.getenv("PVR_BASE_URL", "http://127.0.0.1:8010").rstrip("/")
+PVR_URL = os.getenv("PVR_BASE_URL", "https://pvr-backend-pejx.onrender.com").rstrip("/")
 PVR_EMAIL = os.getenv("PVR_ADMIN_EMAIL", "demo@pvr.local")
 PVR_PASSWORD = os.getenv("PVR_ADMIN_PASSWORD", "demo1234")
 
-async def wait_for_pvr_wakeup(client: httpx.AsyncClient) -> bool:
-    print(f"Pinging PVR instance at {PVR_URL} (waiting for cold start if sleeping)...")
-    for attempt in range(12):  # Wait up to 60 seconds (12 x 5s)
-        try:
-            resp = await client.get(f"{PVR_URL}/v1/health")
-            if resp.status_code == 200:
-                print("PVR backend is awake and healthy!")
-                return True
-        except Exception:
-            pass
-        print(f"Waiting for PVR to wake up (attempt {attempt + 1}/12)...")
-        await asyncio.sleep(5)
-    return False
-
 async def sync_production():
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        # 1. Ensure PVR is awake
-        is_awake = await wait_for_pvr_wakeup(client)
-        if not is_awake:
-            print("PVR backend did not wake up in time. Aborting sync.")
-            return
-
-        # 2. Fetch showtimes & auth token
+    print(f"1. Connecting to PVR at: {PVR_URL}")
+    async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            st_resp = await client.get(f"{PVR_URL}/v1/showtimes")
-            if st_resp.status_code != 200:
-                print(f"Failed to fetch showtimes from PVR: {st_resp.status_code} {st_resp.text}")
-                return
-            pvr_showtimes = st_resp.json()
-
+            # Login to PVR
             login_resp = await client.post(
                 f"{PVR_URL}/v1/auth/login",
                 json={"email": PVR_EMAIL, "password": PVR_PASSWORD},
             )
             pvr_token = login_resp.json().get("token") if login_resp.status_code == 200 else None
+
+            # Get current showtimes from PVR
+            st_resp = await client.get(f"{PVR_URL}/v1/showtimes")
+            pvr_showtimes = st_resp.json()
         except Exception as e:
-            print(f"Error fetching data from PVR: {e}")
+            print(f"Error connecting to PVR ({PVR_URL}): {e}")
             return
 
     if not pvr_showtimes:
-        print("PVR instance returned 0 showtimes. Make sure PVR backend has been seeded.")
+        print("No showtimes returned from PVR.")
         return
 
-    print(f"Found {len(pvr_showtimes)} showtime(s) on PVR. Writing to database...")
+    print(f"2. Fetched {len(pvr_showtimes)} live showtime(s) from PVR.")
 
     async with AsyncSessionLocal() as session:
-        # 3. Create or load Partner
+        # 3. Setup Partner
         partner_query = await session.execute(
             select(PartnerORM).where(PartnerORM.business_name == "PVR Cinemas Ltd")
         )
@@ -74,7 +57,6 @@ async def sync_production():
         if not partner_orm:
             partner_user_id = uuid.uuid4()
             partner_id = uuid.uuid4()
-
             partner_user = User(
                 id=partner_user_id,
                 full_name="PVR Cinemas Partner",
@@ -101,10 +83,8 @@ async def sync_production():
         else:
             partner_id = partner_orm.id
 
-        # 4. Create or load Venue & Screen
-        venue_query = await session.execute(
-            select(Venue).where(Venue.name == "PVR Lulu Mall")
-        )
+        # 4. Setup Venue & Screen
+        venue_query = await session.execute(select(Venue).where(Venue.name == "PVR Lulu Mall"))
         venue = venue_query.scalar_one_or_none()
         if not venue:
             venue = Venue(
@@ -118,23 +98,21 @@ async def sync_production():
             session.add(venue)
             await session.flush()
 
-        screen_query = await session.execute(
-            select(Screen).where(Screen.venue_id == venue.id)
-        )
+        screen_query = await session.execute(select(Screen).where(Screen.venue_id == venue.id))
         screen = screen_query.scalar_one_or_none()
         if not screen:
             screen = Screen(
                 id=uuid.uuid4(),
                 venue_id=venue.id,
                 name="Audi 1 (IMAX)",
-                total_seats=468,
+                total_seats=234,
             )
             session.add(screen)
             await session.flush()
 
-        # 5. Provider Registry
+        # 5. Setup Provider Registry
         provider_query = await session.execute(
-            select(ProviderRegistryModel).where(ProviderRegistryModel.name == "PVR Provider")
+            select(ProviderRegistryModel).where(ProviderRegistryModel.name.ilike("%pvr%"))
         )
         provider = provider_query.scalar_one_or_none()
         if not provider:
@@ -155,14 +133,22 @@ async def sync_production():
                 provider.auth_token_ref = pvr_token
             await session.flush()
 
-        # 6. Sync Movies & Showtimes
-        synced_count = 0
+        # 6. Clean out stale showtimes that do not match current PVR IDs
+        current_pvr_ids = [st["id"] for st in pvr_showtimes]
+        await session.execute(
+            delete(Showtime).where(
+                Showtime.provider_id == provider.id,
+                Showtime.provider_showtime_ref.notin_(current_pvr_ids),
+            )
+        )
+
+        # 7. Create or update showtimes linked to PVR
         for st in pvr_showtimes:
             title = st["movie_title"]
             movie_q = await session.execute(select(Movie).where(Movie.title == title))
-            m = movie_q.scalar_one_or_none()
-            if not m:
-                m = Movie(
+            movie = movie_q.scalar_one_or_none()
+            if not movie:
+                movie = Movie(
                     id=uuid.uuid4(),
                     title=title,
                     language=st.get("language", "Malayalam"),
@@ -173,19 +159,20 @@ async def sync_production():
                     poster_url="https://images.pexels.com/photos/20151747/pexels-photo-20151747.jpeg?auto=compress&cs=tinysrgb&h=500&w=350",
                     synopsis=f"Now showing at PVR Cinemas: {title}",
                 )
-                session.add(m)
+                session.add(movie)
                 await session.flush()
 
             starts_at_dt = datetime.fromisoformat(st["starts_at"].replace("Z", "+00:00"))
 
-            existing_st = await session.execute(
+            existing_st = (await session.execute(
                 select(Showtime).where(Showtime.provider_showtime_ref == st["id"])
-            )
-            if not existing_st.scalar_one_or_none():
-                vybh_showtime = Showtime(
+            )).scalar_one_or_none()
+
+            if not existing_st:
+                new_st = Showtime(
                     id=uuid.uuid4(),
                     screen_id=screen.id,
-                    movie_id=m.id,
+                    movie_id=movie.id,
                     starts_at=starts_at_dt,
                     language=st.get("language", "Malayalam"),
                     format="2D",
@@ -194,11 +181,14 @@ async def sync_production():
                     provider_id=provider.id,
                     provider_showtime_ref=st["id"],
                 )
-                session.add(vybh_showtime)
-                synced_count += 1
+                session.add(new_st)
+            else:
+                existing_st.starts_at = starts_at_dt
+                existing_st.provider_id = provider.id
+                existing_st.status = "ACTIVE"
 
         await session.commit()
-        print(f"SUCCESS: Synced {synced_count} PVR showtime(s) to database!")
+        print(f"3. Successfully synced {len(pvr_showtimes)} showtimes directly to PVR!")
 
 if __name__ == "__main__":
     asyncio.run(sync_production())
