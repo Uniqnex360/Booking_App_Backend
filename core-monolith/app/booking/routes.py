@@ -334,25 +334,89 @@ async def list_my_bookings(
     current_user: AuthUserDomain = Depends(get_current_user),
     booking_service: BookingService = Depends(get_booking_service),
 ):
-    bookings = await booking_service.get_user_bookings(current_user.id)
+    from sqlalchemy import select
+    from app.booking.models import BookingModel
+    from app.movie.models import Showtime, Movie, Screen, Venue
+    from app.event.models import EventORM, TicketCategoryORM
+    import json
+
+    session = booking_service.session
+    stmt = (
+        select(
+            BookingModel,
+            Showtime,
+            Movie,
+            Screen,
+            Venue,
+            EventORM,
+            TicketCategoryORM,
+        )
+        .outerjoin(Showtime, BookingModel.showtime_id == Showtime.id)
+        .outerjoin(Movie, Showtime.movie_id == Movie.id)
+        .outerjoin(Screen, Showtime.screen_id == Screen.id)
+        .outerjoin(Venue, Screen.venue_id == Venue.id)
+        .outerjoin(EventORM, BookingModel.event_id == EventORM.id)
+        .outerjoin(TicketCategoryORM, BookingModel.tier_id == TicketCategoryORM.id)
+        .where(BookingModel.user_id == current_user.id)
+        .order_by(BookingModel.created_at.desc())
+    )
+
+    res = await session.execute(stmt)
+    rows = res.all()
+
+    enriched_bookings = []
+    for b, st, movie, screen, venue, event, tier in rows:
+        # Determine Title, Venue, Location, Image, and Date
+        if movie:
+            title = movie.title
+            venue_name = f"{venue.name} • {screen.name}" if (venue and screen) else (venue.name if venue else "Cinema Hall")
+            location = venue.city if venue else "Kochi"
+            image_url = movie.poster_url or "https://images.pexels.com/photos/20151747/pexels-photo-20151747.jpeg?auto=compress&cs=tinysrgb&h=500&w=350"
+            booking_date = st.starts_at.isoformat() if st else b.created_at.isoformat()
+            
+            # Count seats from seat_refs_json or default 1
+            seat_count = 1
+            if b.seat_refs_json:
+                try:
+                    seat_count = len(json.loads(b.seat_refs_json))
+                except Exception:
+                    seat_count = 1
+            guests = seat_count
+        elif event:
+            title = event.title
+            venue_name = event.venue_name or "Event Venue"
+            location = event.venue_address or "Kochi"
+            image_url = event.cover_image_url if hasattr(event, "cover_image_url") and event.cover_image_url else "https://images.pexels.com/photos/13230484/pexels-photo-13230484.jpeg?auto=compress&cs=tinysrgb&h=400&w=600"
+            booking_date = b.created_at.isoformat()
+            guests = b.quantity or 1
+        else:
+            title = "Cinema Booking" if b.booking_type == "MOVIE" else "Experience Booking"
+            venue_name = "PVR Cinemas" if b.provider_id else "Venue"
+            location = "Kochi"
+            image_url = "https://images.pexels.com/photos/20151747/pexels-photo-20151747.jpeg?auto=compress&cs=tinysrgb&h=500&w=350"
+            booking_date = b.created_at.isoformat()
+            guests = 1
+
+        total_rupees = b.total_paise // 100
+
+        enriched_bookings.append({
+            "id": str(b.id),
+            "user_id": str(b.user_id),
+            "type": b.booking_type or ("MOVIE" if b.showtime_id else "EVENT"),
+            "title": title,
+            "venue": venue_name,
+            "location": location,
+            "booking_date": booking_date,
+            "guests": guests,
+            "total_price": total_rupees,
+            "status": b.status,
+            "image_url": image_url,
+            "ref_code": b.ref_code,
+            "barcode": b.barcode,
+            "created_at": b.created_at.isoformat() if b.created_at else None,
+        })
+
     return success_response(
-        data=[
-            {
-                "id": str(b.id),
-                "user_id": str(b.user_id),
-                "status": b.status.value if hasattr(b.status, "value") else b.status,
-                "total_paise": b.total_paise,
-                "currency": b.currency,
-                "ref_code": b.ref_code,
-                "barcode": b.barcode,
-                "showtime_id": str(b.showtime_id) if b.showtime_id else None,
-                "event_id": str(b.event_id) if b.event_id else None,
-                "tier_id": str(b.tier_id) if b.tier_id else None,
-                "quantity": b.quantity,
-                "created_at": b.created_at.isoformat() if b.created_at else None,
-                "held_until": b.held_until.isoformat() if b.held_until else None,
-            }
-            for b in bookings
-        ],
+        data=enriched_bookings,
         message="User bookings fetched successfully",
     )
