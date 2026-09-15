@@ -371,7 +371,7 @@ async def list_my_bookings(
             title = movie.title
             venue_name = f"{venue.name} • {screen.name}" if (venue and screen) else (venue.name if venue else "Cinema Hall")
             location = venue.city if venue else "Kochi"
-            image_url = movie.poster_url or "https://images.pexels.com/photos/20151747/pexels-photo-20151747.jpeg?auto=compress&cs=tinysrgb&h=500&w=350"
+            image_url = movie.poster_url or "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80"
             booking_date = st.starts_at.isoformat() if st else b.created_at.isoformat()
             
             # Count seats from seat_refs_json or default 1
@@ -393,7 +393,7 @@ async def list_my_bookings(
             title = "Cinema Booking" if b.booking_type == "MOVIE" else "Experience Booking"
             venue_name = "PVR Cinemas" if b.provider_id else "Venue"
             location = "Kochi"
-            image_url = "https://images.pexels.com/photos/20151747/pexels-photo-20151747.jpeg?auto=compress&cs=tinysrgb&h=500&w=350"
+            image_url = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80"
             booking_date = b.created_at.isoformat()
             guests = 1
 

@@ -159,7 +159,13 @@ async def sync_production():
                     certificate=st.get("certificate", "UA"),
                     status="PUBLISHED",
                     partner_id=partner_id,
-                    poster_url="https://images.pexels.com/photos/20151747/pexels-photo-20151747.jpeg?auto=compress&cs=tinysrgb&h=500&w=350",
+                    poster_url=(
+                        "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600&auto=format&fit=crop&q=80"
+                        if "game" in title.lower()
+                        else "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=600&auto=format&fit=crop&q=80"
+                        if "whistle" in title.lower()
+                        else "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80"
+                    ),
                     synopsis=f"Now showing at PVR Cinemas: {title}",
                 )
                 session.add(movie)
