@@ -24,8 +24,8 @@ PVR_EMAIL = os.getenv("PVR_ADMIN_EMAIL", "demo@pvr.local")
 PVR_PASSWORD = os.getenv("PVR_ADMIN_PASSWORD", "demo1234")
 
 POSTER_MAP = {
-    "i am game": "https://m.media-amazon.com/images/M/MV5BZTU1YjI3MjAtYzU4OC00MzZkLWIwMTctZTA0NzA2MmQ4M2U3XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
-    "the final whistle": "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=800&auto=format&fit=crop&q=80",
+    "i am game": "https://i.pinimg.com/1200x/c7/a8/58/c7a858e124a8da21b34624689fae49b2.jpg",
+    "the final whistle": "https://i.pinimg.com/736x/b2/a3/18/b2a31878a8498a21aa582d78094f775c.jpg",
 }
 
 async def sync_production():
@@ -47,6 +47,8 @@ async def sync_production():
     if not pvr_showtimes:
         print("No showtimes returned from PVR.")
         return
+
+    print(f"2. Fetched {len(pvr_showtimes)} live showtime(s) from PVR.")
 
     async with AsyncSessionLocal() as session:
         partner_query = await session.execute(
@@ -198,7 +200,7 @@ async def sync_production():
                 synced += 1
 
         await session.commit()
-        print(f"Synced {synced} showtime(s) with custom posters.")
+        print(f"Synced {synced} showtime(s) with your custom Pinterest posters.")
 
 if __name__ == "__main__":
     asyncio.run(sync_production())
