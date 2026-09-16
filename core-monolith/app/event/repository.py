@@ -17,10 +17,15 @@ class SQLAlchemyEventRepository(IEventRepository):
         self.db = db
 
     def _to_domain(self, orm: EventORM) -> Event:
+        def _u(val):
+            if val is None or isinstance(val, uuid.UUID):
+                return val
+            return uuid.UUID(str(val))
+
         categories = [
             TicketCategory(
-                id=orm.id if isinstance(orm.id, uuid.UUID) else uuid.UUID(orm.id),
-                event_id=uuid.UUID(cat.event_id),
+                id=_u(cat.id),
+                event_id=_u(cat.event_id),
                 name=cat.name,
                 price_paise=cat.price_paise,
                 capacity=cat.capacity,
@@ -35,34 +40,24 @@ class SQLAlchemyEventRepository(IEventRepository):
         ]
         
         return Event(
-            id=orm.id if isinstance(orm.id, uuid.UUID) else uuid.UUID(orm.id),
-            partner_id=orm.partner_id if isinstance(orm.partner_id, uuid.UUID) else uuid.UUID(orm.partner_id),
+            id=_u(orm.id),
+            partner_id=_u(orm.partner_id),
             title=orm.title,
             slug=orm.slug,
             category=EventCategory(orm.category),
             venue_name=orm.venue_name,
+            venue_address=orm.venue_address,
             city=orm.city,
             starts_at=orm.starts_at,
             ends_at=orm.ends_at,
             description=orm.description,
-            event_type=orm.event_type,
-            seating_mode=orm.seating_mode,
-            venue_address=orm.venue_address,
-            latitude=orm.latitude,
-            longitude=orm.longitude,
-            doors_open_at=orm.doors_open_at,
-            age_restriction=orm.age_restriction,
             is_online=orm.is_online,
             online_link=orm.online_link,
-            poster_image_url=orm.poster_image_url,
-            cancellation_policy=orm.cancellation_policy,
             status=EventStatus(orm.status),
+            ticket_categories=categories,
             published_at=orm.published_at,
-            cancelled_at=orm.cancelled_at,
-            cancellation_reason=orm.cancellation_reason,
             created_at=orm.created_at,
-            updated_at=orm.updated_at,
-            ticket_categories=categories
+            updated_at=orm.updated_at
         )
 
     async def create(self, event: Event) -> Event:
