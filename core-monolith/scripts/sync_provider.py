@@ -23,18 +23,21 @@ PVR_URL = os.getenv("PVR_BASE_URL", "https://pvr-backend-pejx.onrender.com").rst
 PVR_EMAIL = os.getenv("PVR_ADMIN_EMAIL", "demo@pvr.local")
 PVR_PASSWORD = os.getenv("PVR_ADMIN_PASSWORD", "demo1234")
 
+POSTER_MAP = {
+    "i am game": "https://m.media-amazon.com/images/M/MV5BZTU1YjI3MjAtYzU4OC00MzZkLWIwMTctZTA0NzA2MmQ4M2U3XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg",
+    "the final whistle": "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=800&auto=format&fit=crop&q=80",
+}
+
 async def sync_production():
     print(f"1. Connecting to PVR at: {PVR_URL}")
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            # Login to PVR
             login_resp = await client.post(
                 f"{PVR_URL}/v1/auth/login",
                 json={"email": PVR_EMAIL, "password": PVR_PASSWORD},
             )
             pvr_token = login_resp.json().get("token") if login_resp.status_code == 200 else None
 
-            # Get current showtimes from PVR
             st_resp = await client.get(f"{PVR_URL}/v1/showtimes")
             pvr_showtimes = st_resp.json()
         except Exception as e:
@@ -45,10 +48,7 @@ async def sync_production():
         print("No showtimes returned from PVR.")
         return
 
-    print(f"2. Fetched {len(pvr_showtimes)} live showtime(s) from PVR.")
-
     async with AsyncSessionLocal() as session:
-        # 3. Setup Partner
         partner_query = await session.execute(
             select(PartnerORM).where(PartnerORM.business_name == "PVR Cinemas Ltd")
         )
@@ -83,7 +83,6 @@ async def sync_production():
         else:
             partner_id = partner_orm.id
 
-        # 4. Setup Venue & Screen
         venue_query = await session.execute(select(Venue).where(Venue.name == "PVR Lulu Mall"))
         venue = venue_query.scalar_one_or_none()
         if not venue:
@@ -110,7 +109,6 @@ async def sync_production():
             session.add(screen)
             await session.flush()
 
-        # 5. Setup Provider Registry
         provider_query = await session.execute(
             select(ProviderRegistryModel).where(ProviderRegistryModel.name.ilike("%pvr%"))
         )
@@ -133,7 +131,6 @@ async def sync_production():
                 provider.auth_token_ref = pvr_token
             await session.flush()
 
-        # 6. Mark stale showtimes as CANCELLED instead of deleting to respect FK constraints
         current_pvr_ids = [st["id"] for st in pvr_showtimes]
         await session.execute(
             update(Showtime)
@@ -144,10 +141,15 @@ async def sync_production():
             .values(status="CANCELLED")
         )
 
-        # 7. Create or update showtimes linked to PVR
         synced = 0
         for st in pvr_showtimes:
             title = st["movie_title"]
+            title_clean = title.lower().strip()
+            poster_url = POSTER_MAP.get(
+                title_clean,
+                "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&auto=format&fit=crop&q=80",
+            )
+
             movie_q = await session.execute(select(Movie).where(Movie.title == title))
             movie = movie_q.scalar_one_or_none()
             if not movie:
@@ -159,16 +161,13 @@ async def sync_production():
                     certificate=st.get("certificate", "UA"),
                     status="PUBLISHED",
                     partner_id=partner_id,
-                    poster_url=(
-                        "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600&auto=format&fit=crop&q=80"
-                        if "game" in title.lower()
-                        else "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=600&auto=format&fit=crop&q=80"
-                        if "whistle" in title.lower()
-                        else "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80"
-                    ),
+                    poster_url=poster_url,
                     synopsis=f"Now showing at PVR Cinemas: {title}",
                 )
                 session.add(movie)
+                await session.flush()
+            else:
+                movie.poster_url = poster_url
                 await session.flush()
 
             starts_at_dt = datetime.fromisoformat(st["starts_at"].replace("Z", "+00:00"))
@@ -199,7 +198,7 @@ async def sync_production():
                 synced += 1
 
         await session.commit()
-        print(f"3. Successfully synced {synced} showtime(s) with live PVR backend!")
+        print(f"Synced {synced} showtime(s) with custom posters.")
 
 if __name__ == "__main__":
     asyncio.run(sync_production())
