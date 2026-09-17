@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class BookingCreateRequest(BaseModel):
+    lock_id: UUID | None = None
+    payment_id: str | None = None
     # Event Booking parameters
     event_id: UUID | None = None
     tier_id: UUID | None = None

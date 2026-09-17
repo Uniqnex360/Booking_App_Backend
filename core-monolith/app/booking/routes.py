@@ -279,12 +279,51 @@ async def reconcile(
 
 
 @router.post("/bookings", status_code=status.HTTP_201_CREATED)
-async def create_legacy_booking(
+async def create_or_confirm_booking(
     payload: BookingCreateRequest,
     current_user: AuthUserDomain = Depends(get_current_user),
     booking_service: BookingService = Depends(get_booking_service),
     movie_booking_service: MovieBookingService = Depends(get_movie_booking_service),
 ):
+    from sqlalchemy import select
+    from app.payment.models import PaymentModel
+    from app.booking.models import BookingModel
+
+    # 1. Check if this is the post-payment confirmation alias: { lock_id, payment_id }
+    if payload.lock_id and payload.payment_id:
+        session = booking_service.session
+        b = await booking_service.booking_repo.get_by_id(payload.lock_id)
+        if not b or b.user_id != current_user.id:
+            return error_response("PAYMENT_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
+            
+        if b.status != "HELD":
+            return error_response("BOOKING_NOT_PAYABLE", "Booking is not in payable state", status.HTTP_409_CONFLICT)
+
+        pay_stmt = select(PaymentModel).where(
+            PaymentModel.booking_id == payload.lock_id,
+            PaymentModel.payment_id == payload.payment_id,
+            PaymentModel.status == "CAPTURED",
+        )
+        p_row = (await session.execute(pay_stmt)).scalar_one_or_none()
+        if not p_row:
+            return error_response("PAYMENT_VERIFICATION_FAILED", "Payment not captured for this booking", status.HTTP_402_PAYMENT_REQUIRED)
+
+        confirmed_booking = await booking_service.mark_paid(payload.lock_id, payload.payment_id)
+        await session.commit()
+
+        return success_response(
+            data={
+                "id": str(confirmed_booking.id),
+                "status": confirmed_booking.status.value if hasattr(confirmed_booking.status, "value") else confirmed_booking.status,
+                "ref_code": confirmed_booking.ref_code,
+                "barcode": confirmed_booking.barcode,
+                "total_paise": confirmed_booking.total_paise,
+            },
+            message="Booking confirmed successfully",
+            code=status.HTTP_201_CREATED,
+        )
+
+    # 2. Otherwise standard booking creation
     try:
         if payload.showtime_id and payload.seat_ids:
             booking = await movie_booking_service.create_booking(
@@ -310,7 +349,9 @@ async def create_legacy_booking(
         raise HTTPException(status_code=400, detail=str(exc))
     except (ShowtimeNotFoundError, SeatNotFoundError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+
     return {"booking": {"id": str(booking.id)}}
+
 @router.patch("/bookings/{booking_id}/cancel")
 async def cancel_legacy_booking(
     booking_id: UUID,
