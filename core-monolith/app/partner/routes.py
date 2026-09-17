@@ -80,3 +80,26 @@ async def list_partners_admin(
         )
     except RepositoryError as e:
         raise PartnerRepositoryHTTP(str(e))
+
+@router.get('/revenue')
+async def get_partner_revenue(
+    from_date: Optional[str] = Query(None, description="Start date YYYY-MM-DD"),
+    to_date: Optional[str] = Query(None, description="End date YYYY-MM-DD"),
+    current_user: AuthUserDomain = Depends(get_current_user),
+    service: PartnerService = Depends(get_partner_service)
+):
+    try:
+        partner = await service.get_partner_by_user_id(current_user.id)
+        revenue = await service.get_revenue_report(
+            partner_id=partner.id,
+            from_date=from_date,
+            to_date=to_date
+        )
+        return success_response(
+            data=revenue,
+            message="Revenue report fetched successfully."
+        )
+    except EntityNotFoundError:
+        raise PartnerNotFoundHTTP()
+    except RepositoryError as e:
+        raise PartnerRepositoryHTTP(str(e))
