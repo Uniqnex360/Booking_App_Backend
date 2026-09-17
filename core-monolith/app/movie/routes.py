@@ -208,6 +208,7 @@ async def get_showtime_availability(
             available_seats=dto.available_seats,
             booked_seats=dto.booked_seats,
             blocked_seats=dto.blocked_seats,
+            locked_seats=getattr(dto, "locked_seats", 0),
         )
     except ShowtimeNotFoundError as exc:
         raise ShowtimeNotFoundHTTPError(str(exc))

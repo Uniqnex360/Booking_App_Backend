@@ -23,7 +23,15 @@ class Settings(BaseSettings):
     EMAILS_FROM: Optional[str] = None
     RESEND_API_KEY: Optional[str] = None
     RESEND_FROM_EMAIL: Optional[str] = "onboarding@resend.dev" 
+    SMTP_PASSWORD: Optional[str] = None
+    EMAILS_FROM: Optional[str] = None
     GOOGLE_PUBLIC_KEYS_URL: Optional[str] = None
+
+    # Razorpay Settings
+    RAZORPAY_ENV: str = "test"
+    RAZORPAY_KEY_ID: str = "rzp_test_VyBhZExTMTk5"
+    RAZORPAY_KEY_SECRET: str = "test_secret_placeholder"
+    RAZORPAY_WEBHOOK_SECRET: str = "whsec_test_placeholder" 
 
     class Config:
         env_file = '.env'

@@ -189,16 +189,17 @@ class SeatState(Base):
     status = Column(String, nullable=False)  
     booking_id = Column(sa.Uuid, nullable=True)
     blocked_reason = Column(String, nullable=True)
+    held_until = Column(TZDateTime, nullable=True)
     booked_at = Column(TZDateTime, nullable=False, default=utcnow)
 
     __table_args__ = (
         Index(
-            "ux_showtime_booked_seat",
+            "ux_showtime_active_seat",
             "showtime_id",
             "seat_id",
             unique=True,
-            postgresql_where=text("status = 'BOOKED'"),
-            sqlite_where=text("status = 'BOOKED'"),
+            postgresql_where=text("status IN ('BOOKED', 'LOCKED')"),
+            sqlite_where=text("status IN ('BOOKED', 'LOCKED')"),
         ),
     )
 

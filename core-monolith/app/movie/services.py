@@ -28,6 +28,10 @@ from app.movie.layout_parser import parse_text_grid
 
 class MovieService:
 
+    async def release_expired_locks(self, booking_id: UUID) -> int:
+        return await self._repo.release_expired_locks(booking_id)
+
+
     async def create_venue(
         self, *, name: str, city: str, partner_id: UUID, address: str | None = None, latitude: float | None = None, longitude: float | None = None, timezone: str = "Asia/Kolkata"
     ):

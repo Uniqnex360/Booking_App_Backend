@@ -10,6 +10,7 @@ from app.event.routes import router as event_router
 from app.admin.routes import router as admin_router
 from app.movie.routes import movie_router
 from app.booking.routes import router as booking_router
+from app.payment.routes import router as payment_router
 
 from slowapi.errors import RateLimitExceeded
 from app.auth.exceptions import (
@@ -60,6 +61,7 @@ app.include_router(user_router, prefix="/v1")
 app.include_router(partner_router, prefix="/v1")
 app.include_router(event_router, prefix="/v1")
 app.include_router(booking_router, prefix="/v1")
+app.include_router(payment_router, prefix="/v1")
 app.include_router(movie_router, prefix="/v1")
 app.include_router(admin_router, prefix="/v1")
 

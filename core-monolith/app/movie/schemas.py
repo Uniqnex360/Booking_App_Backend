@@ -92,6 +92,7 @@ class AvailabilityResponse(BaseModel):
     available_seats: int
     booked_seats: int
     blocked_seats: int
+    locked_seats: int = 0
 
 
 # ---------------------------------------------------------------------------

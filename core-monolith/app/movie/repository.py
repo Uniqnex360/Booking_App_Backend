@@ -50,6 +50,13 @@ from app.movie.models import (
 
 class MovieRepository:
 
+    async def release_expired_locks(self, booking_id: UUID) -> int:
+        stmt = delete(SeatState).where(SeatState.booking_id == booking_id, SeatState.status == "LOCKED")
+        res = await self._session.execute(stmt)
+        await self._session.commit()
+        return res.rowcount
+
+
     async def create_venue(
         self, *, name: str, city: str, partner_id: UUID, address: str | None = None, latitude: float | None = None, longitude: float | None = None, timezone: str = "Asia/Kolkata"
     ) -> Venue:
@@ -297,13 +304,25 @@ class MovieRepository:
         showtime, screen = st_row
         total_seats = screen.total_seats
 
-        states_stmt = select(SeatState.status).where(SeatState.showtime_id == showtime_id)
+        now = utcnow()
+        states_stmt = select(SeatState).where(SeatState.showtime_id == showtime_id)
         states_res = await self._session.execute(states_stmt)
-        statuses = states_res.scalars().all()
+        states = states_res.scalars().all()
 
-        booked = sum(1 for s in statuses if s == "BOOKED")
-        blocked = sum(1 for s in statuses if s == "BLOCKED")
-        available = max(0, total_seats - booked - blocked)
+        booked = 0
+        locked = 0
+        blocked = 0
+        for s in states:
+            if s.status == "BOOKED":
+                booked += 1
+            elif s.status == "BLOCKED":
+                blocked += 1
+            elif s.status == "LOCKED":
+                # Compute expiry at read time dynamically
+                if s.held_until and s.held_until > now:
+                    locked += 1
+
+        available = max(0, total_seats - booked - locked - blocked)
 
         return ShowtimeAvailabilityDTO(
             showtime_id=showtime_id,
@@ -311,11 +330,8 @@ class MovieRepository:
             available_seats=available,
             booked_seats=booked,
             blocked_seats=blocked,
+            locked_seats=locked,
         )
-
-    # -----------------------------------------------------------------------
-    # Partner Write Paths
-    # -----------------------------------------------------------------------
 
     async def create_movie(
         self,

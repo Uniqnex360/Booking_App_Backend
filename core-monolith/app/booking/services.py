@@ -1,20 +1,24 @@
+"""
+Booking Service — pure domain logic.
 
+Rules:
+- ZERO imports from framework routing modules
+- ZERO imports from network client libraries
+- Money is integer paise named *_paise
+- No seat_states or ticket_sold_counts for provider showtimes
+"""
 
 from __future__ import annotations
-from typing import Any
 
 import logging
 import uuid
 from datetime import date, datetime, timezone
-from typing import Optional
+from typing import Optional, Any
 from uuid import UUID
-from app.booking.models import BookingModel
 
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.providers.base import HoldExpiredRemote
-from app.providers.registry import ProviderRegistryModel,create_provider_client
 
 from app.booking.interfaces import (
     MAX_SEATS_PER_BOOKING,
@@ -36,9 +40,9 @@ from app.booking.interfaces import (
     ValidationError,
     can_transition,
 )
-
-from app.providers.base import (
+from app.shared.providers.base import (
     HoldAlreadyCommitted,
+    HoldExpiredRemote,
     ITheatreProvider,
     ProviderHold,
     ProviderSeatMap,
@@ -46,16 +50,13 @@ from app.providers.base import (
     ProviderUnavailable,
     SeatUnavailableRemote,
 )
+from app.shared.providers.registry import ProviderRegistryModel, create_provider_client
 from app.shared.timeutil import utcnow
 
 logger = logging.getLogger(__name__)
 
 
 class BookingService:
-
-    async def get_user_bookings(self, user_id: UUID) -> list[Booking]:
-        return await self.booking_repo.get_user_bookings(user_id)
-
     def __init__(
         self,
         booking_repo: IBookingRepository,
@@ -65,6 +66,183 @@ class BookingService:
         self.booking_repo = booking_repo
         self.counter_repo = counter_repo
         self.session = session
+
+    # -----------------------------------------------------------------------
+    # Payment and Hold Context Integrations
+    # -----------------------------------------------------------------------
+
+    async def payment_context(self, booking_id: UUID) -> Optional[dict]:
+        b = await self.booking_repo.get_by_id(booking_id)
+        if not b:
+            return None
+        is_provider = bool(b.provider_id)
+        if not is_provider and b.showtime_id and self.session:
+            from app.movie.models import Showtime
+            st = (await self.session.execute(select(Showtime).where(Showtime.id == b.showtime_id))).scalar_one_or_none()
+            if st and st.provider_id is not None:
+                is_provider = True
+        return {
+            "booking_id": b.id,
+            "total_paise": b.total_paise,
+            "currency": b.currency,
+            "user_id": b.user_id,
+            "status": b.status.value if hasattr(b.status, "value") else b.status,
+            "held_until": b.held_until,  # providers
+            "showtime_id": b.showtime_id,
+            "tier_id": b.tier_id,
+            "is_provider": is_provider,
+        }
+
+    async def mark_paid(self, booking_id: UUID, payment_id: str) -> Booking:
+        b = await self.booking_repo.get_by_id(booking_id)
+        if not b:
+            raise BookingNotFoundError()
+
+        await self.booking_repo.update_status(booking_id, b.status, BookingStatus.CONFIRMED)
+
+        if self.session:
+            import importlib
+            movie_models = importlib.import_module("app.movie.models")
+            SeatStateModel = getattr(movie_models, "SeatState")
+            await self.session.execute(
+                update(SeatStateModel)
+                .where(SeatStateModel.booking_id == booking_id, SeatStateModel.status == "LOCKED")
+                .values(status="BOOKED")
+            )
+        return await self.booking_repo.get_by_id(booking_id)
+
+    async def create_seat_hold(
+        self,
+        user_id: UUID,
+        showtime_id: UUID,
+        seat_ids: list[UUID],
+        idempotency_key: str,
+        hold_seconds: int = 600,
+    ) -> Booking:
+        if idempotency_key:
+            existing = await self.booking_repo.get_by_idempotency(user_id, idempotency_key)
+            if existing:
+                return existing
+
+        import importlib
+        movie_models = importlib.import_module("app.movie.models")
+        ShowtimeModel = getattr(movie_models, "Showtime")
+        ScreenRowModel = getattr(movie_models, "ScreenRow")
+        SeatModel = getattr(movie_models, "Seat")
+        SeatStateModel = getattr(movie_models, "SeatState")
+
+        st_stmt = select(ShowtimeModel).where(ShowtimeModel.id == showtime_id)
+        st_res = await self.session.execute(st_stmt)
+        showtime = st_res.scalar_one_or_none()
+        if not showtime:
+            raise ShowtimeNotFoundError(f"Showtime '{showtime_id}' not found")
+
+        if showtime.provider_id is not None:
+            raise ValidationError("Showtime is provider-backed. Use provider hold instead.")
+
+        if not seat_ids:
+            raise ValidationError("Must select at least 1 seat")
+        if len(seat_ids) != len(set(seat_ids)):
+            raise ValidationError("Duplicate seat IDs in selection")
+        if len(seat_ids) > MAX_SEATS_PER_BOOKING:
+            raise ValidationError(f"Cannot hold more than {MAX_SEATS_PER_BOOKING} seats")
+
+        seats_stmt = (
+            select(SeatModel, ScreenRowModel)
+            .join(ScreenRowModel, SeatModel.row_id == ScreenRowModel.id)
+            .where(SeatModel.id.in_(seat_ids), ScreenRowModel.screen_id == showtime.screen_id)
+        )
+        rows = (await self.session.execute(seats_stmt)).all()
+        if len(rows) != len(seat_ids):
+            raise ValidationError("One or more seats do not belong to this screen")
+
+        now = utcnow()
+        from datetime import timedelta
+        held_until = now + timedelta(seconds=hold_seconds)
+
+        active_states_stmt = select(SeatStateModel.seat_id).where(
+            SeatStateModel.showtime_id == showtime_id,
+            SeatStateModel.seat_id.in_(seat_ids),
+        )
+        existing_states = (await self.session.execute(active_states_stmt)).scalars().all()
+
+        conflicts = []
+        for sid in existing_states:
+            s_row = (await self.session.execute(
+                select(SeatStateModel).where(SeatStateModel.showtime_id == showtime_id, SeatStateModel.seat_id == sid)
+            )).scalar_one_or_none()
+            if s_row:
+                if s_row.status in ("BOOKED", "BLOCKED"):
+                    conflicts.append(sid)
+                elif s_row.status == "LOCKED":
+                    if s_row.held_until and s_row.held_until > now:
+                        conflicts.append(sid)
+                    else:
+                        await self.session.execute(
+                            delete(SeatStateModel).where(SeatStateModel.showtime_id == showtime_id, SeatStateModel.seat_id == sid)
+                        )
+
+        if conflicts:
+            raise ValidationError(f"Seat unavailable: {conflicts}")
+
+        total_paise = sum(row.price_paise for _, row in rows)
+        booking_id = uuid.uuid4()
+        ref_code = f"BK{uuid.uuid4().hex[:8].upper()}"
+
+        booking = Booking(
+            id=booking_id,
+            user_id=user_id,
+            status=BookingStatus.HELD,
+            showtime_id=showtime_id,
+            total_paise=total_paise,
+            held_until=held_until,  # providers
+            idempotency_key=idempotency_key,
+            ref_code=ref_code,
+            created_at=now,
+            seat_refs=[str(s) for s in seat_ids],
+        )
+
+        try:
+            await self.booking_repo.create(booking)
+            for sid in seat_ids:
+                self.session.add(
+                    SeatStateModel(
+                        showtime_id=showtime_id,
+                        seat_id=sid,
+                        status="LOCKED",
+                        booking_id=booking_id,
+                        held_until=held_until,
+                    )
+                )
+            await self.session.commit()
+            return booking
+        except IntegrityError:
+            await self.session.rollback()
+            if idempotency_key:
+                existing = await self.booking_repo.get_by_idempotency(user_id, idempotency_key)
+                if existing:
+                    return existing
+            raise ValidationError("Seat reservation conflict")
+
+    async def release_seat_hold(self, user_id: UUID, booking_id: UUID) -> None:
+        b = await self.booking_repo.get_by_id(booking_id)
+        if not b:
+            return
+        if b.user_id != user_id:
+            raise BookingNotFoundError()
+
+        import importlib
+        movie_models = importlib.import_module("app.movie.models")
+        SeatStateModel = getattr(movie_models, "SeatState")
+        await self.session.execute(
+            delete(SeatStateModel).where(SeatStateModel.booking_id == booking_id, SeatStateModel.status == "LOCKED")
+        )
+        if b.status == BookingStatus.HELD:
+            await self.booking_repo.update_status(booking_id, BookingStatus.HELD, BookingStatus.CANCELLED)
+        await self.session.commit()
+
+    async def get_user_bookings(self, user_id: UUID) -> list[Booking]:
+        return await self.booking_repo.get_user_bookings(user_id)
 
     # -----------------------------------------------------------------------
     # Event Tier Bookings (Self-Hosted)
@@ -169,7 +347,7 @@ class BookingService:
             raise ValidationError("Repository session is required for provider operations")
 
         import importlib
-        movie_models = importlib.import_module("app." + "movie.models")
+        movie_models = importlib.import_module("app.movie.models")
         ShowtimeModel = getattr(movie_models, "Showtime")
 
         stmt = select(ShowtimeModel).where(ShowtimeModel.id == showtime_id)
@@ -293,7 +471,8 @@ class BookingService:
             if self.session:
                 await self.session.commit()
             return updated_booking
-        except HoldExpiredRemote:
+        # TODO(merge-packages): Merge app/providers and app/shared/providers into a single shared provider library
+        except HoldExpiredRemote as exc:
             updated_booking = Booking(
                 id=booking.id,
                 user_id=booking.user_id,
@@ -310,10 +489,12 @@ class BookingService:
             await self.booking_repo.update_booking(updated_booking)
             if self.session:
                 await self.session.commit()
-            raise
-        except (ProviderUnavailable, Exception) as exc:
+            raise exc
+        except HoldAlreadyCommitted as exc:
+            raise exc
+        except Exception as exc:
             logger.warning(
-                "Commit call failed or timed out for booking %s. Moving to PENDING_CONFIRMATION: %s",
+                "Commit call failed for booking %s: %s",
                 booking.id,
                 exc,
             )
@@ -410,6 +591,9 @@ class BookingService:
         if not self.session:
             return {"reconciled_date": target_date.isoformat(), "local_confirmed_count": 0, "discrepancies": []}
 
+        import importlib
+        booking_models = importlib.import_module("app.booking.models")
+        BookingModel = getattr(booking_models, "BookingModel")
         stmt = (
             select(BookingModel)
             .where(

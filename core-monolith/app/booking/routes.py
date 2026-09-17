@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pydantic import BaseModel, Field
+
 from app.movie.dependencies import get_movie_service
 from app.movie.services import MovieService
 from datetime import date
@@ -420,3 +422,51 @@ async def list_my_bookings(
         data=enriched_bookings,
         message="User bookings fetched successfully",
     )
+
+
+class SelfHostedSeatHoldRequest(BaseModel):
+    showtime_id: UUID
+    seat_ids: list[UUID] = Field(min_length=1, max_length=10)
+
+@router.post("/bookings/seat-hold", status_code=status.HTTP_201_CREATED)
+async def create_self_hosted_seat_hold(
+    payload: SelfHostedSeatHoldRequest,
+    idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    current_user: AuthUserDomain = Depends(get_current_user),
+    booking_service: BookingService = Depends(get_booking_service),
+):
+    try:
+        booking = await booking_service.create_seat_hold(
+            user_id=current_user.id,
+            showtime_id=payload.showtime_id,
+            seat_ids=payload.seat_ids,
+            idempotency_key=idempotency_key,
+        )
+        return success_response(
+            data={
+                "id": str(booking.id),
+                "status": booking.status.value if hasattr(booking.status, "value") else booking.status,
+                "held_until": booking.held_until.isoformat() if booking.held_until else None,
+                "total_paise": booking.total_paise,
+                "currency": booking.currency,
+                "seats": [str(s) for s in payload.seat_ids],
+            },
+            message="Seat hold created successfully",
+            code=status.HTTP_201_CREATED,
+        )
+    except ValidationError as exc:
+        return error_response("SEAT_UNAVAILABLE", str(exc), status.HTTP_409_CONFLICT)
+    except ShowtimeNotFoundError as exc:
+        return error_response("SHOWTIME_NOT_FOUND", str(exc), status.HTTP_404_NOT_FOUND)
+
+@router.delete("/bookings/seat-hold/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_self_hosted_seat_hold(
+    booking_id: UUID,
+    current_user: AuthUserDomain = Depends(get_current_user),
+    booking_service: BookingService = Depends(get_booking_service),
+):
+    try:
+        await booking_service.release_seat_hold(current_user.id, booking_id)
+        return JSONResponse(status_code=status.HTTP_204_NO_CONTENT, content=None)
+    except BookingNotFoundError:
+        return error_response("BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
