@@ -21,6 +21,8 @@ class PaymentModel(Base):
     failure_code = Column(Text, nullable=True)
     failure_reason = Column(Text, nullable=True)
     raw_event = Column(Text, nullable=True)
+    commit_attempts = Column(Integer, nullable=False, default=0, server_default="0")
+    refund_attempts = Column(Integer, nullable=False, default=0, server_default="0")
     created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
 

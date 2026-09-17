@@ -15,7 +15,10 @@ class PaymentRepository:
     async def list_uncommitted_captured_payments(self) -> List[PaymentModel]:
         res = await self.session.execute(
             select(PaymentModel).where(
-                PaymentModel.status == PaymentStatus.CAPTURED.value,
+                PaymentModel.status.in_([
+                    PaymentStatus.CAPTURED.value,
+                    PaymentStatus.REFUND_FAILED.value,
+                ]),
                 PaymentModel.refund_id.is_(None),
             )
         )

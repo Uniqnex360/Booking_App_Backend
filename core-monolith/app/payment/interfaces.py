@@ -13,12 +13,14 @@ class PaymentStatus(str, Enum):
     FAILED = "FAILED"
     EXPIRED = "EXPIRED"
     REFUNDED = "REFUNDED"
+    REFUND_FAILED = "REFUND_FAILED"
 
 
 VALID_PAYMENT_TRANSITIONS = {
     PaymentStatus.CREATED: {PaymentStatus.VERIFIED, PaymentStatus.FAILED, PaymentStatus.EXPIRED},
     PaymentStatus.VERIFIED: {PaymentStatus.CAPTURED, PaymentStatus.FAILED},
-    PaymentStatus.CAPTURED: {PaymentStatus.REFUNDED},
+    PaymentStatus.CAPTURED: {PaymentStatus.REFUNDED, PaymentStatus.REFUND_FAILED},
+    PaymentStatus.REFUND_FAILED: {PaymentStatus.REFUNDED, PaymentStatus.REFUND_FAILED},
     PaymentStatus.FAILED: set(),
     PaymentStatus.EXPIRED: set(),
     PaymentStatus.REFUNDED: set(),
@@ -60,6 +62,11 @@ class PaymentNotRequired(DomainError):
 
 class PaymentNotAvailableHere(DomainError):
     code = "PAYMENT_NOT_AVAILABLE_HERE"
+
+class MissingPaymentIdError(DomainError):
+    def __init__(self, payment_id: str):
+        super().__init__(f"Payment row {payment_id} is CAPTURED with no gateway payment_id; refund refused")
+
 
 class IllegalPaymentTransition(DomainError):
     code = "ILLEGAL_PAYMENT_TRANSITION"

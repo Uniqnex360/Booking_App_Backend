@@ -253,7 +253,7 @@ class PaymentService:
     async def recovery_task(self) -> dict[str, int]:
         now = utcnow()
         cutoff = now - timedelta(seconds=PAYMENT_WINDOW_SECONDS + 60)
-        
+
         # 1. Handle stale CREATED payments
         stale_payments = await self.payment_repo.list_stale_created_payments(cutoff)
         expired_count = 0
@@ -262,10 +262,10 @@ class PaymentService:
             # Delegate release of locked seats cleanly to movie service
             if self.movie_service:
                 await self.movie_service.release_expired_locks(p.booking_id)
-            # Flip booking from HELD -> EXPIRED
+            # Flip booking from HELD -> EXPIRED (transition rule stays inside Booking)
             ctx = await self.booking_service.payment_context(p.booking_id)
             if ctx and ctx["status"] == "HELD":
-                await self.booking_service.booking_repo.update_status(p.booking_id, BookingStatus.HELD, BookingStatus.EXPIRED)
+                await self.booking_service.mark_expired(p.booking_id)
             expired_count += 1
 
         # 2. Handle CAPTURED payments whose booking commit failed (H24)
@@ -273,18 +273,61 @@ class PaymentService:
         refunded_count = 0
         for p in uncommitted_payments:
             ctx = await self.booking_service.payment_context(p.booking_id)
-            if ctx and ctx["status"] != "CONFIRMED":
-                try:
-                    refund_id = await gateway_refund(payment_id=p.payment_id or "pay_default", amount_paise=p.amount_paise)
-                    await self.payment_repo.update_status(
-                        p.id,
-                        PaymentStatus.REFUNDED,
-                        refund_id=refund_id,
-                    )
-                    await self.booking_service.booking_repo.update_status(p.booking_id, BookingStatus(ctx["status"]), BookingStatus.CANCELLED)
-                    refunded_count += 1
-                except Exception as e:
-                    logger.error("Failed to refund captured payment %s: %s", p.id, e)
+            if not ctx:
+                logger.critical(
+                    "PAYMENT_RECOVERY_ORPHAN: payment %s references missing booking %s",
+                    p.id, p.booking_id,
+                )
+                continue
+
+            if ctx["status"] == "CONFIRMED":
+                # A prior sweep's retry already committed this booking. Nothing to do.
+                continue
+
+            # DEFECT 1: retry the commit through Booking's own path before ever
+            # considering a refund. Only after 3 failed attempts do we give up.
+            try:
+                await self.booking_service.mark_paid(p.booking_id, p.payment_id)
+                continue
+            except Exception:
+                p.commit_attempts += 1
+
+            if p.commit_attempts < 3:
+                continue
+
+            # DEFECT 2: refund is keyed on payment_id. A CAPTURED row with no
+            # payment_id must never be refund-blind - no fabricated fallback.
+            if not p.payment_id:
+                logger.critical(
+                    "PAYMENT_RECOVERY_MISSING_PAYMENT_ID: payment %s is CAPTURED "
+                    "with commit_attempts=%s but has no gateway payment_id; "
+                    "refund refused, needs manual intervention",
+                    p.id, p.commit_attempts,
+                )
+                p.status = PaymentStatus.REFUND_FAILED.value
+                p.refund_attempts += 1
+                continue
+
+            try:
+                refund_id = await gateway_refund(payment_id=p.payment_id, amount_paise=p.amount_paise)
+                await self.payment_repo.update_status(
+                    p.id,
+                    PaymentStatus.REFUNDED,
+                    refund_id=refund_id,
+                )
+                # DEFECT 3: never touch booking_repo directly. Booking exposes
+                # the one method that performs this transition.
+                await self.booking_service.force_cancel_after_refund(p.booking_id, p.payment_id)
+                refunded_count += 1
+            except Exception as e:
+                # DEFECT 4: terminal-but-retryable state, never raise out of the
+                # sweep (one poison row must not stop the rest), alertable log.
+                p.status = PaymentStatus.REFUND_FAILED.value
+                p.refund_attempts += 1
+                logger.critical(
+                    "PAYMENT_RECOVERY_REFUND_FAILED: payment %s refund attempt %s failed: %s",
+                    p.id, p.refund_attempts, e,
+                )
 
         await self.session.commit()
         return {"expired_payments": expired_count, "refunded_payments": refunded_count}

@@ -322,16 +322,23 @@ async def test_h24_captured_but_commit_fails_refunds_exactly_once(session: Async
     movie_service = MovieService(MovieRepository(session))
     payment_service = PaymentService(PaymentRepository(session), booking_service, session, movie_service)
 
+    # Simulate a commit that never succeeds, so the retry-then-refund path
+    # under test actually exercises the "3 attempts, then refund" rule.
+    async def failing_mark_paid(booking_id, payment_id):
+        raise RuntimeError("simulated commit failure")
+
+    monkeypatch.setattr(booking_service, "mark_paid", failing_mark_paid)
+
     # Run recovery task 3 times
     res1 = await payment_service.recovery_task()
     res2 = await payment_service.recovery_task()
     res3 = await payment_service.recovery_task()
 
-    # Assert exactly ONE refund call across ALL runs
+    # Assert exactly ONE refund call across ALL runs, and not before attempt 3
     assert refund_call_count == 1
-    assert res1["refunded_payments"] == 1
+    assert res1["refunded_payments"] == 0
     assert res2["refunded_payments"] == 0
-    assert res3["refunded_payments"] == 0
+    assert res3["refunded_payments"] == 1
 
     p_updated = (await session.execute(select(PaymentModel).where(PaymentModel.id == p.id))).scalar_one()
     assert p_updated.status == "REFUNDED"
@@ -386,3 +393,116 @@ async def test_h24b_release_expired_locks_filter(session: AsyncSession):
         select(func.count(SeatState.seat_id)).where(SeatState.booking_id == booking_id, SeatState.status == "BOOKED")
     )).scalar()
     assert b_count == 1
+
+
+# ---------------------------------------------------------------------------
+# H25: commit failure is retried up to 3 times before any refund fires.
+# Fails if reverted to refund-on-first-failure behavior.
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_h27_commit_retried_up_to_three_times_before_refund(session: AsyncSession, monkeypatch):
+    data = await _seed_self_hosted_data(session)
+
+    b = BookingModel(id=uuid.uuid4(), user_id=data["user"].id, booking_type="MOVIE", showtime_id=data["showtime"].id, total_paise=25000, status="HELD")
+    session.add(b)
+    await session.flush()
+    p = PaymentModel(id=uuid.uuid4(), booking_id=b.id, order_id="order_h25", payment_id="pay_h25", amount_paise=25000, status="CAPTURED")
+    session.add(p)
+    await session.commit()
+
+    refund_call_count = 0
+    async def mock_refund(payment_id: str, amount_paise: int) -> str:
+        nonlocal refund_call_count
+        refund_call_count += 1
+        return f"rfnd25_{refund_call_count}"
+    monkeypatch.setattr("app.payment.services.gateway_refund", mock_refund)
+
+    from app.booking.repository import BookingRepository, TierCounterRepository
+    booking_service = BookingService(BookingRepository(session), TierCounterRepository(session), session)
+    from app.movie.repository import MovieRepository
+    from app.movie.services import MovieService
+    movie_service = MovieService(MovieRepository(session))
+    payment_service = PaymentService(PaymentRepository(session), booking_service, session, movie_service)
+
+    mark_paid_calls = 0
+    async def failing_mark_paid(booking_id, payment_id):
+        nonlocal mark_paid_calls
+        mark_paid_calls += 1
+        raise RuntimeError("simulated commit failure")
+    monkeypatch.setattr(booking_service, "mark_paid", failing_mark_paid)
+
+    res1 = await payment_service.recovery_task()
+    assert mark_paid_calls == 1
+    assert res1["refunded_payments"] == 0
+    assert refund_call_count == 0
+
+    res2 = await payment_service.recovery_task()
+    assert mark_paid_calls == 2
+    assert res2["refunded_payments"] == 0
+    assert refund_call_count == 0
+
+    res3 = await payment_service.recovery_task()
+    assert mark_paid_calls == 3
+    assert res3["refunded_payments"] == 1
+    assert refund_call_count == 1
+
+    p_updated = (await session.execute(select(PaymentModel).where(PaymentModel.id == p.id))).scalar_one()
+    assert p_updated.status == "REFUNDED"
+    assert p_updated.commit_attempts == 3
+
+
+# ---------------------------------------------------------------------------
+# H26: commit succeeds on the second retry -> booking CONFIRMED, no refund,
+# never enters CANCELLED. Fails if refund fires before retrying the commit.
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_h28_commit_succeeds_on_second_retry_no_refund(session: AsyncSession, monkeypatch):
+    data = await _seed_self_hosted_data(session)
+
+    b = BookingModel(id=uuid.uuid4(), user_id=data["user"].id, booking_type="MOVIE", showtime_id=data["showtime"].id, total_paise=25000, status="HELD")
+    session.add(b)
+    await session.flush()
+    p = PaymentModel(id=uuid.uuid4(), booking_id=b.id, order_id="order_h26", payment_id="pay_h26", amount_paise=25000, status="CAPTURED")
+    session.add(p)
+    await session.commit()
+
+    refund_call_count = 0
+    async def mock_refund(payment_id: str, amount_paise: int) -> str:
+        nonlocal refund_call_count
+        refund_call_count += 1
+        return f"rfnd26_{refund_call_count}"
+    monkeypatch.setattr("app.payment.services.gateway_refund", mock_refund)
+
+    from app.booking.repository import BookingRepository, TierCounterRepository
+    booking_service = BookingService(BookingRepository(session), TierCounterRepository(session), session)
+    from app.movie.repository import MovieRepository
+    from app.movie.services import MovieService
+    movie_service = MovieService(MovieRepository(session))
+    payment_service = PaymentService(PaymentRepository(session), booking_service, session, movie_service)
+
+    real_mark_paid = booking_service.mark_paid
+    call_count = 0
+    async def flaky_mark_paid(booking_id, payment_id):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise RuntimeError("simulated transient commit failure")
+        return await real_mark_paid(booking_id, payment_id)
+    monkeypatch.setattr(booking_service, "mark_paid", flaky_mark_paid)
+
+    res1 = await payment_service.recovery_task()
+    assert res1["refunded_payments"] == 0
+    assert call_count == 1
+
+    res2 = await payment_service.recovery_task()
+    assert res2["refunded_payments"] == 0
+    assert call_count == 2
+
+    assert refund_call_count == 0
+
+    b_updated = (await session.execute(select(BookingModel).where(BookingModel.id == b.id))).scalar_one()
+    assert b_updated.status == "CONFIRMED"
+
+    p_updated = (await session.execute(select(PaymentModel).where(PaymentModel.id == p.id))).scalar_one()
+    assert p_updated.status == "CAPTURED"
+    assert p_updated.refund_id is None

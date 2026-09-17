@@ -111,6 +111,35 @@ class BookingService:
             )
         return await self.booking_repo.get_by_id(booking_id)
 
+    async def force_cancel_after_refund(self, booking_id: UUID, payment_id: str) -> Booking:
+        """Called only by Payment after a refund has been issued at the gateway.
+        The CONFIRMED/CANCELLED transition rule stays here, inside Booking."""
+        b = await self.booking_repo.get_by_id(booking_id)
+        if not b:
+            raise BookingNotFoundError()
+
+        await self.booking_repo.update_status(booking_id, b.status, BookingStatus.CANCELLED)
+
+        if self.session and b.showtime_id:
+            import importlib
+            movie_models = importlib.import_module("app.movie.models")
+            SeatStateModel = getattr(movie_models, "SeatState")
+            await self.session.execute(
+                delete(SeatStateModel).where(SeatStateModel.booking_id == booking_id)
+            )
+            await self.session.commit()
+
+        return await self.booking_repo.get_by_id(booking_id)
+
+    async def mark_expired(self, booking_id: UUID) -> Booking:
+        """Called only by Payment's recovery sweep for a stale HELD booking.
+        The transition rule stays here, inside Booking."""
+        b = await self.booking_repo.get_by_id(booking_id)
+        if not b:
+            raise BookingNotFoundError()
+        await self.booking_repo.update_status(booking_id, b.status, BookingStatus.EXPIRED)
+        return await self.booking_repo.get_by_id(booking_id)
+
     async def create_seat_hold(
         self,
         user_id: UUID,
