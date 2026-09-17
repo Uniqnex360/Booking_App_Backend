@@ -95,12 +95,17 @@ def verify_webhook_signature(body: bytes, signature: str) -> bool:
     ).hexdigest()
     return hmac.compare_digest(expected, signature)
 
-async def refund(payment_id: str, amount_paise: int) -> str:
+async def refund(payment_id: str, amount_paise: int, idempotency_key: str) -> str:
+    """idempotency_key must be stable and deterministic per payment row (e.g. the
+    payment's own UUID), never a fresh value per call. If the DB write after a
+    successful refund crashes, the next sweep resends the SAME key and Razorpay
+    returns the original refund instead of issuing a second one."""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
                 f"https://api.razorpay.com/v1/payments/{payment_id}/refund",
                 json={"amount": amount_paise},
+                headers={"X-Razorpay-Idempotency": idempotency_key},
                 auth=(_get_key_id(), _get_key_secret()),
             )
             if resp.status_code not in (200, 201):

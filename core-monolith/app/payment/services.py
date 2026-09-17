@@ -309,7 +309,7 @@ class PaymentService:
                 continue
 
             try:
-                refund_id = await gateway_refund(payment_id=p.payment_id, amount_paise=p.amount_paise)
+                refund_id = await gateway_refund(payment_id=p.payment_id, amount_paise=p.amount_paise, idempotency_key=str(p.id))
                 await self.payment_repo.update_status(
                     p.id,
                     PaymentStatus.REFUNDED,

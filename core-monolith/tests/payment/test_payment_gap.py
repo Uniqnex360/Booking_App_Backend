@@ -271,7 +271,7 @@ async def test_h23_stale_created_expires_and_frees_seats(session: AsyncSession, 
 
     # Stub refund tracking
     refund_called = 0
-    async def mock_refund(payment_id, amount_paise):
+    async def mock_refund(payment_id, amount_paise, idempotency_key=None):
         nonlocal refund_called
         refund_called += 1
         return "rfnd_fake"
@@ -308,7 +308,7 @@ async def test_h24_captured_but_commit_fails_refunds_exactly_once(session: Async
     await session.commit()
 
     refund_call_count = 0
-    async def mock_refund(payment_id: str, amount_paise: int) -> str:
+    async def mock_refund(payment_id: str, amount_paise: int, idempotency_key: str = None) -> str:
         nonlocal refund_call_count
         refund_call_count += 1
         return f"rfnd_{refund_call_count}"
@@ -411,7 +411,7 @@ async def test_h27_commit_retried_up_to_three_times_before_refund(session: Async
     await session.commit()
 
     refund_call_count = 0
-    async def mock_refund(payment_id: str, amount_paise: int) -> str:
+    async def mock_refund(payment_id: str, amount_paise: int, idempotency_key: str = None) -> str:
         nonlocal refund_call_count
         refund_call_count += 1
         return f"rfnd25_{refund_call_count}"
@@ -467,7 +467,7 @@ async def test_h28_commit_succeeds_on_second_retry_no_refund(session: AsyncSessi
     await session.commit()
 
     refund_call_count = 0
-    async def mock_refund(payment_id: str, amount_paise: int) -> str:
+    async def mock_refund(payment_id: str, amount_paise: int, idempotency_key: str = None) -> str:
         nonlocal refund_call_count
         refund_call_count += 1
         return f"rfnd26_{refund_call_count}"
