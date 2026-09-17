@@ -94,7 +94,7 @@ class PartnerService:
             logger = logging.getLogger(__name__)
 
             try:
-                session = self.partner_repo.session
+                session = self.partner_repo.db
 
                 # 1. Find all event IDs owned by this partner
                 event_ids_stmt = select(EventORM.id).where(EventORM.partner_id == partner_id)
