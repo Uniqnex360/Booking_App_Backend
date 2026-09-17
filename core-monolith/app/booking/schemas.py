@@ -1,3 +1,4 @@
+"""Pydantic schemas for the Booking Module."""
 
 from __future__ import annotations
 
@@ -7,12 +8,14 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class BookingCreateRequest(BaseModel):
+    # Payment confirmation alias parameters
     lock_id: UUID | None = None
     payment_id: str | None = None
+
     # Event Booking parameters
     event_id: UUID | None = None
     tier_id: UUID | None = None
-    quantity: int | None = Field(default=None, ge=1, le=10)
+    quantity: int | None = Field(default=None, ge=1, le=20)
 
     # Movie Booking parameters
     showtime_id: UUID | None = None
@@ -23,12 +26,15 @@ class BookingCreateRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_booking_type(self) -> BookingCreateRequest:
-        is_event = self.event_id is not None and self.tier_id is not None and self.quantity is not None
+        if self.lock_id and self.payment_id:
+            return self
+
+        is_event = self.tier_id is not None and self.quantity is not None
         is_movie = self.showtime_id is not None and self.seat_ids is not None and len(self.seat_ids) > 0
 
         if not is_event and not is_movie:
             raise ValueError(
-                "Must provide either Event parameters (event_id, tier_id, quantity) "
+                "Must provide either Event parameters (tier_id, quantity) "
                 "or Movie parameters (showtime_id, seat_ids)."
             )
         if is_event and is_movie:
