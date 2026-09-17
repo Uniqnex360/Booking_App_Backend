@@ -1,3 +1,5 @@
+import httpx
+from httpx import Response, MockTransport
 """
 Missing Payment Tests Gap Suite.
 Contains the 7 missing tests: H2b, H6, H8, H14, H17, H23, H24.
@@ -400,7 +402,7 @@ async def test_h24b_release_expired_locks_filter(session: AsyncSession):
 # Fails if reverted to refund-on-first-failure behavior.
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_h27_commit_retried_up_to_three_times_before_refund(session: AsyncSession, monkeypatch):
+async def test_h24b_commit_retried_three_times_before_refund(session: AsyncSession, monkeypatch):
     data = await _seed_self_hosted_data(session)
 
     b = BookingModel(id=uuid.uuid4(), user_id=data["user"].id, booking_type="MOVIE", showtime_id=data["showtime"].id, total_paise=25000, status="HELD")
@@ -506,3 +508,33 @@ async def test_h28_commit_succeeds_on_second_retry_no_refund(session: AsyncSessi
     p_updated = (await session.execute(select(PaymentModel).where(PaymentModel.id == p.id))).scalar_one()
     assert p_updated.status == "CAPTURED"
     assert p_updated.refund_id is None
+
+
+# ---------------------------------------------------------------------------
+# H29: Refund carries correct X-Refund-Idempotency header
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_h29_refund_carries_idempotency_header(monkeypatch):
+    captured_headers = {}
+
+    def mock_handler(request: httpx.Request):
+        if "refund" in request.url.path:
+            nonlocal captured_headers
+            captured_headers = dict(request.headers)
+            return Response(200, json={"id": "rfnd_test_h29"})
+        return Response(404)
+
+    mock_client = httpx.AsyncClient(transport=MockTransport(mock_handler))
+    monkeypatch.setattr("app.payment.gateway.httpx.AsyncClient", lambda **kwargs: mock_client)
+
+    from app.payment.gateway import refund as gateway_refund
+    idem_key = uuid.uuid4().hex  # 32-char hex string
+    refund_id = await gateway_refund(payment_id="pay_test_h29", amount_paise=1000, idempotency_key=idem_key)
+
+    assert refund_id == "rfnd_test_h29"
+    # Assert header presence
+    assert "x-refund-idempotency" in captured_headers
+    val = captured_headers["x-refund-idempotency"]
+    assert val == idem_key
+    assert len(val) == 32
+    assert val.isalnum()
