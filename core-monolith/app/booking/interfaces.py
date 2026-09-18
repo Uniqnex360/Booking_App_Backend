@@ -110,6 +110,10 @@ class IBookingRepository(ABC):
     @abstractmethod
     async def get_by_idempotency(self, user_id: UUID, key: str) -> Optional[Booking]: ...
     @abstractmethod
+    async def get_booking_with_context(
+        self, booking_id: UUID
+    ) -> Optional[tuple[Booking, Optional[dict]]]: ...
+    @abstractmethod
     async def create(self, booking: Booking) -> Booking: ...
     @abstractmethod
     async def update_status(

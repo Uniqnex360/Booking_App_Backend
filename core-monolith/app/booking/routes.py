@@ -6,6 +6,7 @@ from app.movie.dependencies import get_movie_service
 from app.movie.services import MovieService
 from datetime import date
 from uuid import UUID
+from app.booking.schemas import BookingDetailResponse 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from app.auth.dependencies import get_current_user
@@ -144,33 +145,51 @@ async def delete_provider_hold(
         return error_response("BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
     except IllegalBookingTransition as exc:
         return error_response("ILLEGAL_BOOKING_TRANSITION", str(exc), status.HTTP_409_CONFLICT)
-@router.get("/bookings/{booking_id}", status_code=status.HTTP_200_OK)
+    
+# @router.get("/bookings/{booking_id}", status_code=status.HTTP_200_OK)
+# async def get_booking_details(
+#     booking_id: UUID,
+#     current_user: AuthUserDomain = Depends(get_current_user),
+#     booking_service: BookingService = Depends(get_booking_service),
+# ):
+#     try:
+#         booking = await booking_service.get_booking_for_user(
+#             user_id=current_user.id, booking_id=booking_id
+#         )
+#         return success_response(
+#             data={
+#                 "id": str(booking.id),
+#                 "status": booking.status.value,
+#                 "total_paise": booking.total_paise,
+#                 "currency": booking.currency,
+#                 "ref_code": booking.ref_code,
+#                 "barcode": booking.barcode,
+#                 "held_until": booking.held_until.isoformat() if booking.held_until else None,
+#                 "created_at": booking.created_at.isoformat() if booking.created_at else None,
+#             },
+#             message="Booking fetched successfully",
+#         )
+#     except BookingNotFoundError:
+#         return error_response("BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
+
+@router.get(
+    "/bookings/{booking_id}",
+    response_model=BookingDetailResponse,
+    status_code=status.HTTP_200_OK,
+)
 async def get_booking_details(
     booking_id: UUID,
     current_user: AuthUserDomain = Depends(get_current_user),
     booking_service: BookingService = Depends(get_booking_service),
 ):
     try:
-        booking = await booking_service.get_booking_for_user(
-            user_id=current_user.id, booking_id=booking_id
+        detail = await booking_service.get_booking_detail(
+            user_id=current_user.id,
+            booking_id=booking_id,
         )
-        return success_response(
-            data={
-                "id": str(booking.id),
-                "status": booking.status.value,
-                "total_paise": booking.total_paise,
-                "currency": booking.currency,
-                "ref_code": booking.ref_code,
-                "barcode": booking.barcode,
-                "held_until": booking.held_until.isoformat() if booking.held_until else None,
-                "created_at": booking.created_at.isoformat() if booking.created_at else None,
-            },
-            message="Booking fetched successfully",
-        )
+        return detail
     except BookingNotFoundError:
         return error_response("BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
-
-
 
 @router.get("/showtimes/{showtime_id}/seat-map", status_code=status.HTTP_200_OK)
 async def get_showtime_seat_map(

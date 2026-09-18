@@ -70,3 +70,108 @@ class BookingResponse(BaseModel):
     held_until: datetime | None = None
     provider_booking_id: str | None = None
     seats: list[str] | None = None
+from typing import Literal
+from pydantic import BaseModel
+
+class BaseBookingDetail(BaseModel):
+    type: str
+    id: UUID
+    status: str
+    total_paise: int
+    currency: str
+    ref_code: str | None = None
+    barcode: str | None = None
+    created_at: datetime | None = None
+
+    @classmethod
+    def from_domain(cls, b) -> "BaseBookingDetail":
+        return cls(
+            type="MOVIE" if b.showtime_id else ("EVENT" if b.event_id else "UNKNOWN"),
+            id=b.id,
+            status=b.status.value if hasattr(b.status, "value") else b.status,
+            total_paise=b.total_paise,
+            currency=b.currency,
+            ref_code=b.ref_code,
+            barcode=b.barcode,
+            created_at=b.created_at,
+        )
+
+
+class MovieBookingDetail(BaseBookingDetail):
+    type: Literal["MOVIE"] = "MOVIE"
+    movie_title: str
+    poster_url: str | None = None
+    certificate: str | None = None
+    duration_min: int | None = None
+    language: str | None = None
+    format: str | None = None
+    starts_at: datetime | None = None
+    screen_name: str | None = None
+    cinema_name: str | None = None
+    cinema_city: str | None = None
+    cinema_address: str | None = None
+    seat_codes: list[str] | None = None
+    quantity: int
+    unit_price_paise: int | None = None
+
+    @classmethod
+    def from_context(cls, b, ctx) -> "MovieBookingDetail":
+        st, movie, screen, venue = ctx["showtime"], ctx["movie"], ctx["screen"], ctx["venue"]
+        seats = b.seat_refs or []
+        base = BaseBookingDetail.from_domain(b).model_dump()
+        return cls(
+            **base,
+            movie_title=movie.title,
+            poster_url=movie.poster_url,
+            certificate=movie.certificate,
+            duration_min=movie.duration_min,
+            language=st.language or movie.language,
+            format=st.format,
+            starts_at=st.starts_at,
+            screen_name=screen.name if screen else None,
+            cinema_name=venue.name if venue else None,
+            cinema_city=venue.city if venue else None,
+            cinema_address=venue.address if venue else None,
+            seat_codes=seats or None,
+            quantity=b.quantity or len(seats) or 1,
+            unit_price_paise=b.unit_price_paise,
+        )
+
+
+class EventBookingDetail(BaseBookingDetail):
+    type: Literal["EVENT"] = "EVENT"
+    title: str
+    poster_url: str | None = None
+    category: str | None = None
+    age_restriction: str | None = None
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    venue_name: str | None = None
+    venue_address: str | None = None
+    city: str | None = None
+    tier_name: str | None = None
+    tier_price_paise: int | None = None
+    quantity: int
+
+    @classmethod
+    def from_context(cls, b, ctx) -> "EventBookingDetail":
+        event, tier = ctx["event"], ctx["tier"]
+        base = BaseBookingDetail.from_domain(b).model_dump()
+        return cls(
+            **base,
+            title=event.title,
+            poster_url=event.poster_image_url,
+            category=event.category,
+            age_restriction=event.age_restriction,
+            starts_at=event.starts_at,
+            ends_at=event.ends_at,
+            venue_name=event.venue_name,
+            venue_address=event.venue_address,
+            city=event.city,
+            tier_name=tier.name if tier else None,
+            tier_price_paise=tier.price_paise if tier else None,
+            quantity=b.quantity or 1,
+        )
+
+
+BookingDetailResponse = MovieBookingDetail | EventBookingDetail | BaseBookingDetail
