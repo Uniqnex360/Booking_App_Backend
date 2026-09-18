@@ -371,6 +371,7 @@ class MovieRepository:
             certificate=movie.certificate,
             release_date=movie.release_date,
             poster_url=movie.poster_url,
+            genre=movie.genre,
             status=movie.status,
         )
 
@@ -401,6 +402,7 @@ class MovieRepository:
             certificate=movie.certificate,
             release_date=movie.release_date,
             poster_url=movie.poster_url,
+            genre=movie.genre,
             status=movie.status,
         )
 
@@ -422,6 +424,7 @@ class MovieRepository:
             original_title=movie.original_title,
             language=movie.language,
             duration_min=movie.duration_min,
+            genre=movie.genre,
             certificate=movie.certificate,
             release_date=movie.release_date,
             poster_url=movie.poster_url,
