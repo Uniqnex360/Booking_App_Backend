@@ -5,7 +5,7 @@ import uuid
 import httpx
 from datetime import datetime
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime,timezone
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -206,7 +206,10 @@ async def sync_production():
                 await session.flush()
             else:
                 movie.poster_url = poster_url
-                genre=st.get("genre")
+                movie.genre = st.get("genre") 
+                release_year = st.get("release_year")
+                if release_year:
+                    movie.release_date = datetime(release_year, 1, 1, tzinfo=timezone.utc)
                 await session.flush()
 
             cinema_name = st.get("cinema_name") or "Unknown Cinema"
