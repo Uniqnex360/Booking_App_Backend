@@ -409,22 +409,38 @@ async def list_my_bookings(
 
     enriched_bookings = []
     for b, st, movie, screen, venue, event, tier in rows:
-        # Determine Title, Venue, Location, Image, and Date
         if movie:
             title = movie.title
             venue_name = f"{venue.name} • {screen.name}" if (venue and screen) else (venue.name if venue else "Cinema Hall")
             location = venue.city if venue else "Kochi"
             image_url = movie.poster_url or "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80"
             booking_date = st.starts_at.isoformat() if st else b.created_at.isoformat()
-            
-            # Count seats from seat_refs_json or default 1
-            seat_count = 1
+
+            # Seat refs → codes list
+            seat_codes: list[str] = []
             if b.seat_refs_json:
                 try:
-                    seat_count = len(json.loads(b.seat_refs_json))
-                except Exception:
-                    seat_count = 1
-            guests = seat_count
+                    parsed = json.loads(b.seat_refs_json)
+                    if isinstance(parsed, list):
+                        seat_codes = [str(x) for x in parsed]
+                except (json.JSONDecodeError, TypeError):
+                    seat_codes = []
+            guests = len(seat_codes) if seat_codes else 1
+
+            extra = {
+                "movie_title": movie.title,
+                "poster_url": movie.poster_url,
+                "language": st.language if st else movie.language,
+                "format": st.format if st else None,
+                "certificate": movie.certificate,
+                "duration_min": movie.duration_min,
+                "starts_at": st.starts_at.isoformat() if st else None,
+                "screen_name": screen.name if screen else None,
+                "cinema_name": venue.name if venue else None,
+                "cinema_city": venue.city if venue else None,
+                "cinema_address": venue.address if venue else None,
+                "seat_codes": seat_codes or None,
+            }
         elif event:
             title = event.title
             venue_name = event.venue_name or "Event Venue"
@@ -441,8 +457,7 @@ async def list_my_bookings(
             guests = 1
 
         total_rupees = b.total_paise // 100
-
-        enriched_bookings.append({
+        row = {
             "id": str(b.id),
             "user_id": str(b.user_id),
             "type": b.booking_type or ("MOVIE" if b.showtime_id else "EVENT"),
@@ -457,7 +472,28 @@ async def list_my_bookings(
             "ref_code": b.ref_code,
             "barcode": b.barcode,
             "created_at": b.created_at.isoformat() if b.created_at else None,
-        })
+        }
+
+        if movie:
+            row.update(extra)
+
+        enriched_bookings.append(row)
+        # enriched_bookings.append({
+        #     "id": str(b.id),
+        #     "user_id": str(b.user_id),
+        #     "type": b.booking_type or ("MOVIE" if b.showtime_id else "EVENT"),
+        #     "title": title,
+        #     "venue": venue_name,
+        #     "location": location,
+        #     "booking_date": booking_date,
+        #     "guests": guests,
+        #     "total_price": total_rupees,
+        #     "status": b.status,
+        #     "image_url": image_url,
+        #     "ref_code": b.ref_code,
+        #     "barcode": b.barcode,
+        #     "created_at": b.created_at.isoformat() if b.created_at else None,
+        # })
 
     return success_response(
         data=enriched_bookings,
