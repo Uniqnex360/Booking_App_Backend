@@ -51,7 +51,7 @@ class MovieSummaryDTO:
     release_date: datetime | None
     poster_url: str | None
     status: str
-    genre: str | None  
+    genre: str | None = None    
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,8 +87,9 @@ class MovieDetailsDTO:
     trailer_url: str | None
     synopsis: str | None
     status: str
-    genre: str | None         
     venues: list[VenueShowtimesDTO]
+    genre: str | None = None   
+    
 
 
 @dataclass(frozen=True, slots=True)
