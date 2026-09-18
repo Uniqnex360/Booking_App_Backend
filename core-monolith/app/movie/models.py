@@ -137,6 +137,7 @@ class Movie(Base):
     poster_url = Column(Text, nullable=True)
     trailer_url = Column(Text, nullable=True)
     synopsis = Column(Text, nullable=True)
+    genre = Column(String(120), nullable=True)    
     status = Column(
         String,
         nullable=False,

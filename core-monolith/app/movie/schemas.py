@@ -21,6 +21,7 @@ class MovieSummaryResponse(BaseModel):
     release_date: datetime | None = None
     poster_url: str | None = None
     status: str
+    genre: str | None = None
 
 
 class ShowtimeSlotResponse(BaseModel):
@@ -54,6 +55,7 @@ class MovieDetailsResponse(BaseModel):
     synopsis: str | None = None
     status: str
     venues: list[VenueShowtimesResponse]
+    genre: str | None = None
 
 
 class SeatProjectionResponse(BaseModel):

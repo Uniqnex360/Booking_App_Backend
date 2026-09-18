@@ -5,6 +5,7 @@ import uuid
 import httpx
 from datetime import datetime
 from pathlib import Path
+from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -183,6 +184,11 @@ async def sync_production():
             movie_q = await session.execute(select(Movie).where(Movie.title == title))
             movie = movie_q.scalar_one_or_none()
             if not movie:
+                release_year = st.get("release_year")
+                release_date = (
+                    datetime(release_year, 1, 1, tzinfo=timezone.utc)
+                    if release_year else None
+                )
                 movie = Movie(
                     id=uuid.uuid4(),
                     title=title,
@@ -192,12 +198,15 @@ async def sync_production():
                     status="PUBLISHED",
                     partner_id=partner_id,
                     poster_url=poster_url,
+                    release_date=release_date, 
+                    genre=st.get("genre"),  
                     synopsis=f"Now showing at PVR Cinemas: {title}",
                 )
                 session.add(movie)
                 await session.flush()
             else:
                 movie.poster_url = poster_url
+                genre=st.get("genre")
                 await session.flush()
 
             cinema_name = st.get("cinema_name") or "Unknown Cinema"
