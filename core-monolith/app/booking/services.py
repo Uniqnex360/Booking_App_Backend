@@ -1,12 +1,3 @@
-"""
-Booking Service — pure domain logic.
-
-Rules:
-- ZERO imports from framework routing modules
-- ZERO imports from network client libraries
-- Money is integer paise named *_paise
-- No seat_states or ticket_sold_counts for provider showtimes
-"""
 
 from __future__ import annotations
 
@@ -15,6 +6,7 @@ import uuid
 from datetime import date, datetime, timezone
 from typing import Optional, Any
 from uuid import UUID
+from app.booking.schemas import BaseBookingDetail,EventBookingDetail,MovieBookingDetail
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
@@ -70,7 +62,31 @@ class BookingService:
     # -----------------------------------------------------------------------
     # Payment and Hold Context Integrations
     # -----------------------------------------------------------------------
+    async def get_booking_detail(self, user_id: UUID, booking_id: UUID):
+        """
+        Return the enriched booking detail for a user, or raise BookingNotFoundError.
+        Delegates joins to the repository; builds the typed response DTO here.
+        """
+        result = await self.booking_repo.get_booking_with_context(booking_id)
+        if not result:
+            raise BookingNotFoundError()
 
+        booking, context = result
+
+        # Ownership check — must be here, not in the router
+        if booking.user_id != user_id:
+            raise BookingNotFoundError()
+
+        if context is None:
+            return BaseBookingDetail.from_domain(booking)
+
+        kind = context.get("kind")
+        if kind == "MOVIE":
+            return MovieBookingDetail.from_context(booking, context)
+        if kind == "EVENT":
+            return EventBookingDetail.from_context(booking, context)
+
+        return BaseBookingDetail.from_domain(booking)
     async def payment_context(self, booking_id: UUID) -> Optional[dict]:
         b = await self.booking_repo.get_by_id(booking_id)
         if not b:
