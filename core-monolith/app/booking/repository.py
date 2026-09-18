@@ -57,6 +57,7 @@ class BookingRepository(IBookingRepository):
 
     async def create(self, b: Booking) -> Booking:
         seat_refs_str = json.dumps(b.seat_refs) if b.seat_refs else None
+        seat_codes_str = json.dumps(b.seat_codes) if b.seat_codes else None
         model = BookingModel(
             id=b.id,
             user_id=b.user_id,
@@ -77,6 +78,7 @@ class BookingRepository(IBookingRepository):
             idempotency_key=b.idempotency_key,
             barcode=b.barcode,
             seat_refs_json=seat_refs_str,
+            seat_codes_json=seat_codes_str,
         )
         self.session.add(model)
         await self.session.flush()
@@ -176,6 +178,13 @@ class BookingRepository(IBookingRepository):
             except Exception:
                 seat_refs = None
 
+        seat_codes = None
+        if m.seat_codes_json:
+            try:
+                seat_codes = json.loads(m.seat_codes_json)
+            except Exception:
+                seat_codes = None
+
         return Booking(
             id=m.id,
             user_id=m.user_id,
@@ -196,6 +205,7 @@ class BookingRepository(IBookingRepository):
             created_at=m.created_at,
             barcode=m.barcode,
             seat_refs=seat_refs,
+            seat_codes=seat_codes,
         )
 
 

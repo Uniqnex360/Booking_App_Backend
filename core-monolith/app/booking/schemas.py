@@ -45,6 +45,7 @@ class BookingCreateRequest(BaseModel):
 class ProviderHoldCreateRequest(BaseModel):
     showtime_id: UUID
     seat_ids: list[str] = Field(min_length=1, max_length=10)
+    seat_codes: list[str] | None = Field(default=None, max_length=10)
 
 
 class CommitBookingRequest(BaseModel):
@@ -70,6 +71,7 @@ class BookingResponse(BaseModel):
     held_until: datetime | None = None
     provider_booking_id: str | None = None
     seats: list[str] | None = None
+    seat_codes: list[str] | None = None
 from typing import Literal
 from pydantic import BaseModel
 
@@ -117,7 +119,7 @@ class MovieBookingDetail(BaseBookingDetail):
     @classmethod
     def from_context(cls, b, ctx) -> "MovieBookingDetail":
         st, movie, screen, venue = ctx["showtime"], ctx["movie"], ctx["screen"], ctx["venue"]
-        seats = b.seat_refs or []
+        seats = b.seat_codes or b.seat_refs or []
         base = BaseBookingDetail.from_domain(b).model_dump()
         return cls(
             **base,

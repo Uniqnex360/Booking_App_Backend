@@ -64,6 +64,7 @@ async def create_provider_hold(
             showtime_id=payload.showtime_id,
             seat_ids=payload.seat_ids,
             idem_key=idempotency_key,
+            seat_codes=payload.seat_codes,
         )
         return success_response(
             data={
@@ -437,9 +438,10 @@ async def list_my_bookings(
 
             # Seat refs → codes list
             seat_codes: list[str] = []
-            if b.seat_refs_json:
+            raw = b.seat_codes_json or b.seat_refs_json
+            if raw:
                 try:
-                    parsed = json.loads(b.seat_refs_json)
+                    parsed = json.loads(raw)
                     if isinstance(parsed, list):
                         seat_codes = [str(x) for x in parsed]
                 except (json.JSONDecodeError, TypeError):

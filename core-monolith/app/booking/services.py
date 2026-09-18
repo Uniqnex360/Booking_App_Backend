@@ -419,6 +419,7 @@ class BookingService:
         showtime_id: UUID,
         seat_ids: list[str],
         idem_key: str,
+        seat_codes: list[str] | None = None,
     ) -> Booking:
         if idempotency_key := idem_key:
             existing = await self.booking_repo.get_by_idempotency(user_id, idempotency_key)
@@ -457,6 +458,7 @@ class BookingService:
             idempotency_key=idem_key,
             created_at=now,
             seat_refs=seat_ids,
+             seat_codes=seat_codes
         )
 
         try:

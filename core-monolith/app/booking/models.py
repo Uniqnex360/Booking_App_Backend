@@ -33,7 +33,7 @@ class BookingModel(Base):
     idempotency_key = Column(String(255), index=True, nullable=True)
     barcode = Column(String(255), nullable=True)
     seat_refs_json = Column(Text, nullable=True)
-
+    seat_codes_json = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 

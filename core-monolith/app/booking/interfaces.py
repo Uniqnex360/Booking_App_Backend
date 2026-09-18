@@ -67,6 +67,7 @@ class Booking:
     idempotency_key: Optional[str] = None
     barcode: Optional[str] = None
     seat_refs: Optional[list[str]] = None
+    seat_codes: Optional[list[str]] = None
 class ValidationError(ValueError, DomainError):
     pass
 class SoldOutError(DomainError):
