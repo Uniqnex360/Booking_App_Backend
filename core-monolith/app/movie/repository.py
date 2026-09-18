@@ -127,6 +127,7 @@ class MovieRepository:
             MovieSummaryDTO(
                 id=m.id,
                 title=m.title,
+                genre=m.genre, 
                 original_title=m.original_title,
                 language=m.language,
                 duration_min=m.duration_min,
@@ -188,6 +189,7 @@ class MovieRepository:
         return MovieDetailsDTO(
             id=movie.id,
             title=movie.title,
+            genre=movie.genre,
             original_title=movie.original_title,
             language=movie.language,
             duration_min=movie.duration_min,
