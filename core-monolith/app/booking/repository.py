@@ -94,51 +94,7 @@ class BookingRepository(IBookingRepository):
             .values(status=new_status.value)
         )
         return res.rowcount > 0
-    async def get_booking_with_context(
-        self, booking_id: UUID
-    ) -> Optional[tuple[Booking, Optional[dict]]]:
-       
-        from app.movie.models import Showtime, Movie, Screen, Venue
 
-        stmt = (
-            select(
-                BookingModel,
-                Showtime, Movie, Screen, Venue,
-                EventORM, TicketCategoryORM,
-            )
-            .select_from(BookingModel)
-            .outerjoin(Showtime, BookingModel.showtime_id == Showtime.id)
-            .outerjoin(Movie, Showtime.movie_id == Movie.id)
-            .outerjoin(Screen, Showtime.screen_id == Screen.id)
-            .outerjoin(Venue, Screen.venue_id == Venue.id)
-            .outerjoin(EventORM, BookingModel.event_id == EventORM.id)
-            .outerjoin(TicketCategoryORM, BookingModel.tier_id == TicketCategoryORM.id)
-            .where(BookingModel.id == booking_id)
-        )
-        row = (await self.session.execute(stmt)).first()
-        if not row:
-            return None
-
-        b_model, st, movie, screen, venue, event, tier = row
-        booking = self._to_domain(b_model)
-
-        context: Optional[dict] = None
-        if movie and st:
-            context = {
-                "kind": "MOVIE",
-                "showtime": st,
-                "movie": movie,
-                "screen": screen,
-                "venue": venue,
-            }
-        elif event:
-            context = {
-                "kind": "EVENT",
-                "event": event,
-                "tier": tier,
-            }
-
-        return booking, context
     async def update_booking(self, b: Booking) -> Booking:
         seat_refs_str = json.dumps(b.seat_refs) if b.seat_refs else None
         await self.session.execute(
