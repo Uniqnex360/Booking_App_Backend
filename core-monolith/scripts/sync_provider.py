@@ -147,9 +147,10 @@ async def sync_production():
         for st in pvr_showtimes:
             title = st["movie_title"]
             title_clean = title.lower().strip()
-            poster_url = POSTER_MAP.get(
-                title_clean,
-                "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&auto=format&fit=crop&q=80",
+            poster_url = (
+                st.get("poster_url")
+                or POSTER_MAP.get(title_clean)
+                or "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&auto=format&fit=crop&q=80"
             )
 
             movie_q = await session.execute(select(Movie).where(Movie.title == title))
