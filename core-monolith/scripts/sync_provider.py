@@ -3,7 +3,7 @@ import os
 import sys
 import uuid
 import httpx
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -28,6 +28,7 @@ POSTER_MAP = {
     "the final whistle": "https://i.pinimg.com/736x/b2/a3/18/b2a31878a8498a21aa582d78094f775c.jpg",
 }
 
+
 async def sync_production():
     print(f"1. Connecting to PVR at: {PVR_URL}")
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -51,6 +52,7 @@ async def sync_production():
     print(f"2. Fetched {len(pvr_showtimes)} live showtime(s) from PVR.")
 
     async with AsyncSessionLocal() as session:
+        # --- Partner (unchanged) ---
         partner_query = await session.execute(
             select(PartnerORM).where(PartnerORM.business_name == "PVR Cinemas Ltd")
         )
@@ -85,32 +87,7 @@ async def sync_production():
         else:
             partner_id = partner_orm.id
 
-        venue_query = await session.execute(select(Venue).where(Venue.name == "PVR Lulu Mall"))
-        venue = venue_query.scalar_one_or_none()
-        if not venue:
-            venue = Venue(
-                id=uuid.uuid4(),
-                name="PVR Lulu Mall",
-                city="Kochi",
-                address="Lulu Mall, Edappally, Kochi",
-                timezone="Asia/Kolkata",
-                partner_id=partner_id,
-            )
-            session.add(venue)
-            await session.flush()
-
-        screen_query = await session.execute(select(Screen).where(Screen.venue_id == venue.id))
-        screen = screen_query.scalar_one_or_none()
-        if not screen:
-            screen = Screen(
-                id=uuid.uuid4(),
-                venue_id=venue.id,
-                name="Audi 1 (IMAX)",
-                total_seats=234,
-            )
-            session.add(screen)
-            await session.flush()
-
+        # --- Provider (unchanged) ---
         provider_query = await session.execute(
             select(ProviderRegistryModel).where(ProviderRegistryModel.name.ilike("%pvr%"))
         )
@@ -133,6 +110,55 @@ async def sync_production():
                 provider.auth_token_ref = pvr_token
             await session.flush()
 
+        # --- NEW: build venue + screen maps keyed by (cinema_name, city, screen_name) ---
+
+        venues_by_key: dict[tuple[str, str], Venue] = {}
+        screens_by_key: dict[tuple[str, str, str], Screen] = {}
+
+        for st in pvr_showtimes:
+            cinema_name = st.get("cinema_name") or "Unknown Cinema"
+            city = st.get("city") or "Kochi"
+            screen_name = st.get("screen_name") or "Screen 1"
+
+            vkey = (cinema_name, city)
+            if vkey not in venues_by_key:
+                venue = (await session.execute(
+                    select(Venue).where(Venue.name == cinema_name, Venue.city == city)
+                )).scalar_one_or_none()
+                if not venue:
+                    venue = Venue(
+                        id=uuid.uuid4(),
+                        name=cinema_name,
+                        city=city,
+                        address=None,
+                        timezone="Asia/Kolkata",
+                        partner_id=partner_id,
+                    )
+                    session.add(venue)
+                    await session.flush()
+                venues_by_key[vkey] = venue
+
+            skey = (cinema_name, city, screen_name)
+            if skey not in screens_by_key:
+                venue = venues_by_key[vkey]
+                screen = (await session.execute(
+                    select(Screen).where(
+                        Screen.venue_id == venue.id,
+                        Screen.name == screen_name,
+                    )
+                )).scalar_one_or_none()
+                if not screen:
+                    screen = Screen(
+                        id=uuid.uuid4(),
+                        venue_id=venue.id,
+                        name=screen_name,
+                        total_seats=0,
+                    )
+                    session.add(screen)
+                    await session.flush()
+                screens_by_key[skey] = screen
+
+        # --- Cancel stale showtimes ---
         current_pvr_ids = [st["id"] for st in pvr_showtimes]
         await session.execute(
             update(Showtime)
@@ -143,6 +169,7 @@ async def sync_production():
             .values(status="CANCELLED")
         )
 
+        # --- Upsert movies + showtimes ---
         synced = 0
         for st in pvr_showtimes:
             title = st["movie_title"]
@@ -173,6 +200,11 @@ async def sync_production():
                 movie.poster_url = poster_url
                 await session.flush()
 
+            cinema_name = st.get("cinema_name") or "Unknown Cinema"
+            city = st.get("city") or "Kochi"
+            screen_name = st.get("screen_name") or "Screen 1"
+            screen = screens_by_key[(cinema_name, city, screen_name)]
+
             starts_at_dt = datetime.fromisoformat(st["starts_at"].replace("Z", "+00:00"))
 
             existing_st = (await session.execute(
@@ -195,13 +227,15 @@ async def sync_production():
                 session.add(new_st)
                 synced += 1
             else:
+                existing_st.screen_id = screen.id
                 existing_st.starts_at = starts_at_dt
                 existing_st.provider_id = provider.id
                 existing_st.status = "ACTIVE"
                 synced += 1
 
         await session.commit()
-        print(f"Synced {synced} showtime(s) with your custom Pinterest posters.")
+        print(f"Synced {synced} showtime(s). Venues: {len(venues_by_key)}, Screens: {len(screens_by_key)}.")
+
 
 if __name__ == "__main__":
     asyncio.run(sync_production())
