@@ -267,7 +267,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 
 from app.core.database import AsyncSessionLocal
 import app.auth.models
@@ -325,8 +325,6 @@ async def _fetch_showtimes(client: httpx.AsyncClient, base_url: str) -> list[dic
     resp = await client.get(f"{base_url.rstrip('/')}/v1/showtimes")
     resp.raise_for_status()
     return resp.json()
-
-
 async def _sync_one_provider(
     session,
     client: httpx.AsyncClient,
@@ -340,14 +338,20 @@ async def _sync_one_provider(
     try:
         pvr_showtimes = await _fetch_showtimes(client, base)
     except Exception as exc:
-        print(f"     FAILED: {exc}")
-        return {"venues": 0, "screens": 0, "showtimes": 0, "cancelled": 0, "error": str(exc)}
+        print(f"     FETCH FAILED: {exc} — skipping provider, no rows touched")
+        return {
+            "venues": 0, "screens": 0, "showtimes": 0, "cancelled": 0,
+            "error": str(exc), "skipped": True,
+        }
 
     if not pvr_showtimes:
-        print("     no showtimes returned")
-        return {"venues": 0, "screens": 0, "showtimes": 0, "cancelled": 0}
+        print("     EMPTY RESPONSE — skipping provider, no rows touched")
+        return {
+            "venues": 0, "screens": 0, "showtimes": 0, "cancelled": 0,
+            "skipped": True, "reason": "empty_response",
+        }
 
-    # Build venue + screen maps scoped to this provider
+    # --- Build venue + screen maps scoped to this provider ---
     venues_by_key: dict[tuple[str, str], Venue] = {}
     screens_by_key: dict[tuple[str, str, str], Screen] = {}
 
@@ -398,8 +402,44 @@ async def _sync_one_provider(
                 await session.flush()
             screens_by_key[skey] = screen
 
-    # Cancel stale showtimes for THIS provider
+    # --- Guarded cancellation ---
+    #
+    # CANCELLATION IS ONLY VALID WHEN ABSENCE IS CONFIRMED.
+    # We confirmed a successful, non-empty fetch above. But to guard against
+    # partial responses from a cold Render instance or a mid-stream timeout,
+    # we refuse to cancel more than 20% of the provider's currently-active
+    # showtimes in one sync. Anything more indicates a fetch problem, not a
+    # real schedule change.
     current_ids = [st["id"] for st in pvr_showtimes]
+
+    live_count = (await session.execute(
+        select(func.count()).select_from(Showtime).where(
+            Showtime.provider_id == provider.id,
+            Showtime.status == "ACTIVE",
+        )
+    )).scalar() or 0
+
+    prospective_cancel_count = (await session.execute(
+        select(func.count()).select_from(Showtime).where(
+            Showtime.provider_id == provider.id,
+            Showtime.status == "ACTIVE",
+            Showtime.provider_showtime_ref.notin_(current_ids),
+        )
+    )).scalar() or 0
+
+    if live_count > 0 and prospective_cancel_count > max(5, int(live_count * 0.2)):
+        print(
+            f"     CANCELLATION REFUSED: would cancel {prospective_cancel_count} of "
+            f"{live_count} live showtimes "
+            f"({prospective_cancel_count * 100 // live_count}%). "
+            f"Threshold is 20%. Treating as a fetch problem, no rows touched."
+        )
+        return {
+            "venues": 0, "screens": 0, "showtimes": 0, "cancelled": 0,
+            "skipped": True, "reason": "cancellation_threshold_exceeded",
+            "would_have_cancelled": prospective_cancel_count,
+        }
+
     cancel_result = await session.execute(
         update(Showtime)
         .where(
@@ -410,7 +450,7 @@ async def _sync_one_provider(
     )
     cancelled = cancel_result.rowcount or 0
 
-    # Upsert movies and showtimes
+    # --- Upsert movies and showtimes ---
     synced = 0
     for st in pvr_showtimes:
         title = st["movie_title"]
@@ -421,16 +461,22 @@ async def _sync_one_provider(
         )).scalar_one_or_none()
 
         if not movie:
+            release_year = st.get("release_year")
+            release_date = (
+                datetime(release_year, 1, 1, tzinfo=timezone.utc)
+                if release_year else None
+            )
             movie = Movie(
                 id=uuid.uuid4(),
                 title=title,
                 language=st.get("language", "Malayalam"),
                 duration_min=st.get("duration_min", 150),
                 certificate=st.get("certificate", "UA"),
-                genre=st.get("genre"),
                 status="PUBLISHED",
                 partner_id=partner_id,
                 poster_url=poster_url,
+                release_date=release_date,
+                genre=st.get("genre"),
                 synopsis=f"Now showing: {title}",
             )
             session.add(movie)
@@ -438,6 +484,9 @@ async def _sync_one_provider(
         else:
             movie.poster_url = poster_url
             movie.genre = st.get("genre")
+            release_year = st.get("release_year")
+            if release_year:
+                movie.release_date = datetime(release_year, 1, 1, tzinfo=timezone.utc)
             await session.flush()
 
         cinema_name = st.get("cinema_name") or "Unknown Cinema"
@@ -447,11 +496,11 @@ async def _sync_one_provider(
 
         starts_at_dt = datetime.fromisoformat(st["starts_at"].replace("Z", "+00:00"))
 
-        existing = (await session.execute(
+        existing_st = (await session.execute(
             select(Showtime).where(Showtime.provider_showtime_ref == st["id"])
         )).scalar_one_or_none()
 
-        if not existing:
+        if not existing_st:
             session.add(Showtime(
                 id=uuid.uuid4(),
                 screen_id=screen.id,
@@ -465,10 +514,10 @@ async def _sync_one_provider(
                 provider_showtime_ref=st["id"],
             ))
         else:
-            existing.screen_id = screen.id
-            existing.starts_at = starts_at_dt
-            existing.provider_id = provider.id
-            existing.status = "ACTIVE"
+            existing_st.screen_id = screen.id
+            existing_st.starts_at = starts_at_dt
+            existing_st.provider_id = provider.id
+            existing_st.status = "ACTIVE"
 
         synced += 1
 
@@ -478,8 +527,6 @@ async def _sync_one_provider(
         "showtimes": synced,
         "cancelled": cancelled,
     }
-
-
 async def sync_all_providers():
     print("=" * 60)
     print("Vyhbz provider sync")
