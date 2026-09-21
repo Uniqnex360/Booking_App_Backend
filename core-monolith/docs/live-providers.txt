@@ -1,3 +1,8 @@
-PVR   https://pvr-backend-pejx.onrender.com
-AGS   https://ags-app-e0qm.onrender.com
-Rakki https://rakki-app.onrender.com
+Deployed providers (as of 2026-09-21):
+
+  PVR Provider              https://pvr-backend-pejx.onrender.com
+  AGS                       https://ags-app-e0qm.onrender.com
+  Rakki                     https://rakki-app.onrender.com
+  Cinepolis Centre Square   https://kochi-app-1.onrender.com
+  Vanitha Vineetha          https://vanitha-kochi-app-2.onrender.com
+  Shenoys                   https://shenoys.onrender.com
