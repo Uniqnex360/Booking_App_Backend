@@ -1,0 +1,69 @@
+=== AGS live URL ===
+https://ags-app-e0qm.onrender.com/v1/showtimes
+
+=== AGS chain response (first showtime) ===
+{
+  "id": "6a62b08b-ab6f-4816-a3c4-36020521d24c",
+  "screen_name": "Screen 3",
+  "cinema_name": "AGS T. Nagar",
+  "movie_title": "Avengers: Endgame Encore",
+  "language": "English",
+  "certificate": "UA",
+  "duration_min": 182,
+  "starts_at": "2026-09-21T04:30:00Z",
+  "poster_url": "https://i.pinimg.com/736x/93/54/5f/93545f7e45707c04baf5a972efbcbc02.jpg",
+  "city": "Chennai",
+  "genre": "Action, Sci-Fi, Adventure"
+}
+
+=== Vyhbz aggregated response: movie 322b854f venues ===
+{
+  "venue_name": "AGS Cinemas",
+  "city": "Chennai",
+  "showtime_count": 3
+}
+{
+  "venue_name": "AGS Maduravoyal",
+  "city": "Chennai",
+  "showtime_count": 4
+}
+{
+  "venue_name": "AGS T. Nagar",
+  "city": "Chennai",
+  "showtime_count": 4
+}
+{
+  "venue_name": "AGS Villivakkam",
+  "city": "Chennai",
+  "showtime_count": 4
+}
+{
+  "venue_name": "Cinepolis Nexus",
+  "city": "Bangalore",
+  "showtime_count": 4
+}
+{
+  "venue_name": "INOX Garuda Mall",
+  "city": "Bangalore",
+  "showtime_count": 4
+}
+{
+  "venue_name": "PVR Forum Mall",
+  "city": "Bangalore",
+  "showtime_count": 4
+}
+{
+  "venue_name": "PVR Grand Mall",
+  "city": "Chennai",
+  "showtime_count": 3
+}
+{
+  "venue_name": "PVR Lulu Mall",
+  "city": "Kochi",
+  "showtime_count": 4
+}
+{
+  "venue_name": "Sathyam Cinemas",
+  "city": "Chennai",
+  "showtime_count": 3
+}
