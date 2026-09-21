@@ -1,0 +1,3 @@
+PVR   https://pvr-backend-pejx.onrender.com
+AGS   https://ags-app-e0qm.onrender.com
+Rakki https://rakki-app.onrender.com
