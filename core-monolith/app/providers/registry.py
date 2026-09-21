@@ -23,23 +23,38 @@ class ProviderRegistryModel(Base):
     hold_ttl_seconds = Column(Integer, nullable=False, server_default=sa.text("600"))
     enabled = Column(Boolean, nullable=False, server_default=sa.text("true"))
     partner_id = Column(PG_UUID(as_uuid=True), ForeignKey("partners.id"), nullable=True)
-
+    adapter = Column(
+        String(20),
+        nullable=False,
+        server_default=sa.text("'pvr'"),
+    )
 
 def create_provider_client(
     registry: ProviderRegistryModel,
     client: Any = None,
 ) -> ITheatreProvider:
-    name_lower = registry.name.lower()
-    if "pvr" in name_lower:
+    adapter = (registry.adapter or "pvr").lower()
+
+    if adapter == "pvr":
         return PVRProvider(
             base_url=registry.base_url,
-            auth_token=registry.auth_token_ref,
-            timeout_seconds=float(registry.hold_ttl_seconds if registry.hold_ttl_seconds < 15 else 5.0),
+            timeout_seconds=float(
+                registry.hold_ttl_seconds
+                if registry.hold_ttl_seconds < 15
+                else 5.0
+            ),
             client=client,
         )
-    # Default fallback
-    return PVRProvider(
-        base_url=registry.base_url,
-        auth_token=registry.auth_token_ref,
-        client=client,
-    )
+
+    if adapter == "http":
+        return PVRProvider(
+            base_url=registry.base_url,
+            timeout_seconds=float(
+                registry.hold_ttl_seconds
+                if registry.hold_ttl_seconds < 15
+                else 5.0
+            ),
+            client=client,
+        )
+
+    raise ValueError(f"Unknown provider adapter: {adapter!r}")

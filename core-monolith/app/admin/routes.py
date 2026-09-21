@@ -135,6 +135,7 @@ async def update_event_or_movie_status(
         return MovieSummaryResponse(
             id=dto.id,
             title=dto.title,
+            genre=dto.genre,  
             original_title=dto.original_title,
             language=dto.language,
             duration_min=dto.duration_min,
