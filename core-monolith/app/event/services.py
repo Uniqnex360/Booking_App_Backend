@@ -4,11 +4,13 @@ from datetime import datetime, timezone
 from app.event.exceptions import EventLockedError
 from app.auth.interfaces import ValidationError, NotFoundError
 from app.shared.exceptions import ForbiddenError
+from app.partner.interfaces import PartnerNotApprovedError, PartnerStatus
+from app.partner.interfaces import IPartnerRepository
 
 from typing import Optional, List, Tuple, Callable
 from app.event.interfaces import (
     IEventRepository, ITicketCategoryRepository, Event, TicketCategory,
-    EventStatus, EventCategory, CancellationPolicy
+    EventStatus
 )
 
 EDIT_LOCK_HOURS = 24
@@ -22,11 +24,22 @@ def slugify(text: str) -> str:
 
 
 class EventService:
-    def __init__(self, event_repo: IEventRepository, clock: Callable[[], datetime] = None):
+    def __init__(
+        self,
+        event_repo: IEventRepository,
+        partner_repo: IPartnerRepository,
+        clock: Callable[[], datetime] = None,
+    ):
         self.event_repo = event_repo
+        self.partner_repo = partner_repo
         self.clock = clock or (lambda: datetime.now(timezone.utc))
 
     async def create_event(self, partner_id: uuid.UUID, data: dict) -> Event:
+        partner = await self.partner_repo.get_by_id(partner_id)
+        if not partner:
+            raise NotFoundError("Partner not found")
+        if partner.status != PartnerStatus.APPROVED:
+            raise PartnerNotApprovedError("Partner must be approved before hosting events")
         now = self.clock()
         starts_at = data['starts_at']
         ends_at = data['ends_at']
