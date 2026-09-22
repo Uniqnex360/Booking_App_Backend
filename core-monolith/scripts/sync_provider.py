@@ -412,10 +412,13 @@ async def _sync_one_provider(
     # real schedule change.
     current_ids = [st["id"] for st in pvr_showtimes]
 
+    now = datetime.now(timezone.utc)
+
     live_count = (await session.execute(
         select(func.count()).select_from(Showtime).where(
             Showtime.provider_id == provider.id,
             Showtime.status == "ACTIVE",
+            Showtime.starts_at > now,
         )
     )).scalar() or 0
 
@@ -423,6 +426,7 @@ async def _sync_one_provider(
         select(func.count()).select_from(Showtime).where(
             Showtime.provider_id == provider.id,
             Showtime.status == "ACTIVE",
+            Showtime.starts_at > now,
             Showtime.provider_showtime_ref.notin_(current_ids),
         )
     )).scalar() or 0
@@ -520,6 +524,20 @@ async def _sync_one_provider(
             existing_st.status = "ACTIVE"
 
         synced += 1
+
+    # Expire past showtimes so they don't block the guard tomorrow.
+    expired_result = await session.execute(
+        update(Showtime)
+        .where(
+            Showtime.provider_id == provider.id,
+            Showtime.status == "ACTIVE",
+            Showtime.starts_at < now,
+        )
+        .values(status="CANCELLED")
+    )
+    expired = expired_result.rowcount or 0
+    if expired:
+        print(f"     expired {expired} past showtime(s)")
 
     return {
         "venues": len(venues_by_key),
