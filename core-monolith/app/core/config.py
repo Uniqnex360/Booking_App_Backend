@@ -18,13 +18,10 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: Optional[str] = None
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: Optional[int] = None
-    RESEND_FROM_EMAIL: Optional[str] = None
-    SMTP_PASSWORD: Optional[str] = None
-    EMAILS_FROM: Optional[str] = None
     RESEND_API_KEY: Optional[str] = None
-    RESEND_FROM_EMAIL: Optional[str] = "onboarding@resend.dev" 
+    RESEND_FROM_EMAIL: Optional[str] = "noreply@datavioai.com"
     SMTP_PASSWORD: Optional[str] = None
-    EMAILS_FROM: Optional[str] = None
+    EMAILS_FROM: Optional[str] = "noreply@datavioai.com"
     GOOGLE_PUBLIC_KEYS_URL: Optional[str] = None
 
     # Razorpay Settings

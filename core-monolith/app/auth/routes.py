@@ -3,7 +3,8 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from typing import List
 import uuid
-
+import logging
+logger = logging.getLogger(__name__)
 from app.core.config import settings
 from app.shared.response import success_response  
 from app.auth.dependencies import (
@@ -108,10 +109,23 @@ async def register_initiate(
         )
         user = await auth_service.user_repo.create(new_user)
     
-    await otp_service.generate_and_send(user, method="EMAIL")
+    otp_sent = False
+    try:
+        result = await otp_service.generate_and_send(user, method="EMAIL")
+        # generate_and_send may return None, True, or a bool. Treat
+        # anything that didn't raise as a successful send attempt.
+        otp_sent = True if result is None else bool(result)
+    except Exception as exc:
+        logger.error("OTP delivery failed for user %s: %s", user.id, exc)
+
+    if otp_sent:
+        return success_response(
+            data={"user_id": str(user.id), "otp_sent": True},
+            message="OTP sent to email",
+        )
     return success_response(
-        data={"user_id": user.id}, 
-        message="OTP sent to email"
+        data={"user_id": str(user.id), "otp_sent": False},
+        message="Account created. We couldn't send the OTP right now — please retry.",
     )
 
 @router.post("/login")

@@ -28,7 +28,7 @@ class NotificationService(INotificationService):
 
     async def send_email(self, email: str, subject: str, body: str) -> bool:
         resend_key = getattr(settings, "RESEND_API_KEY", None)
-        from_email = getattr(settings, "RESEND_FROM_EMAIL", None) or getattr(settings, "EMAILS_FROM", None) or "onboarding@resend.dev"
+        from_email = getattr(settings, "RESEND_FROM_EMAIL", None) or getattr(settings, "EMAILS_FROM", None) or "noreply@datavioai.com"
 
         # 1. Preferred: Resend REST API (HTTPS Port 443 - Never blocked by Render)
         if resend_key:
