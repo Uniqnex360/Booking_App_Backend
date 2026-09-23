@@ -454,16 +454,27 @@ async def _sync_one_provider(
     )
     cancelled = cancel_result.rowcount or 0
 
-    # --- Upsert movies and showtimes ---
+
+    titles = {st["movie_title"] for st in pvr_showtimes}
+    existing_movies = (await session.execute(
+        select(Movie).where(Movie.title.in_(titles))
+    )).scalars().all()
+    movies_by_title = {m.title: m for m in existing_movies}
+
+    existing_showtimes = (await session.execute(
+        select(Showtime).where(Showtime.provider_showtime_ref.in_(current_ids))
+    )).scalars().all()
+    showtimes_by_ref = {s.provider_showtime_ref: s for s in existing_showtimes}
+
+    new_movies: list[Movie] = []
+    new_showtimes: list[Showtime] = []
     synced = 0
+
     for st in pvr_showtimes:
         title = st["movie_title"]
         poster_url = st.get("poster_url") or DEFAULT_POSTER
 
-        movie = (await session.execute(
-            select(Movie).where(Movie.title == title)
-        )).scalar_one_or_none()
-
+        movie = movies_by_title.get(title)
         if not movie:
             release_year = st.get("release_year")
             release_date = (
@@ -483,29 +494,24 @@ async def _sync_one_provider(
                 genre=st.get("genre"),
                 synopsis=f"Now showing: {title}",
             )
-            session.add(movie)
-            await session.flush()
+            new_movies.append(movie)
+            movies_by_title[title] = movie
         else:
             movie.poster_url = poster_url
             movie.genre = st.get("genre")
             release_year = st.get("release_year")
             if release_year:
                 movie.release_date = datetime(release_year, 1, 1, tzinfo=timezone.utc)
-            await session.flush()
 
         cinema_name = st.get("cinema_name") or "Unknown Cinema"
         city = st.get("city") or "Kochi"
         screen_name = st.get("screen_name") or "Screen 1"
         screen = screens_by_key[(cinema_name, city, screen_name)]
-
         starts_at_dt = datetime.fromisoformat(st["starts_at"].replace("Z", "+00:00"))
 
-        existing_st = (await session.execute(
-            select(Showtime).where(Showtime.provider_showtime_ref == st["id"])
-        )).scalar_one_or_none()
-
+        existing_st = showtimes_by_ref.get(st["id"])
         if not existing_st:
-            session.add(Showtime(
+            new_showtimes.append(Showtime(
                 id=uuid.uuid4(),
                 screen_id=screen.id,
                 movie_id=movie.id,
@@ -524,6 +530,14 @@ async def _sync_one_provider(
             existing_st.status = "ACTIVE"
 
         synced += 1
+
+    # Flush new movies first so they get ids, then showtimes that reference them.
+    if new_movies:
+        session.add_all(new_movies)
+        await session.flush()
+    if new_showtimes:
+        session.add_all(new_showtimes)
+        await session.flush()
 
     # Expire past showtimes so they don't block the guard tomorrow.
     expired_result = await session.execute(
