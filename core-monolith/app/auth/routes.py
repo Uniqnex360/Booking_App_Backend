@@ -6,6 +6,7 @@ from app.auth.schemas import LoginVerifyRequest,LoginInitiateRequest
 
 import uuid
 import logging
+from app.shared.response import error_response
 logger = logging.getLogger(__name__)
 from app.core.config import settings
 from app.shared.response import success_response  
@@ -61,8 +62,11 @@ async def login_initiate(
         method = "SMS"
 
     if not user:
-        # Match the existing login error class so the frontend sees a familiar shape
-        raise UserNotFoundError("No account with those details")
+        return error_response(
+            "INVALID_CREDENTIALS",
+            "No account with those details.",
+            401,
+        )
 
     await otp_service.generate_and_send(user, method=method)
 
@@ -84,7 +88,7 @@ async def login_verify(
 
     user = await user_repo.get_by_id(payload.user_id)
     if not user:
-        raise UserNotFoundError("User no longer exists")
+        return error_response("USER_NOT_FOUND", "User no longer exists.", 404)
 
     ip = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
