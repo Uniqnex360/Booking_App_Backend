@@ -41,7 +41,7 @@ def create_provider_client(
             timeout_seconds=float(
                 registry.hold_ttl_seconds
                 if registry.hold_ttl_seconds < 15
-                else 5.0
+                else 45.0
             ),
             client=client,
         )

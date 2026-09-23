@@ -46,7 +46,7 @@ class PVRProvider(ITheatreProvider):
         self,
         base_url: str,
         auth_token: str | None = None,
-        timeout_seconds: float = 5.0,
+        timeout_seconds: float = 45.0,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
@@ -71,6 +71,30 @@ class PVRProvider(ITheatreProvider):
             return {"Authorization": f"Bearer {self._auth_token}"}
         return {}
 
+    async def _request_with_retry(
+        self, method: str, path: str, **kwargs
+    ) -> httpx.Response:
+        client = self._get_client()
+        last_exc: Exception | None = None
+        for attempt in range(2):
+            try:
+                return await client.request(
+                    method,
+                    f"{self._base_url}{path}",
+                    headers=self._headers(),
+                    timeout=self._timeout,
+                    **kwargs,
+                )
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
+                last_exc = exc
+                if attempt == 0:
+                    await asyncio.sleep(20.0)
+                    continue
+                raise ProviderUnavailable(
+                    f"PVR {method} {path} failed after retry: {last_exc}"
+                ) from last_exc
+        raise ProviderUnavailable(f"PVR {method} {path} unreachable: {last_exc}")
+
     async def _get_with_retry(self, path: str, params: dict | None = None) -> httpx.Response:
         client = self._get_client()
         last_exc: Exception | None = None
@@ -81,14 +105,14 @@ class PVRProvider(ITheatreProvider):
                 )
                 if resp.status_code >= 500:
                     if attempt < 2:
-                        await asyncio.sleep(0.1 * (2**attempt))
+                        await asyncio.sleep(20.0 if attempt == 0 else 40.0)
                         continue
                     raise ProviderUnavailable(f"PVR upstream 5xx on GET {path}: {resp.status_code}")
                 return resp
             except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
                 last_exc = exc
                 if attempt < 2:
-                    await asyncio.sleep(0.1 * (2**attempt))
+                    await asyncio.sleep(20.0 if attempt == 0 else 40.0)
                     continue
         raise ProviderUnavailable(f"PVR upstream unreachable on GET {path}: {last_exc}")
 
@@ -181,15 +205,7 @@ class PVRProvider(ITheatreProvider):
             "idempotency_key": idem_key,
             "end_user_ref": end_user_ref,
         }
-        try:
-            resp = await client.post(
-                f"{self._base_url}/v1/holds",
-                json=payload,
-                headers=self._headers(),
-                timeout=self._timeout,
-            )
-        except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
-            raise ProviderUnavailable(f"PVR hold call failed: {exc}") from exc
+        resp = await self._request_with_retry("POST", "/v1/holds", json=payload)
 
         if resp.status_code == 201:
             try:
@@ -236,15 +252,9 @@ class PVRProvider(ITheatreProvider):
     ) -> ProviderTicket:
         client = self._get_client()
         payload = {"payment_ref": payment_ref}
-        try:
-            resp = await client.post(
-                f"{self._base_url}/v1/holds/{hold_id}/commit",
-                json=payload,
-                headers=self._headers(),
-                timeout=self._timeout,
-            )
-        except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
-            raise ProviderUnavailable(f"PVR commit call timed out or failed: {exc}") from exc
+        resp = await self._request_with_retry(
+            "POST", f"/v1/holds/{hold_id}/commit", json=payload
+        )
 
         if resp.status_code == 200:
             try:
@@ -296,17 +306,9 @@ class PVRProvider(ITheatreProvider):
 
     async def release(self, hold_id: str) -> None:
         client = self._get_client()
-        try:
-            resp = await client.delete(
-                f"{self._base_url}/v1/holds/{hold_id}",
-                headers=self._headers(),
-                timeout=self._timeout,
-            )
-            if resp.status_code not in (200, 204, 404):
-                if resp.status_code >= 500:
-                    raise ProviderUnavailable(f"PVR 5xx on release: {resp.status_code}")
-        except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
-            raise ProviderUnavailable(f"PVR release call failed: {exc}") from exc
+        resp = await self._request_with_retry("DELETE", f"/v1/holds/{hold_id}")
+        if resp.status_code not in (200, 204, 404) and resp.status_code >= 500:
+            raise ProviderUnavailable(f"PVR 5xx on release: {resp.status_code}")
 
     async def hold_state(self, hold_id: str) -> ProviderHoldState:
         resp = await self._get_with_retry(f"/v1/holds/{hold_id}")
