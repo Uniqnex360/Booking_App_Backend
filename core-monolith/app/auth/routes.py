@@ -2,11 +2,8 @@ from fastapi import APIRouter, Depends, Request, status
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from typing import List
-from app.auth.schemas import LoginVerifyRequest,LoginInitiateRequest
-
 import uuid
 import logging
-from app.shared.response import error_response
 logger = logging.getLogger(__name__)
 from app.core.config import settings
 from app.shared.response import success_response  
@@ -47,62 +44,6 @@ async def register(
         data=user, 
         message="Account created. OTP sent to your phone.", 
         code=201
-    )
-@router.post("/login/initiate")
-async def login_initiate(
-    payload: LoginInitiateRequest,
-    otp_service: IOTPService = Depends(get_otp_service),
-    user_repo: IUserRepository = Depends(get_user_repo),
-):
-    if payload.email:
-        user = await user_repo.get_by_email(payload.email)
-        method = "EMAIL"
-    else:
-        user = await user_repo.get_by_phone(payload.phone or "")
-        method = "SMS"
-
-    if not user:
-        return error_response(
-            "INVALID_CREDENTIALS",
-            "No account with those details.",
-            401,
-        )
-
-    await otp_service.generate_and_send(user, method=method)
-
-    return success_response(
-        data={"user_id": str(user.id), "method": method},
-        message=f"OTP sent via {method.lower()}",
-    )
-
-
-@router.post("/login/verify")
-async def login_verify(
-    payload: LoginVerifyRequest,
-    request: Request,
-    otp_service: IOTPService = Depends(get_otp_service),
-    auth_service: AuthService = Depends(get_auth_service),
-    user_repo: IUserRepository = Depends(get_user_repo),
-):
-    await otp_service.verify(payload.user_id, payload.otp_code, method=payload.method)
-
-    user = await user_repo.get_by_id(payload.user_id)
-    if not user:
-        return error_response("USER_NOT_FOUND", "User no longer exists.", 404)
-
-    ip = request.client.host if request.client else None
-    user_agent = request.headers.get("user-agent")
-
-    access, refresh = await auth_service.login_user(user, ip, user_agent)
-
-    return success_response(
-        data={
-            "access_token": access,
-            "refresh_token": refresh,
-            "token_type": "Bearer",
-            "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        },
-        message="Login successful",
     )
 @router.post("/login/firebase")
 async def login_firebase(

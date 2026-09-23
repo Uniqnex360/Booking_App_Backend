@@ -5,8 +5,6 @@ from pydantic import BaseModel, EmailStr, BeforeValidator
 import re
 import uuid
 from datetime import datetime
-from pydantic import model_validator
-
 def normalize_email_str(v: str) -> str:
     if isinstance(v, str):
         return unicodedata.normalize('NFKC', v).lower().strip()
@@ -41,21 +39,7 @@ class UserRegisterRequest(BaseModel):
     @classmethod
     def normalize_name(cls,v:str)->str:
         return unicodedata.normalize('NFKC',v).strip()
-class LoginInitiateRequest(BaseModel):
-    email: Optional[str] = None
-    phone: Optional[str] = None
-
-    @model_validator(mode="after")
-    def _exactly_one(self):
-        if bool(self.email) == bool(self.phone):
-            raise ValueError("Provide exactly one of email or phone")
-        return self
-
-
-class LoginVerifyRequest(BaseModel):
-    user_id: uuid.UUID
-    otp_code: str
-    method: str = "EMAIL"  # "EMAIL" or "SMS"     
+        
 class UserLoginRequest(BaseModel):
     email:NormalizedEmail
     password:str
