@@ -81,6 +81,64 @@ class MovieRepository:
     # Public Read Paths
     # -----------------------------------------------------------------------
 
+    # async def list_movies(
+    #     self,
+    #     *,
+    #     city: str | None = None,
+    #     language: str | None = None,
+    #     format: str | None = None,
+    #     target_date: date | None = None,
+    #     page: int = 1,
+    #     limit: int = 20,
+    # ) -> tuple[list[MovieSummaryDTO], int]:
+    #     stmt = select(Movie).where(Movie.status == MovieStatus.PUBLISHED.value)
+
+    #     if language:
+    #         stmt = stmt.where(Movie.language == language)
+
+    #     # always join to showtimes
+    #         stmt = stmt.join(Showtime, Showtime.movie_id == Movie.id).join(
+    #             Screen, Showtime.screen_id == Screen.id
+    #         )
+    #         if city:
+    #             stmt = stmt.join(Venue, Screen.venue_id == Venue.id).where(
+    #                 Venue.city == city
+    #             )
+    #         if format:
+    #             stmt = stmt.where(Showtime.format == format)
+    #         if target_date:
+    #             tz = ZoneInfo("Asia/Kolkata")
+    #             start_dt = datetime.combine(target_date, time.min, tzinfo=tz).astimezone(ZoneInfo("UTC"))
+    #             end_dt = datetime.combine(target_date, time.max, tzinfo=tz).astimezone(ZoneInfo("UTC"))
+    #             stmt = stmt.where(Showtime.starts_at.between(start_dt, end_dt))
+
+    #     stmt = stmt.distinct()
+
+    #     count_stmt = select(func.count()).select_from(stmt.subquery())
+    #     total = (await self._session.execute(count_stmt)).scalar() or 0
+
+    #     offset = (page - 1) * limit
+    #     stmt = stmt.order_by(Movie.created_at.desc()).offset(offset).limit(limit)
+
+    #     result = await self._session.execute(stmt)
+    #     movies = result.scalars().all()
+
+    #     dtos = [
+    #         MovieSummaryDTO(
+    #             id=m.id,
+    #             title=m.title,
+    #             genre=m.genre, 
+    #             original_title=m.original_title,
+    #             language=m.language,
+    #             duration_min=m.duration_min,
+    #             certificate=m.certificate,
+    #             release_date=m.release_date,
+    #             poster_url=m.poster_url,
+    #             status=m.status,
+    #         )
+    #         for m in movies
+    #     ]
+    #     return dtos, total
     async def list_movies(
         self,
         *,
@@ -96,21 +154,22 @@ class MovieRepository:
         if language:
             stmt = stmt.where(Movie.language == language)
 
-        if city or format or target_date:
-            stmt = stmt.join(Showtime, Showtime.movie_id == Movie.id).join(
-                Screen, Showtime.screen_id == Screen.id
+        stmt = stmt.join(Showtime, Showtime.movie_id == Movie.id).join(
+            Screen, Showtime.screen_id == Screen.id
+        )
+        stmt = stmt.where(Showtime.starts_at > utcnow())
+
+        if city:
+            stmt = stmt.join(Venue, Screen.venue_id == Venue.id).where(
+                Venue.city == city
             )
-            if city:
-                stmt = stmt.join(Venue, Screen.venue_id == Venue.id).where(
-                    Venue.city == city
-                )
-            if format:
-                stmt = stmt.where(Showtime.format == format)
-            if target_date:
-                tz = ZoneInfo("Asia/Kolkata")
-                start_dt = datetime.combine(target_date, time.min, tzinfo=tz).astimezone(ZoneInfo("UTC"))
-                end_dt = datetime.combine(target_date, time.max, tzinfo=tz).astimezone(ZoneInfo("UTC"))
-                stmt = stmt.where(Showtime.starts_at.between(start_dt, end_dt))
+        if format:
+            stmt = stmt.where(Showtime.format == format)
+        if target_date:
+            tz = ZoneInfo("Asia/Kolkata")
+            start_dt = datetime.combine(target_date, time.min, tzinfo=tz).astimezone(ZoneInfo("UTC"))
+            end_dt = datetime.combine(target_date, time.max, tzinfo=tz).astimezone(ZoneInfo("UTC"))
+            stmt = stmt.where(Showtime.starts_at.between(start_dt, end_dt))
 
         stmt = stmt.distinct()
 
@@ -127,7 +186,7 @@ class MovieRepository:
             MovieSummaryDTO(
                 id=m.id,
                 title=m.title,
-                genre=m.genre, 
+                genre=m.genre,
                 original_title=m.original_title,
                 language=m.language,
                 duration_min=m.duration_min,
