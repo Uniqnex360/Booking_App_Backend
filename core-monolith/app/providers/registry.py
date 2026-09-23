@@ -8,7 +8,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-
+from typing import Any
 from app.core.database import Base
 from app.providers.base import ITheatreProvider
 
@@ -28,27 +28,16 @@ class ProviderRegistryModel(Base):
         nullable=False,
         server_default=sa.text("'pvr'"),
     )
-
 def create_provider_client(
     registry: ProviderRegistryModel,
     client: Any = None,
 ) -> ITheatreProvider:
     adapter = (registry.adapter or "pvr").lower()
 
-    if adapter == "pvr":
+    if adapter in ("pvr", "http"):
         return PVRProvider(
             base_url=registry.base_url,
-            timeout_seconds=float(
-                registry.hold_ttl_seconds
-                if registry.hold_ttl_seconds < 15
-                else 5.0
-            ),
-            client=client,
-        )
-
-    if adapter == "http":
-        return PVRProvider(
-            base_url=registry.base_url,
+            auth_token=registry.auth_token_ref,
             timeout_seconds=float(
                 registry.hold_ttl_seconds
                 if registry.hold_ttl_seconds < 15
