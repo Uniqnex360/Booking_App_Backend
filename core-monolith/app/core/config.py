@@ -24,7 +24,6 @@ class Settings(BaseSettings):
     EMAILS_FROM: Optional[str] = "noreply@datavioai.com"
     GOOGLE_PUBLIC_KEYS_URL: Optional[str] = None
 
-    # Razorpay Settings
     RAZORPAY_ENV: str = "test"
     RAZORPAY_KEY_ID: str = "rzp_test_VyBhZExTMTk5"
     RAZORPAY_KEY_SECRET: str = "test_secret_placeholder"
@@ -35,6 +34,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = '.env'
         case_sensitive = True
-        extra = "ignore"  # ← Ignore unknown fields
+        extra = "ignore" 
 
 settings = Settings()

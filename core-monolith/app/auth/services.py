@@ -25,10 +25,10 @@ from app.auth.interfaces import (
 )
 from app.auth.exceptions import (
     DuplicateEmailError,
-    InvalidCredentialsError,
     InvalidTokenError,
     TokenReuseError,
-    InactiveAccountError
+    UserNotFoundError
+    
 )
 from app.auth.schemas import UserRegisterRequest
 
@@ -231,7 +231,7 @@ class AuthService:
     ) -> None:
         user = await self.user_repo.get_by_email(email)
         if user is None:
-            return
+            raise UserNotFoundError()
 
         is_password_user = bool(
             user.password_hash and user.password_hash.startswith("$2")
