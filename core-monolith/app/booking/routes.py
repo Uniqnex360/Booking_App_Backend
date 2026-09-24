@@ -101,7 +101,7 @@ async def create_provider_hold(
 async def commit_booking(
     booking_id: UUID,
     payload: CommitBookingRequest | None = None,
-    current_user: AuthUserDomain = Depends(get_current_user),
+    current_user: AuthUserDomain | None = Depends(get_current_user_optional),
     booking_service: BookingService = Depends(get_booking_service),
 ):
     payment_ref = payload.payment_ref if payload else None
@@ -136,7 +136,7 @@ async def commit_booking(
 @router.delete("/bookings/hold/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_provider_hold(
     booking_id: UUID,
-    current_user: AuthUserDomain = Depends(get_current_user),
+    current_user: AuthUserDomain | None = Depends(get_current_user_optional),
     booking_service: BookingService = Depends(get_booking_service),
 ):
     try:

@@ -490,7 +490,9 @@ class BookingService:
         payment_ref: Optional[str] = None,
     ) -> Booking:
         booking = await self.booking_repo.get_by_id(booking_id)
-        if not booking or booking.user_id != user_id:
+        if not booking:
+            raise BookingNotFoundError()
+        if booking.user_id is not None and booking.user_id != user_id:
             raise BookingNotFoundError()
 
         if booking.status != BookingStatus.HELD:
@@ -573,7 +575,9 @@ class BookingService:
 
     async def cancel_hold(self, user_id: UUID, booking_id: UUID) -> Booking:
         booking = await self.booking_repo.get_by_id(booking_id)
-        if not booking or booking.user_id != user_id:
+        if not booking:
+            raise BookingNotFoundError()
+        if booking.user_id is not None and booking.user_id != user_id:
             raise BookingNotFoundError()
 
         if booking.status not in (BookingStatus.HELD, BookingStatus.PENDING_CONFIRMATION):
