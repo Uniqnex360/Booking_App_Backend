@@ -26,18 +26,18 @@ class NotificationService(INotificationService):
         print(f"[SMS MOCK TO {phone}]: {message}")
         return True
 
-    async def send_email(self, email: str, subject: str, body: str) -> bool:
+    async def send_email(self, email: str, subject: str, body: str, content_type: str = "text") -> bool: 
         resend_key = getattr(settings, "RESEND_API_KEY", None)
         from_email = getattr(settings, "RESEND_FROM_EMAIL", None) or getattr(settings, "EMAILS_FROM", None) or "noreply@datavioai.com"
 
-        # 1. Preferred: Resend REST API (HTTPS Port 443 - Never blocked by Render)
+        
         if resend_key:
             sender = f"Vybh <{from_email}>" if "<" not in from_email else from_email
             payload = {
                 "from": sender,
                 "to": [email],
                 "subject": subject,
-                "text": body,
+                "html": body,
             }
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
@@ -59,14 +59,14 @@ class NotificationService(INotificationService):
                 logger.error(f"Failed to connect to Resend API: {e}")
                 return False
 
-        # 2. Fallback: SMTP (if configured and Resend key is missing)
+        
         if getattr(settings, "SMTP_HOST", None) and getattr(settings, "RESEND_FROM_EMAIL", None):
             import aiosmtplib
             msg = EmailMessage()
             msg["From"] = getattr(settings, "EMAILS_FROM", from_email)
             msg["To"] = email
             msg["Subject"] = subject
-            msg.set_content(body)
+            msg.add_alternative(body, subtype="html")
             try:
                 await aiosmtplib.send(
                     msg,
@@ -84,7 +84,7 @@ class NotificationService(INotificationService):
                 logger.error(f"Failed to send email via SMTP: {e}")
                 return False
 
-        # 3. Development fallback
+        
         print(f"\n--- [DEV EMAIL] To: {email} | Subject: {subject} | Body: {body} ---\n")
         return True
 

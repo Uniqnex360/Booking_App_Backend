@@ -614,6 +614,7 @@ class BookingService:
                         email=updated_booking.contact_email,
                         subject=f"Your ticket is confirmed — {updated_booking.ref_code}",
                         body=self._ticket_email_body(updated_booking),
+                        content_type="html",
                     )
                 except Exception as exc:
                     logger.error(
