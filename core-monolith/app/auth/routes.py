@@ -38,7 +38,7 @@ from app.auth.schemas import (
     VerifyOTPRequest,
     UserMeResponse
 )
-from app.auth.exceptions import DuplicateEmailError, UserNotFoundError
+from app.auth.exceptions import DuplicateEmailError, AccountNotFoundError
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 limiter = Limiter(key_func=get_remote_address)
@@ -171,7 +171,7 @@ async def register_verify(
     await otp_service.verify(payload.user_id, payload.otp_code, method="EMAIL")
     user = await auth_service.user_repo.get_by_id(payload.user_id)
     if not user:
-        raise UserNotFoundError()
+        raise AccountNotFoundError()
         
     user.is_active = True
     user.is_verified = True
