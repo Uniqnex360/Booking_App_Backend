@@ -9,6 +9,7 @@ from app.booking.movie_service import MovieBookingService
 from app.booking.repository import BookingRepository, TierCounterRepository
 from app.booking.services import BookingService
 from app.core.database import get_db
+from app.auth.otp_service import NotificationService
 
 
 async def get_booking_service(
@@ -20,6 +21,7 @@ async def get_booking_service(
         booking_repo=booking_repo,
         counter_repo=counter_repo,
         session=session,
+        notification=NotificationService(),
     )
 
 

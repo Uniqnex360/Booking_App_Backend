@@ -42,6 +42,8 @@ from app.shared.providers.base import (
     ProviderUnavailable,
     SeatUnavailableRemote,
 )
+from app.auth.interfaces import INotificationService
+
 from app.shared.providers.registry import ProviderRegistryModel, create_provider_client
 from app.shared.timeutil import utcnow
 
@@ -54,26 +56,105 @@ class BookingService:
         booking_repo: IBookingRepository,
         counter_repo: ITierCounterRepository,
         session: Optional[AsyncSession] = None,
+        notification: "INotificationService | None" = None,
     ):
         self.booking_repo = booking_repo
         self.counter_repo = counter_repo
         self.session = session
+        self._notification = notification
+    
+    
+    def _ticket_email_body(self, booking: Booking) -> str:
+        from datetime import timezone
+        from zoneinfo import ZoneInfo
 
-    # -----------------------------------------------------------------------
-    # Payment and Hold Context Integrations
-    # -----------------------------------------------------------------------
+        # Booking has: id, user_id, status, total_paise, created_at, currency,
+        # showtime_id, provider_id, provider_hold_id, provider_booking_id,
+        # held_until, ref_code, barcode, idempotency_key, seat_refs, seat_codes,
+        # contact_email, contact_phone.
+        #
+        # Movie title, cinema, screen, and starts_at are NOT on the Booking object.
+        # If you want them in the email, fetch them before calling this method and
+        # pass them in, or build a lookup here. Placeholders below.
+
+        dt = booking.held_until or booking.created_at
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        starts_at_ist = dt.astimezone(ZoneInfo("Asia/Kolkata")).strftime(
+            "%A, %d %B %Y at %I:%M %p"
+        )
+
+        seat_codes = ", ".join(booking.seat_codes or booking.seat_refs or [])
+        amount_formatted = f"₹{booking.total_paise / 100:.2f}"
+        ref_code = booking.ref_code or "—"
+
+        return f"""\
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta charset="utf-8">
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0a0a0a; color: #f5f5f5; margin: 0; padding: 20px; }}
+        .ticket-card {{ max-width: 520px; margin: 0 auto; background: #171717; border-radius: 16px; border: 1px solid #262626; overflow: hidden; }}
+        .ticket-header {{ background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; padding: 24px; }}
+        .ticket-header h1 {{ margin: 0; font-size: 24px; font-weight: 900; letter-spacing: 1px; }}
+        .ticket-ref {{ font-family: monospace; font-size: 14px; font-weight: bold; opacity: 0.9; margin-top: 4px; }}
+        .ticket-body {{ padding: 24px; }}
+        .movie-title {{ font-size: 22px; font-weight: bold; color: #ffffff; margin: 0 0 4px 0; }}
+        .cinema-name {{ color: #a3a3a3; font-size: 14px; margin-bottom: 20px; }}
+        .info-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; background: #262626; padding: 16px; border-radius: 12px; margin-bottom: 24px; }}
+        .info-label {{ font-size: 11px; text-transform: uppercase; color: #737373; font-weight: bold; }}
+        .info-val {{ font-size: 14px; color: #f5f5f5; font-weight: bold; margin-top: 2px; }}
+        .btn {{ display: block; text-align: center; background: #f59e0b; color: #000; text-decoration: none; font-weight: bold; padding: 14px; border-radius: 10px; font-size: 14px; }}
+        .footer {{ text-align: center; color: #525252; font-size: 12px; margin-top: 20px; }}
+    </style>
+    </head>
+    <body>
+    <div class="ticket-card">
+        <div class="ticket-header">
+        <h1>VYHBZ</h1>
+        <div class="ticket-ref">BOOKING CONFIRMED: {ref_code}</div>
+        </div>
+        <div class="ticket-body">
+        <div class="movie-title">Your tickets are confirmed</div>
+        <div class="cinema-name">Booking reference {ref_code}</div>
+
+        <div class="info-grid">
+            <div>
+            <div class="info-label">Booked on</div>
+            <div class="info-val">{starts_at_ist}</div>
+            </div>
+            <div>
+            <div class="info-label">Seats ({len(booking.seat_codes or booking.seat_refs or [])})</div>
+            <div class="info-val" style="color: #f59e0b;">{seat_codes}</div>
+            </div>
+            <div>
+            <div class="info-label">Total Amount</div>
+            <div class="info-val">{amount_formatted}</div>
+            </div>
+            <div>
+            <div class="info-label">Status</div>
+            <div class="info-val" style="color: #4ade80;">{booking.status.value if hasattr(booking.status, "value") else booking.status}</div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Show this reference at the venue. You'll receive a reminder before your show.
+        </div>
+        </div>
+    </div>
+    </body>
+    </html>
+    """
     async def get_booking_detail(self, user_id: UUID, booking_id: UUID):
-        """
-        Return the enriched booking detail for a user, or raise BookingNotFoundError.
-        Delegates joins to the repository; builds the typed response DTO here.
-        """
+        
         result = await self.booking_repo.get_booking_with_context(booking_id)
         if not result:
             raise BookingNotFoundError()
 
         booking, context = result
 
-        # Ownership check — must be here, not in the router
+        
         if booking.user_id != user_id:
             raise BookingNotFoundError()
 
@@ -103,7 +184,7 @@ class BookingService:
             "currency": b.currency,
             "user_id": b.user_id,
             "status": b.status.value if hasattr(b.status, "value") else b.status,
-            "held_until": b.held_until,  # providers
+            "held_until": b.held_until,  
             "showtime_id": b.showtime_id,
             "tier_id": b.tier_id,
             "is_provider": is_provider,
@@ -128,8 +209,7 @@ class BookingService:
         return await self.booking_repo.get_by_id(booking_id)
 
     async def force_cancel_after_refund(self, booking_id: UUID, payment_id: str) -> Booking:
-        """Called only by Payment after a refund has been issued at the gateway.
-        The CONFIRMED/CANCELLED transition rule stays here, inside Booking."""
+        
         b = await self.booking_repo.get_by_id(booking_id)
         if not b:
             raise BookingNotFoundError()
@@ -148,8 +228,7 @@ class BookingService:
         return await self.booking_repo.get_by_id(booking_id)
 
     async def mark_expired(self, booking_id: UUID) -> Booking:
-        """Called only by Payment's recovery sweep for a stale HELD booking.
-        The transition rule stays here, inside Booking."""
+        
         b = await self.booking_repo.get_by_id(booking_id)
         if not b:
             raise BookingNotFoundError()
@@ -240,7 +319,7 @@ class BookingService:
             status=BookingStatus.HELD,
             showtime_id=showtime_id,
             total_paise=total_paise,
-            held_until=held_until,  # providers
+            held_until=held_until,  
             idempotency_key=idempotency_key,
             ref_code=ref_code,
             created_at=now,
@@ -289,9 +368,9 @@ class BookingService:
     async def get_user_bookings(self, user_id: UUID) -> list[Booking]:
         return await self.booking_repo.get_user_bookings(user_id)
 
-    # -----------------------------------------------------------------------
-    # Event Tier Bookings (Self-Hosted)
-    # -----------------------------------------------------------------------
+    
+    
+    
 
     async def create_booking(
         self,
@@ -381,9 +460,9 @@ class BookingService:
             await self.session.commit()
         return await self.booking_repo.get_by_id(booking_id)
 
-    # -----------------------------------------------------------------------
-    # Provider-Backed Cinema Holds & Bookings
-    # -----------------------------------------------------------------------
+    
+    
+    
 
     async def _resolve_provider_and_showtime(
         self, showtime_id: UUID
@@ -515,7 +594,7 @@ class BookingService:
                 provider_id=booking.provider_id,
                 provider_hold_id=booking.provider_hold_id,
                 provider_booking_id=ticket.booking_id,
-                held_until=booking.held_until,  # providers
+                held_until=booking.held_until,  
                 currency=ticket.currency,
                 total_paise=ticket.total_paise,
                 ref_code=ticket.ref_code,
@@ -523,12 +602,26 @@ class BookingService:
                 idempotency_key=booking.idempotency_key,
                 created_at=booking.created_at,
                 seat_refs=booking.seat_refs,
+                contact_email=booking.contact_email,     
+                contact_phone=booking.contact_phone,  
             )
             await self.booking_repo.update_booking(updated_booking)
             if self.session:
                 await self.session.commit()
+            if self._notification and updated_booking.contact_email:
+                try:
+                    await self._notification.send_email(
+                        email=updated_booking.contact_email,
+                        subject=f"Your ticket is confirmed — {updated_booking.ref_code}",
+                        body=self._ticket_email_body(updated_booking),
+                    )
+                except Exception as exc:
+                    logger.error(
+                        "Ticket email failed for booking %s: %s",
+                        updated_booking.id, exc,
+                    )
             return updated_booking
-        # TODO(merge-packages): Merge app/providers and app/shared/providers into a single shared provider library
+        
         except HoldExpiredRemote as exc:
             updated_booking = Booking(
                 id=booking.id,
@@ -537,7 +630,7 @@ class BookingService:
                 showtime_id=booking.showtime_id,
                 provider_id=booking.provider_id,
                 provider_hold_id=booking.provider_hold_id,
-                held_until=booking.held_until,  # providers
+                held_until=booking.held_until,  
                 total_paise=booking.total_paise,
                 currency=booking.currency,
                 created_at=booking.created_at,
@@ -562,7 +655,7 @@ class BookingService:
                 showtime_id=booking.showtime_id,
                 provider_id=booking.provider_id,
                 provider_hold_id=booking.provider_hold_id,
-                held_until=booking.held_until,  # providers
+                held_until=booking.held_until,  
                 total_paise=booking.total_paise,
                 currency=booking.currency,
                 created_at=booking.created_at,
@@ -597,7 +690,7 @@ class BookingService:
             showtime_id=booking.showtime_id,
             provider_id=booking.provider_id,
             provider_hold_id=booking.provider_hold_id,
-            held_until=booking.held_until,  # providers
+            held_until=booking.held_until,  
             total_paise=booking.total_paise,
             currency=booking.currency,
             created_at=booking.created_at,
@@ -614,7 +707,7 @@ class BookingService:
             raise BookingNotFoundError()
         return booking
 
-    async def release_expired_holds(self) -> list[UUID]:  # providers
+    async def release_expired_holds(self) -> list[UUID]:  
         expired_bookings = await self.booking_repo.get_expired_held_bookings()
         swept_ids: list[UUID] = []
         for b in expired_bookings:
