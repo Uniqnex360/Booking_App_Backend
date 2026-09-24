@@ -99,6 +99,8 @@ async def list_movies(
             release_date=m.release_date,
             poster_url=m.poster_url,
             banner_url=m.banner_url,
+            rating=float(m.rating) if m.rating is not None else None,
+            rating_count=m.rating_count,
             trailer_url=m.trailer_url, 
             synopsis=m.synopsis, 
             status=m.status,
@@ -132,6 +134,8 @@ async def get_movie_details(
             banner_url=dto.banner_url,  
             trailer_url=dto.trailer_url,
             synopsis=dto.synopsis,
+            rating=dto.rating,
+            rating_count=dto.rating_count,
             status=dto.status,
             venues=[
                 VenueShowtimesResponse(
