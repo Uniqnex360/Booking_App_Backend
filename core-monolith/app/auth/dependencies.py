@@ -36,6 +36,8 @@ from app.auth.security import BcryptPasswordHasher, JWTTokenService
 from app.auth.exceptions import InvalidTokenError
 _optional_bearer = HTTPBearer(auto_error=False)
 
+_required_bearer = HTTPBearer(auto_error=True)
+
 def get_user_repo(db: AsyncSession = Depends(get_db)) -> IUserRepository:
     return SQLAlchemyUserRepository(db)
 
@@ -80,7 +82,6 @@ def get_token_service() -> ITokenService:
 
 
 
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/login")
 async def get_current_user_optional(
     auth: HTTPAuthorizationCredentials | None = Depends(_optional_bearer),
@@ -98,6 +99,22 @@ async def get_current_user_optional(
     if user is None or not user.is_active:
         return None
     return user
+
+async def get_current_user(
+    auth: HTTPAuthorizationCredentials = Depends(_required_bearer),
+    token_service: ITokenService = Depends(get_token_service),
+    user_repo: IUserRepository = Depends(get_user_repo),
+) -> UserDomain:
+    try:
+        payload = token_service.decode_token(auth.credentials, token_type="access")
+        user_id = uuid.UUID(payload.get("sub"))
+    except (InvalidTokenError, ValueError):
+        raise InvalidTokenError()
+
+    user = await user_repo.get_by_id(user_id)
+    if user is None or not user.is_active:
+        raise InvalidTokenError()
+    return user
 def get_auth_service(
     user_repo: IUserRepository = Depends(get_user_repo),
     token_repo: IRefreshTokenRepository = Depends(get_refresh_token_repo),
@@ -113,6 +130,7 @@ def get_auth_service(
         token_service=token_service,
         auth_strategy=strategy
     )
+
 def require_role(allowed_roles: list[str]):
     async def checker(user: UserDomain = Depends(get_current_user)) -> UserDomain:
         user_role_str=user.role.value if hasattr(user.role,'value')else user.role 
