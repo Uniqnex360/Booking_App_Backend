@@ -202,16 +202,17 @@ async def get_me(current_user: UserDomain = Depends(get_current_user)):
         data=UserMeResponse.model_validate(current_user, from_attributes=True),
         message="Profile fetched successfully.",
     )
-@router.get("/admin/users")
-async def list_users(
-    admin: UserDomain = Depends(require_role([UserRole.ADMIN.value])),
-    auth_service: AuthService = Depends(get_auth_service)
-):
-    users = await auth_service.user_repo.list_all()
-    return success_response(
-        data=[
-            UserMeResponse.model_validate(u, from_attributes=True)
-            for u in users
-        ],
-        message="Users list fetched.",
-    )
+    
+# @router.get("/admin/users")
+# async def list_users(
+#     admin: UserDomain = Depends(require_role([UserRole.ADMIN.value])),
+#     auth_service: AuthService = Depends(get_auth_service)
+# ):
+#     users = await auth_service.user_repo.list_all()
+#     return success_response(
+#         data=[
+#             UserMeResponse.model_validate(u, from_attributes=True)
+#             for u in users
+#         ],
+#         message="Users list fetched.",
+#     )
