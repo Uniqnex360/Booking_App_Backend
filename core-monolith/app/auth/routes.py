@@ -235,6 +235,8 @@ async def forgot_password(
 ):
     try:
         await auth_service.request_password_reset(body.email, reset_repo, notification)
+    except UserNotFoundError:
+        raise
     except Exception as exc:
         logger.error("Forgot-password failed silently for %s: %s", body.email, exc)
 
