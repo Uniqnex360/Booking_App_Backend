@@ -37,7 +37,8 @@ class NotificationService(INotificationService):
                 "from": sender,
                 "to": [email],
                 "subject": subject,
-                "html": body,
+                "html" if content_type == "html" else "text": body,
+
             }
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
