@@ -23,7 +23,8 @@ from app.auth.interfaces import (
 from app.auth.repositories import (
     SQLAlchemyUserRepository, 
     SQLAlchemyRefreshTokenRepository, 
-    SQLAlchemyOTPCodesRepository
+    SQLAlchemyOTPCodesRepository,
+    SQLAlchemyPasswordResetRepository
 )
 from app.auth.strategies import (
     PasswordAuthStrategy, 
