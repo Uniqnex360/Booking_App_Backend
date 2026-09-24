@@ -3,6 +3,8 @@ from typing import Optional,Annotated
 import unicodedata
 from pydantic import BaseModel, EmailStr, BeforeValidator
 import re
+from uuid import UUID
+
 import uuid
 from datetime import datetime
 def normalize_email_str(v: str) -> str:
@@ -15,6 +17,18 @@ def normalize_phone_str(v: str) -> str:
     return v
 NormalizedPhone = Annotated[str, BeforeValidator(normalize_phone_str)]
 
+class UserMeResponse(BaseModel):
+    id: UUID
+    full_name: str
+    email: Optional[str] = None
+    role: str
+    is_active: bool
+    is_verified: bool
+    phone: Optional[str] = None
+    last_login_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
 NormalizedEmail=Annotated[EmailStr,BeforeValidator(normalize_email_str)]
 class VerifyOTPRequest(BaseModel):
     user_id: uuid.UUID

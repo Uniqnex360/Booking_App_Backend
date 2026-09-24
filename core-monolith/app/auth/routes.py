@@ -27,7 +27,8 @@ from app.auth.schemas import (
     UserRegisterRequest, 
     UserLoginRequest, 
     RefreshTokenRequest,
-    VerifyOTPRequest
+    VerifyOTPRequest,
+    UserMeResponse
 )
 from app.auth.exceptions import DuplicateEmailError, UserNotFoundError
 
@@ -41,9 +42,9 @@ async def register(
 ):
     user = await auth_service.register(user_data)
     return success_response(
-        data=user, 
-        message="Account created. OTP sent to your phone.", 
-        code=201
+        data=UserMeResponse.model_validate(user, from_attributes=True),
+        message="Account created. OTP sent to your phone.",
+        code=201,
     )
 @router.post("/login/firebase")
 async def login_firebase(
@@ -168,7 +169,10 @@ async def register_verify(
     user.is_verified = True
     updated_user = await auth_service.user_repo.update(user)
     
-    return success_response(data=updated_user, message="Phone number verified successfully.")
+    return success_response(
+        data=UserMeResponse.model_validate(updated_user, from_attributes=True),
+        message="Phone number verified successfully.",
+    )
 
 @router.post("/refresh")
 async def refresh(
@@ -194,12 +198,20 @@ async def logout(
 
 @router.get("/me")
 async def get_me(current_user: UserDomain = Depends(get_current_user)):
-    return success_response(data=current_user, message="Profile fetched successfully.")
-
+    return success_response(
+        data=UserMeResponse.model_validate(current_user, from_attributes=True),
+        message="Profile fetched successfully.",
+    )
 @router.get("/admin/users")
 async def list_users(
     admin: UserDomain = Depends(require_role([UserRole.ADMIN.value])),
     auth_service: AuthService = Depends(get_auth_service)
 ):
     users = await auth_service.user_repo.list_all()
-    return success_response(data=users, message="Users list fetched.")
+    return success_response(
+        data=[
+            UserMeResponse.model_validate(u, from_attributes=True)
+            for u in users
+        ],
+        message="Users list fetched.",
+    )
