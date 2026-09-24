@@ -415,14 +415,21 @@ class BookingService:
 
     async def create_hold(
         self,
-        user_id: UUID,
+        user_id: UUID | None,
         showtime_id: UUID,
         seat_ids: list[str],
         idem_key: str,
         seat_codes: list[str] | None = None,
+        contact_email: str | None = None,
+        contact_phone: str | None = None,
     ) -> Booking:
-        if idempotency_key := idem_key:
-            existing = await self.booking_repo.get_by_idempotency(user_id, idempotency_key)
+        if user_id is None and not (contact_email or contact_phone):
+            raise ValidationError(
+                "Guest bookings require contact_email or contact_phone"
+            )
+
+        if user_id is not None and idem_key:
+            existing = await self.booking_repo.get_by_idempotency(user_id, idem_key)
             if existing:
                 return existing
 
@@ -440,7 +447,7 @@ class BookingService:
             showtime_ref=provider_showtime_ref,
             seat_refs=seat_ids,
             idem_key=idem_key,
-            end_user_ref=str(user_id),
+            end_user_ref=str(user_id) if user_id else (contact_email or contact_phone or "guest"),
         )
 
         booking_id = uuid.uuid4()
@@ -452,13 +459,15 @@ class BookingService:
             showtime_id=st.id,
             provider_id=registry.id,
             provider_hold_id=remote_hold.hold_id,
-            held_until=remote_hold.expires_at,  # providers
+            held_until=remote_hold.expires_at,
             currency=remote_hold.currency,
             total_paise=remote_hold.total_paise,
             idempotency_key=idem_key,
             created_at=now,
             seat_refs=seat_ids,
-             seat_codes=seat_codes
+            seat_codes=seat_codes,
+            contact_email=contact_email,
+            contact_phone=contact_phone,
         )
 
         try:
@@ -469,12 +478,11 @@ class BookingService:
         except IntegrityError:
             if self.session:
                 await self.session.rollback()
-            if idem_key:
+            if user_id is not None and idem_key:
                 existing = await self.booking_repo.get_by_idempotency(user_id, idem_key)
                 if existing:
                     return existing
             raise
-
     async def commit_booking(
         self,
         user_id: UUID,

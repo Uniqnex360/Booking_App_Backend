@@ -41,11 +41,12 @@ class BookingCreateRequest(BaseModel):
             raise ValueError("Cannot combine Event and Movie bookings in a single request.")
         return self
 
-
 class ProviderHoldCreateRequest(BaseModel):
     showtime_id: UUID
     seat_ids: list[str] = Field(min_length=1, max_length=10)
     seat_codes: list[str] | None = Field(default=None, max_length=10)
+    contact_email: str | None = None
+    contact_phone: str | None = None
 
 
 class CommitBookingRequest(BaseModel):

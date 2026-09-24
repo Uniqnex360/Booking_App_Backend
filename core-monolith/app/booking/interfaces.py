@@ -49,7 +49,7 @@ class TierInfo:
 @dataclass(frozen=True)
 class Booking:
     id: UUID
-    user_id: UUID
+    user_id: Optional[UUID] 
     status: BookingStatus
     total_paise: int
     created_at: datetime
@@ -68,6 +68,8 @@ class Booking:
     barcode: Optional[str] = None
     seat_refs: Optional[list[str]] = None
     seat_codes: Optional[list[str]] = None
+    contact_email: Optional[str] = None      
+    contact_phone: Optional[str] = None 
 class ValidationError(ValueError, DomainError):
     pass
 class SoldOutError(DomainError):

@@ -9,7 +9,7 @@ from uuid import UUID
 from app.booking.schemas import BookingDetailResponse 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import JSONResponse
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user,get_current_user_optional
 from app.auth.interfaces import User as AuthUserDomain
 from app.providers.base import HoldAlreadyCommitted
 from app.booking.dependencies import get_booking_service, get_movie_booking_service
@@ -49,7 +49,7 @@ router = APIRouter(tags=["bookings"])
 async def create_provider_hold(
     payload: ProviderHoldCreateRequest,
     idempotency_key: str = Header(..., alias="Idempotency-Key"),
-    current_user: AuthUserDomain = Depends(get_current_user),
+    current_user: AuthUserDomain | None = Depends(get_current_user_optional),
     booking_service: BookingService = Depends(get_booking_service),
 ):
     if not idempotency_key:

@@ -79,6 +79,8 @@ class BookingRepository(IBookingRepository):
             barcode=b.barcode,
             seat_refs_json=seat_refs_str,
             seat_codes_json=seat_codes_str,
+            contact_email=b.contact_email,          
+            contact_phone=b.contact_phone, 
         )
         self.session.add(model)
         await self.session.flush()

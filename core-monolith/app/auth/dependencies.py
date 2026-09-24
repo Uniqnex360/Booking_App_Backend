@@ -29,9 +29,12 @@ from app.auth.strategies import (
     OTPAuthStrategy, 
     FirebaseManualPhoneStrategy 
 )
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
 from app.auth.otp_service import OTPService
 from app.auth.security import BcryptPasswordHasher, JWTTokenService
 from app.auth.exceptions import InvalidTokenError
+_optional_bearer = HTTPBearer(auto_error=False)
 
 def get_user_repo(db: AsyncSession = Depends(get_db)) -> IUserRepository:
     return SQLAlchemyUserRepository(db)
@@ -79,22 +82,21 @@ def get_token_service() -> ITokenService:
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/login")
-
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
+async def get_current_user_optional(
+    auth: HTTPAuthorizationCredentials | None = Depends(_optional_bearer),
     token_service: ITokenService = Depends(get_token_service),
-    user_repo: IUserRepository = Depends(get_user_repo)
-) -> UserDomain:
+    user_repo: IUserRepository = Depends(get_user_repo),
+) -> UserDomain | None:
+    if auth is None or not auth.credentials:
+        return None
     try:
-        payload = token_service.decode_token(token, token_type="access")
+        payload = token_service.decode_token(auth.credentials, token_type="access")
         user_id = uuid.UUID(payload.get("sub"))
-    except (InvalidTokenError, ValueError):
-        raise InvalidTokenError()
-    
+    except Exception:
+        return None
     user = await user_repo.get_by_id(user_id)
     if user is None or not user.is_active:
-        raise InvalidTokenError()
-    
+        return None
     return user
 def get_auth_service(
     user_repo: IUserRepository = Depends(get_user_repo),

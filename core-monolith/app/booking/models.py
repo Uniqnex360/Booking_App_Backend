@@ -14,7 +14,9 @@ class BookingModel(Base):
     __tablename__ = "bookings"
 
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(PG_UUID(as_uuid=True), nullable=False, index=True)
+    user_id = Column(PG_UUID(as_uuid=True), nullable=True, index=True)
+    contact_email = Column(String(255), nullable=True)
+    contact_phone = Column(String(20), nullable=True)
     booking_type = Column(Text, nullable=False, server_default="EVENT")
     event_id = Column(PG_UUID(as_uuid=True), nullable=True, index=True)
     tier_id = Column(PG_UUID(as_uuid=True), nullable=True, index=True)
