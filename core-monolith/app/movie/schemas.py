@@ -7,9 +7,9 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
-# ---------------------------------------------------------------------------
-# Public Responses
-# ---------------------------------------------------------------------------
+
+
+
 
 class MovieSummaryResponse(BaseModel):
     id: UUID
@@ -20,6 +20,8 @@ class MovieSummaryResponse(BaseModel):
     certificate: str
     release_date: datetime | None = None
     poster_url: str | None = None
+    banner_url: str | None = None       
+    trailer_url: str | None = None   
     status: str
     genre: str | None = None
 
@@ -98,9 +100,9 @@ class AvailabilityResponse(BaseModel):
     locked_seats: int = 0
 
 
-# ---------------------------------------------------------------------------
-# Partner Request / Response Schemas
-# ---------------------------------------------------------------------------
+
+
+
 
 class CreateMovieRequest(BaseModel):
     title: str = Field(min_length=1, max_length=255)
@@ -132,7 +134,7 @@ class ApplyLayoutRequest(BaseModel):
         description="Text grid specification (e.g. 'A: 1111 2 1111')"
     )
     default_price_paise: int = Field(default=29000, ge=0)
-    section: str | None = None  # STALLS | BALCONY | CLUB
+    section: str | None = None  
 
 
 class AdminApplyLayoutRequest(ApplyLayoutRequest):
@@ -144,7 +146,7 @@ class CreateShowtimeRequest(BaseModel):
     movie_id: UUID
     starts_at: datetime
     language: str = Field(default="Malayalam")
-    format: str = Field(default="2D")  # 2D | 3D | IMAX | DOLBY
+    format: str = Field(default="2D")  
 
 
 class BlockSeatsRequest(BaseModel):
@@ -157,7 +159,7 @@ class UnblockSeatsRequest(BaseModel):
 
 
 class ContentStatusUpdateRequest(BaseModel):
-    status: str  # PUBLISHED | REJECTED | CANCELLED
+    status: str  
 class CreateVenueRequest(BaseModel):
     name: str = Field(min_length=1, max_length=128)
     city: str = Field(min_length=1, max_length=64)
