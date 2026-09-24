@@ -1,7 +1,6 @@
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from typing import List
 import uuid
 import logging
 logger = logging.getLogger(__name__)
@@ -9,17 +8,26 @@ from app.core.config import settings
 from app.shared.response import success_response  
 from app.auth.dependencies import (
     get_current_user, 
-    require_role, 
+    get_notification_service,
     get_auth_service,
     get_firebase_manual_strategy,
     get_otp_service,
     get_user_repo
+)
+from app.shared.response import success_response, error_response
+from app.auth.dependencies import get_password_reset_repo, get_refresh_token_repo, get_password_hasher
+
+from app.auth.schemas import (
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    ValidateResetTokenResponse,
 )
 from app.auth.interfaces import (
     User as UserDomain, 
     UserRole, 
     IAuthenticationStrategy,
     IOTPService,
+    IPasswordResetRepository, IRefreshTokenRepository, IPasswordHasher,
     IUserRepository
 )
 from app.auth.services import AuthService
@@ -216,3 +224,56 @@ async def get_me(current_user: UserDomain = Depends(get_current_user)):
 #         ],
 #         message="Users list fetched.",
 #     )
+@router.post("/forgot-password")
+@limiter.limit("3/minute")
+async def forgot_password(
+    request: Request,
+    body: ForgotPasswordRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+    reset_repo: IPasswordResetRepository = Depends(get_password_reset_repo),
+    notification=Depends(get_notification_service),
+):
+    try:
+        await auth_service.request_password_reset(body.email, reset_repo, notification)
+    except Exception as exc:
+        logger.error("Forgot-password failed silently for %s: %s", body.email, exc)
+
+    return success_response(
+        data=None,
+        message="If that account exists, we've sent instructions.",
+    )
+
+
+@router.post("/reset-password/validate", response_model=ValidateResetTokenResponse)
+async def validate_reset(
+    body: dict,
+    auth_service: AuthService = Depends(get_auth_service),
+    reset_repo: IPasswordResetRepository = Depends(get_password_reset_repo),
+):
+    raw = body.get("token", "")
+    row = await auth_service.validate_reset_token(reset_repo, raw)
+    return ValidateResetTokenResponse(valid=row is not None)
+
+
+@router.post("/reset-password")
+async def reset_password(
+    body: ResetPasswordRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+    reset_repo: IPasswordResetRepository = Depends(get_password_reset_repo),
+    refresh_repo: IRefreshTokenRepository = Depends(get_refresh_token_repo),
+    hasher: IPasswordHasher = Depends(get_password_hasher),
+):
+    ok = await auth_service.reset_password(
+        reset_repo=reset_repo,
+        refresh_repo=refresh_repo,
+        hasher=hasher,
+        raw_token=body.token,
+        new_password=body.new_password,
+    )
+    if not ok:
+        return error_response(
+            "INVALID_RESET_TOKEN",
+            "This reset link is invalid or has expired.",
+            400,
+        )
+    return success_response(data=None, message="Password updated. Please sign in.")

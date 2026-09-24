@@ -4,12 +4,15 @@ import logging
 from datetime import datetime, timedelta
 from typing import Tuple, Optional
 from fastapi import HTTPException
+from app.shared.hashing import sha256_hex
+
 from app.auth.interfaces import (
     IUserRepository,
     IRefreshTokenRepository,
     IAuthenticationStrategy,
     ITokenService,
     IPasswordHasher,
+    IPasswordResetRepository,
     User as UserDomain,
     RefreshToken as RefreshTokenDomain,
     UserRole,
@@ -213,5 +216,88 @@ class AuthService:
             raise HTTPException(status_code=503, detail="Logout failed")
     
     def _hash_refresh_token(self, token: str) -> str:
-        import hashlib
-        return hashlib.sha256(token.encode()).hexdigest()
+        return sha256_hex(token)
+    async def request_password_reset(
+        self,
+        email: str,
+        reset_repo: IPasswordResetRepository,
+        notification: INotificationService,
+    ) -> None:
+        """Always succeeds from the caller's perspective. No enumeration."""
+        user = await self.user_repo.get_by_email(email)
+        if user is None:
+            return
+
+        is_password_user = bool(
+            user.password_hash and user.password_hash.startswith("$2")
+        )
+
+        if is_password_user:
+            await reset_repo.delete_for_user(user.id)   # invalidate previous
+            raw = secrets.token_urlsafe(32)
+            expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+            await reset_repo.create(user.id, _hash_token(raw), expires_at)
+
+            link = f"{settings.FRONTEND_URL}/reset-password?token={raw}"
+            await notification.send_email(
+                email=user.email,
+                subject="Reset your Vyhbz password",
+                body=(
+                    f"Click to reset your password:\n\n{link}\n\n"
+                    f"This link expires in 30 minutes. "
+                    f"If you didn't request this, ignore this email."
+                ),
+                content_type="text",
+            )
+            return
+
+        # Google / phone-email user: no password, tell them how to sign in.
+        if user.email:
+            await notification.send_email(
+                email=user.email,
+                subject="Reset your Vyhbz password",
+                body=(
+                    "You signed up with Google or a phone number, "
+                    "so there's no password to reset. "
+                    "Use the same method to sign in."
+                ),
+                content_type="text",
+            )
+        # phone.email users have email=None. Nothing to send. Silent.
+
+
+    async def validate_reset_token(
+        self, reset_repo: IPasswordResetRepository, raw_token: str
+    ) -> PasswordResetRow | None:
+        return await reset_repo.get_valid(_hash_token(raw_token))
+
+
+    async def reset_password(
+        self,
+        reset_repo: IPasswordResetRepository,
+        refresh_repo: IRefreshTokenRepository,
+        hasher: IPasswordHasher,
+        raw_token: str,
+        new_password: str,
+    ) -> bool:
+        row = await reset_repo.get_valid(_hash_token(raw_token))
+        if row is None:
+            return False
+
+        user = await self.user_repo.get_by_id(row.user_id)
+        if user is None:
+            return False
+
+        user.password_hash = hasher.hash(new_password)
+        await self.user_repo.update(user)
+
+        await reset_repo.mark_used(row.id)
+
+        # Kill every active session for this user.
+        try:
+            await refresh_repo.revoke_all_for_user(user.id)
+        except AttributeError:
+            # If your refresh repo doesn't have that method yet, add it.
+            pass
+
+        return True

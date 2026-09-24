@@ -27,7 +27,13 @@ class User:
     last_login_at: Optional[datetime] = None
     created_at: datetime = field(default_factory=datetime.utcnow)
 
-
+@dataclass(frozen=True)
+class PasswordResetRow:
+    id: uuid.UUID
+    user_id: uuid.UUID
+    expires_at: datetime
+    used_at: datetime | None
+    
 @dataclass 
 class RefreshToken:
     id: uuid.UUID
@@ -74,6 +80,7 @@ class IRefreshTokenRepository(Protocol):
     async def revoke(self, token_hash: str) -> None: ...
     async def revoke_all_for_user(self, user_id: uuid.UUID) -> None: ...
     async def revoke_by_family(self, family: uuid.UUID) -> None: ...
+    async def revoke_all_for_user(self, user_id: uuid.UUID) -> None: ...
 
 
 class IOTPCodesRepository(Protocol):
@@ -87,7 +94,18 @@ class IOTPCodesRepository(Protocol):
     async def get_valid_code_by_email(self, email: str, method: str) -> Optional[dict]: ...
 
 
+class IPasswordResetRepository(Protocol):
+    async def create(
+        self, user_id: uuid.UUID, token_hash: str, expires_at: datetime
+    ) -> None: ...
 
+    async def get_valid(
+        self, token_hash: str
+    ) -> "PasswordResetRow | None": ...
+
+    async def mark_used(self, reset_id: uuid.UUID) -> None: ...
+
+    async def delete_for_user(self, user_id: uuid.UUID) -> None: ...
 
 
 class IAuthenticationStrategy(ABC):

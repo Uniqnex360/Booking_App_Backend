@@ -14,6 +14,7 @@ from app.auth.interfaces import (
     IRefreshTokenRepository, 
     IOTPCodesRepository,
     IAuthenticationStrategy, 
+    IPasswordResetRepository,
     ITokenService, 
     IOTPService, 
     IPasswordHasher,
@@ -81,7 +82,10 @@ def get_token_service() -> ITokenService:
     return JWTTokenService()
 
 
-
+def get_password_reset_repo(
+    db: AsyncSession = Depends(get_db),
+) -> IPasswordResetRepository:
+    return SQLAlchemyPasswordResetRepository(db)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/login")
 async def get_current_user_optional(
     auth: HTTPAuthorizationCredentials | None = Depends(_optional_bearer),

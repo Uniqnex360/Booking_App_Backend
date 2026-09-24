@@ -1,11 +1,11 @@
 import secrets
-import hashlib
 import logging
 import uuid
 import httpx
 from datetime import datetime, timedelta
 from typing import Optional
 from email.message import EmailMessage
+from app.shared.hashing import sha256_hex
 
 from app.auth.interfaces import (
     IOTPService, 
@@ -110,7 +110,8 @@ class OTPService(IOTPService):
         return ''.join(secrets.choice('0123456789') for _ in range(self.CODE_LENGTH))
 
     def _hash_code(self, code: str) -> str:
-        return hashlib.sha256(code.encode()).hexdigest()
+        return sha256_hex(code)
+
 
     async def generate_and_send(self, user: UserDomain, method: str = "SMS") -> None:
         recent_count = await self.otp_repo.count_recent_requests(user.id, 60)

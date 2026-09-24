@@ -1,4 +1,3 @@
-import hashlib
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
@@ -9,6 +8,7 @@ from passlib.context import CryptContext
 from app.core.config import settings
 from app.auth.exceptions import InvalidTokenError
 from app.auth.interfaces import IPasswordHasher, ITokenService, User as UserDomain
+from app.shared.hashing import sha256_hex
 
 
 
@@ -74,4 +74,4 @@ class JWTTokenService(ITokenService):
 
     def hash_token(self, token: str) -> str:
        
-        return hashlib.sha256(token.encode()).hexdigest()
+        return sha256_hex(token)

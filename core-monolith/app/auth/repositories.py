@@ -16,11 +16,56 @@ from app.auth.interfaces import (
     IRefreshTokenRepository, 
     IOTPCodesRepository,
     RepositoryError,
+    IPasswordResetRepository,
     DuplicateError,
     NotFoundError
 )
 
+class SQLAlchemyPasswordResetRepository(IPasswordResetRepository):
+    def __init__(self, session: AsyncSession):
+        self.session = session
 
+    async def create(
+        self, user_id: uuid.UUID, token_hash: str, expires_at: datetime
+    ) -> None:
+        row = PasswordResetModel(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+        )
+        self.session.add(row)
+        await self.session.commit()
+
+    async def get_valid(self, token_hash: str) -> PasswordResetRow | None:
+        stmt = select(PasswordResetModel).where(
+            PasswordResetModel.token_hash == token_hash,
+            PasswordResetModel.used_at.is_(None),
+            PasswordResetModel.expires_at > datetime.now(timezone.utc),
+        )
+        row = (await self.session.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            return None
+        return PasswordResetRow(
+            id=row.id,
+            user_id=row.user_id,
+            expires_at=row.expires_at,
+            used_at=row.used_at,
+        )
+
+    async def mark_used(self, reset_id: uuid.UUID) -> None:
+        await self.session.execute(
+            update(PasswordResetModel)
+            .where(PasswordResetModel.id == reset_id)
+            .values(used_at=datetime.now(timezone.utc))
+        )
+        await self.session.commit()
+
+    async def delete_for_user(self, user_id: uuid.UUID) -> None:
+        await self.session.execute(
+            delete(PasswordResetModel).where(PasswordResetModel.user_id == user_id)
+        )
+        await self.session.commit()
 class SQLAlchemyUserRepository(IUserRepository):
     
     def __init__(self, db: AsyncSession):
@@ -157,7 +202,13 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
             ip_address=orm.ip_address,
             user_agent=orm.user_agent
         )
-    
+    async def revoke_all_for_user(self, user_id: uuid.UUID) -> None:
+        await self.session.execute(
+            update(RefreshTokenModel)
+            .where(RefreshTokenModel.user_id == user_id)
+            .values(is_revoked=True)
+        )
+        await self.session.commit()
     async def get_by_hash(self, token_hash: str, lock: bool = False) -> Optional[RefreshTokenDomain]:
       
         try:

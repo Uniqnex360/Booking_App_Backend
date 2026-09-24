@@ -16,7 +16,17 @@ def normalize_phone_str(v: str) -> str:
         return ''.join(c for c in v if c.isdigit() or c == '+')
     return v
 NormalizedPhone = Annotated[str, BeforeValidator(normalize_phone_str)]
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
 
+
+class ValidateResetTokenResponse(BaseModel):
+    valid: bool
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=200)
+    new_password: str = Field(min_length=8, max_length=128)
 class UserMeResponse(BaseModel):
     id: UUID
     full_name: str
