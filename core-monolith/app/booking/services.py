@@ -11,6 +11,7 @@ from app.booking.schemas import BaseBookingDetail,EventBookingDetail,MovieBookin
 from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.movie.models import Showtime
 
 from app.booking.interfaces import (
     MAX_SEATS_PER_BOOKING,
@@ -64,7 +65,8 @@ class BookingService:
         self._notification = notification
     
     
-    def _ticket_email_body(self, booking: Booking) -> str:
+    def _ticket_email_body(self, booking: Booking, showtime_at=None) -> str:
+
         from datetime import timezone
         from zoneinfo import ZoneInfo
 
@@ -77,7 +79,7 @@ class BookingService:
         # If you want them in the email, fetch them before calling this method and
         # pass them in, or build a lookup here. Placeholders below.
 
-        dt = booking.held_until or booking.created_at
+        dt = showtime_at or booking.held_until or booking.created_at
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         starts_at_ist = dt.astimezone(ZoneInfo("Asia/Kolkata")).strftime(
@@ -110,6 +112,7 @@ class BookingService:
     </style>
     </head>
     <body>
+    <div class="info-label">Showtime</div>
     <div class="ticket-card">
         <div class="ticket-header">
         <h1>VYHBZ</h1>
@@ -586,6 +589,10 @@ class BookingService:
             ticket: ProviderTicket = await provider.commit(
                 hold_id=booking.provider_hold_id, payment_ref=payment_ref
             )
+            st_row = (await self.session.execute(
+                select(Showtime).where(Showtime.id == booking.showtime_id)
+            )).scalar_one_or_none()
+
             updated_booking = Booking(
                 id=booking.id,
                 user_id=booking.user_id,
@@ -602,6 +609,7 @@ class BookingService:
                 idempotency_key=booking.idempotency_key,
                 created_at=booking.created_at,
                 seat_refs=booking.seat_refs,
+                seat_codes=booking.seat_codes,  
                 contact_email=booking.contact_email,     
                 contact_phone=booking.contact_phone,  
             )
@@ -613,7 +621,8 @@ class BookingService:
                     await self._notification.send_email(
                         email=updated_booking.contact_email,
                         subject=f"Your ticket is confirmed — {updated_booking.ref_code}",
-                        body=self._ticket_email_body(updated_booking),
+                        body=self._ticket_email_body(updated_booking, showtime_at=st_row.starts_at if st_row else None),
+
                         content_type="html",
                     )
                 except Exception as exc:
