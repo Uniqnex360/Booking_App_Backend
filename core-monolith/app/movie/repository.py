@@ -195,6 +195,7 @@ class MovieRepository:
                 poster_url=m.poster_url,
                 banner_url=m.banner_url,
                 trailer_url=m.trailer_url,  
+                synopsis=m.synopsis, 
                 status=m.status,
             )
             for m in movies
