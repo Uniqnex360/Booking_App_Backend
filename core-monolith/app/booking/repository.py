@@ -208,6 +208,8 @@ class BookingRepository(IBookingRepository):
             barcode=m.barcode,
             seat_refs=seat_refs,
             seat_codes=seat_codes,
+            contact_email=m.contact_email,      
+            contact_phone=m.contact_phone,
         )
 
 
