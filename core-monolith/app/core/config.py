@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     RAZORPAY_KEY_ID: str = "rzp_test_VyBhZExTMTk5"
     RAZORPAY_KEY_SECRET: str = "test_secret_placeholder"
     RAZORPAY_WEBHOOK_SECRET: str = "whsec_test_placeholder" 
+    FRONTEND_URL:str
+    
 
     class Config:
         env_file = '.env'

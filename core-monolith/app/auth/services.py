@@ -1,10 +1,12 @@
 
 import uuid
 import logging
-from datetime import datetime, timedelta
 from typing import Tuple, Optional
 from fastapi import HTTPException
 from app.shared.hashing import sha256_hex
+import secrets
+from datetime import datetime, timedelta, timezone
+from app.core.config import settings
 
 from app.auth.interfaces import (
     IUserRepository,
@@ -219,13 +221,14 @@ class AuthService:
     
     def _hash_refresh_token(self, token: str) -> str:
         return sha256_hex(token)
+    def _hash_token(self, token: str) -> str:
+        return sha256_hex(token)
     async def request_password_reset(
         self,
         email: str,
         reset_repo: IPasswordResetRepository,
         notification: INotificationService,
     ) -> None:
-        """Always succeeds from the caller's perspective. No enumeration."""
         user = await self.user_repo.get_by_email(email)
         if user is None:
             return
@@ -235,10 +238,10 @@ class AuthService:
         )
 
         if is_password_user:
-            await reset_repo.delete_for_user(user.id)   # invalidate previous
+            await reset_repo.delete_for_user(user.id)  
             raw = secrets.token_urlsafe(32)
             expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
-            await reset_repo.create(user.id, _hash_token(raw), expires_at)
+            await reset_repo.create(user.id, self._hash_token(raw), expires_at)
 
             link = f"{settings.FRONTEND_URL}/reset-password?token={raw}"
             await notification.send_email(
@@ -253,7 +256,6 @@ class AuthService:
             )
             return
 
-        # Google / phone-email user: no password, tell them how to sign in.
         if user.email:
             await notification.send_email(
                 email=user.email,
@@ -265,13 +267,12 @@ class AuthService:
                 ),
                 content_type="text",
             )
-        # phone.email users have email=None. Nothing to send. Silent.
 
 
     async def validate_reset_token(
         self, reset_repo: IPasswordResetRepository, raw_token: str
     ) -> PasswordResetRow | None:
-        return await reset_repo.get_valid(_hash_token(raw_token))
+        return await reset_repo.get_valid(self._hash_token(raw_token))
 
 
     async def reset_password(
@@ -282,7 +283,7 @@ class AuthService:
         raw_token: str,
         new_password: str,
     ) -> bool:
-        row = await reset_repo.get_valid(_hash_token(raw_token))
+        row = await reset_repo.get_valid(self._hash_token(raw_token))
         if row is None:
             return False
 
@@ -295,11 +296,9 @@ class AuthService:
 
         await reset_repo.mark_used(row.id)
 
-        # Kill every active session for this user.
         try:
             await refresh_repo.revoke_all_for_user(user.id)
         except AttributeError:
-            # If your refresh repo doesn't have that method yet, add it.
             pass
 
         return True
