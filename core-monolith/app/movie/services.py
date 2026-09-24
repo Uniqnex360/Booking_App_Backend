@@ -1,20 +1,9 @@
-"""
-Movie & Showtime Service — pure domain logic.
-
-Boundary Contract Checklist:
-- ZERO imports from fastapi or starlette
-- ZERO imports from schemas.py, exceptions.py, models.py, repository.py
-- Imports ONLY from interfaces.py and app.shared
-- Raises ONLY domain exceptions
-"""
-
 from __future__ import annotations
-
 from datetime import date, datetime
 from uuid import UUID
-
 from app.movie.interfaces import (
     IMovieRepository,
+    MovieReviewDTO,
     MovieDetailsDTO,
     MovieNotFoundError,
     MovieNotPublishedError,
@@ -24,26 +13,17 @@ from app.movie.interfaces import (
     ShowtimeNotFoundError,
 )
 from app.movie.layout_parser import parse_text_grid
-
-
 class MovieService:
-
     async def release_expired_locks(self, booking_id: UUID) -> int:
         return await self._repo.release_expired_locks(booking_id)
-
-
     async def create_venue(
         self, *, name: str, city: str, partner_id: UUID, address: str | None = None, latitude: float | None = None, longitude: float | None = None, timezone: str = "Asia/Kolkata"
     ):
         return await self._repo.create_venue(
             name=name, city=city, partner_id=partner_id, address=address, latitude=latitude, longitude=longitude, timezone=timezone
         )
-
     def __init__(self, movie_repo: IMovieRepository) -> None:
         self._repo = movie_repo
-
-    # --- Read Paths ---
-
     async def list_movies(
         self,
         *,
@@ -62,19 +42,16 @@ class MovieService:
             page=page,
             limit=limit,
         )
-
     async def get_movie_details(self, movie_id: UUID) -> MovieDetailsDTO:
         movie = await self._repo.get_movie_details(movie_id)
         if movie is None:
             raise MovieNotFoundError(f"Movie '{movie_id}' not found")
         return movie
-
     async def get_seat_map(self, showtime_id: UUID) -> SeatMapDTO:
         seat_map = await self._repo.get_seat_map(showtime_id)
         if seat_map is None:
             raise ShowtimeNotFoundError(f"Showtime '{showtime_id}' not found")
         return seat_map
-
     async def get_showtime_availability(
         self, showtime_id: UUID
     ) -> ShowtimeAvailabilityDTO:
@@ -82,9 +59,6 @@ class MovieService:
         if availability is None:
             raise ShowtimeNotFoundError(f"Showtime '{showtime_id}' not found")
         return availability
-
-    # --- Partner Write Paths ---
-
     async def create_movie(
         self,
         *,
@@ -109,22 +83,31 @@ class MovieService:
             banner_url=banner_url,
             synopsis=synopsis,
         )
-
+    async def submit_review(
+        self, user_id: UUID, movie_id: UUID, rating: float, hashtags: list[str]
+    ) -> MovieReviewDTO:
+        movie = await self._repo.get_movie_details(movie_id)
+        if movie is None:
+            raise MovieNotFoundError(f"Movie '{movie_id}' not found")
+        review = await self._repo.upsert_review(user_id, movie_id, rating, hashtags)
+        await self._repo.recompute_movie_rating(movie_id)
+        return review
+    async def get_my_review(
+        self, user_id: UUID, movie_id: UUID
+    ) -> MovieReviewDTO | None:
+        return await self._repo.get_review_for_user(user_id, movie_id)
     async def update_movie(
         self, movie_id: UUID, partner_id: UUID, updates: dict
     ) -> MovieSummaryDTO:
         return await self._repo.update_movie(movie_id, partner_id, updates)
-
     async def update_movie_status(
         self, movie_id: UUID, new_status: str
     ) -> MovieSummaryDTO:
         return await self._repo.update_movie_status(movie_id, new_status)
-
     async def create_screen(
         self, venue_id: UUID, name: str, partner_id: UUID
     ) -> UUID:
         return await self._repo.create_screen(venue_id, name, partner_id)
-
     async def apply_screen_layout(
         self,
         screen_id: UUID,
@@ -141,7 +124,6 @@ class MovieService:
         return await self._repo.apply_screen_layout(
             screen_id, parsed_rows, is_admin_override=is_admin_override
         )
-
     async def create_showtime(
         self,
         *,
@@ -165,17 +147,14 @@ class MovieService:
             format=format,
             partner_id=partner_id,
         )
-
     async def cancel_showtime(
         self, showtime_id: UUID, partner_id: UUID
     ) -> bool:
         return await self._repo.cancel_showtime(showtime_id, partner_id)
-
     async def block_seats(
         self, showtime_id: UUID, seat_ids: list[UUID], reason: str
     ) -> bool:
         return await self._repo.block_seats(showtime_id, seat_ids, reason)
-
     async def unblock_seats(
         self, showtime_id: UUID, seat_ids: list[UUID]
     ) -> bool:

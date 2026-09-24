@@ -1,14 +1,8 @@
-"""
-FastAPI routes for Movie Module (Public, Partner & Admin Endpoints).
-"""
-
 from __future__ import annotations
-
 from datetime import date
 from uuid import UUID
-
 from fastapi import APIRouter, Depends, Query, status
-
+from app.movie.schemas import CreateReviewRequest, ReviewResponse
 from app.auth.dependencies import require_role
 from app.auth.interfaces import User as AuthUserDomain
 from app.movie.dependencies import get_movie_service
@@ -61,14 +55,35 @@ from app.movie.services import MovieService
 from app.partner.dependencies import required_approved_partner
 from app.partner.interfaces import Partner
 from app.shared.schemas import PaginatedResponse, PaginationMeta
-
 movie_router = APIRouter(tags=["Movie"])
-
-
-# ---------------------------------------------------------------------------
-# Public Read Paths
-# ---------------------------------------------------------------------------
-
+from app.auth.dependencies import get_current_user
+@movie_router.post("/movies/{id}/reviews", response_model=ReviewResponse)
+async def submit_review(
+    id: UUID,
+    body: CreateReviewRequest,
+    current_user: AuthUserDomain = Depends(get_current_user),
+    movie_service: MovieService = Depends(get_movie_service),
+):
+    try:
+        review = await movie_service.submit_review(
+            user_id=current_user.id,
+            movie_id=id,
+            rating=body.rating,
+            hashtags=body.hashtags,
+        )
+        return ReviewResponse.model_validate(review, from_attributes=True)
+    except MovieNotFoundError as exc:
+        raise MovieNotFoundHTTPError(str(exc))
+@movie_router.get("/movies/{id}/reviews/me", response_model=ReviewResponse | None)
+async def get_my_review(
+    id: UUID,
+    current_user: AuthUserDomain = Depends(get_current_user),
+    movie_service: MovieService = Depends(get_movie_service),
+):
+    review = await movie_service.get_my_review(current_user.id, id)
+    if review is None:
+        return None
+    return ReviewResponse.model_validate(review, from_attributes=True)
 @movie_router.get("/movies", response_model=PaginatedResponse[MovieSummaryResponse])
 async def list_movies(
     city: str | None = Query(None),
@@ -112,8 +127,6 @@ async def list_movies(
         data=responses,
         meta=PaginationMeta(total=total, page=page, limit=limit, total_pages=total_pages),
     )
-
-
 @movie_router.get("/movies/{id}", response_model=MovieDetailsResponse)
 async def get_movie_details(
     id: UUID,
@@ -161,8 +174,6 @@ async def get_movie_details(
         )
     except MovieNotFoundError as exc:
         raise MovieNotFoundHTTPError(str(exc))
-
-
 @movie_router.get("/showtimes/{id}/seat-map", response_model=SeatMapResponse)
 async def get_seat_map(
     id: UUID,
@@ -203,8 +214,6 @@ async def get_seat_map(
         )
     except ShowtimeNotFoundError as exc:
         raise ShowtimeNotFoundHTTPError(str(exc))
-
-
 @movie_router.get("/showtimes/{id}/availability", response_model=AvailabilityResponse)
 async def get_showtime_availability(
     id: UUID,
@@ -222,12 +231,6 @@ async def get_showtime_availability(
         )
     except ShowtimeNotFoundError as exc:
         raise ShowtimeNotFoundHTTPError(str(exc))
-
-
-# ---------------------------------------------------------------------------
-# Partner Write Paths
-# ---------------------------------------------------------------------------
-
 @movie_router.post(
     "/partner/movies",
     response_model=MovieSummaryResponse,
@@ -262,8 +265,6 @@ async def create_partner_movie(
         )
     except UnapprovedPartnerError as exc:
         raise UnapprovedPartnerHTTPError(str(exc))
-
-
 @movie_router.patch("/partner/movies/{id}", response_model=MovieSummaryResponse)
 async def update_partner_movie(
     id: UUID,
@@ -291,8 +292,6 @@ async def update_partner_movie(
         raise MovieNotFoundHTTPError(str(exc))
     except PartnerOwnershipError as exc:
         raise PartnerOwnershipHTTPError(str(exc))
-
-
 @movie_router.post("/partner/screens", status_code=status.HTTP_201_CREATED)
 async def create_partner_screen(
     body: CreateScreenRequest,
@@ -310,8 +309,6 @@ async def create_partner_screen(
         raise VenueNotFoundHTTPError(str(exc))
     except PartnerOwnershipError as exc:
         raise PartnerOwnershipHTTPError(str(exc))
-
-
 @movie_router.patch("/partner/screens/{id}/layout")
 async def apply_screen_layout(
     id: UUID,
@@ -334,8 +331,6 @@ async def apply_screen_layout(
         raise ScreenLayoutLockedHTTPError(str(exc))
     except LayoutParseError as exc:
         raise InvalidLayoutGridHTTPError(str(exc))
-
-
 @movie_router.post("/admin/screens/{id}/layout")
 async def admin_override_screen_layout(
     id: UUID,
@@ -361,8 +356,6 @@ async def admin_override_screen_layout(
         raise ScreenNotFoundHTTPError(str(exc))
     except LayoutParseError as exc:
         raise InvalidLayoutGridHTTPError(str(exc))
-
-
 @movie_router.post("/partner/showtimes", status_code=status.HTTP_201_CREATED)
 async def create_partner_showtime(
     body: CreateShowtimeRequest,
@@ -385,8 +378,6 @@ async def create_partner_showtime(
         raise MovieNotFoundHTTPError(str(exc))
     except ScreenNotFoundError as exc:
         raise ScreenNotFoundHTTPError(str(exc))
-
-
 @movie_router.patch("/partner/showtimes/{id}/cancel")
 async def cancel_partner_showtime(
     id: UUID,
@@ -402,8 +393,6 @@ async def cancel_partner_showtime(
         raise ShowtimeNotFoundHTTPError(str(exc))
     except PartnerOwnershipError as exc:
         raise PartnerOwnershipHTTPError(str(exc))
-
-
 @movie_router.patch("/partner/showtimes/{id}/seats/block")
 async def block_showtime_seats(
     id: UUID,
@@ -422,8 +411,6 @@ async def block_showtime_seats(
         raise SeatNotFoundHTTPError(str(exc))
     except SeatAlreadyBookedError as exc:
         raise SeatConflictHTTPError(str(exc))
-
-
 @movie_router.patch("/partner/showtimes/{id}/seats/unblock")
 async def unblock_showtime_seats(
     id: UUID,
@@ -436,9 +423,3 @@ async def unblock_showtime_seats(
         return {"showtime_id": id, "unblocked_seats": len(body.seat_ids)}
     except ShowtimeNotFoundError as exc:
         raise ShowtimeNotFoundHTTPError(str(exc))
-
-
-# ---------------------------------------------------------------------------
-# Admin Moderation Path
-# ---------------------------------------------------------------------------
-

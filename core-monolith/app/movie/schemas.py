@@ -1,17 +1,8 @@
-"""Pydantic schemas for Movie Module Read and Partner Write Endpoints."""
-
 from __future__ import annotations
-
 from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel, Field
-
-
-
-
-
-
-class MovieSummaryResponse(BaseModel):
+from pydantic import BaseModel, Field, field_validator
+class MovieBaseResponse(BaseModel):
     id: UUID
     title: str
     original_title: str | None = None
@@ -20,13 +11,17 @@ class MovieSummaryResponse(BaseModel):
     certificate: str
     release_date: datetime | None = None
     poster_url: str | None = None
-    banner_url: str | None = None   
-    synopsis: str | None = None   
-    trailer_url: str | None = None   
-    status: str
+    banner_url: str | None = None
+    trailer_url: str | None = None
+    synopsis: str | None = None
+    rating: float | None = None
+    rating_count: int = 0
     genre: str | None = None
-
-
+    status: str
+class MovieSummaryResponse(MovieBaseResponse):
+    pass
+class MovieDetailsResponse(MovieBaseResponse):
+    venues: list[VenueShowtimesResponse]
 class ShowtimeSlotResponse(BaseModel):
     id: UUID
     screen_id: UUID
@@ -35,33 +30,12 @@ class ShowtimeSlotResponse(BaseModel):
     language: str
     format: str
     status: str
-
-
 class VenueShowtimesResponse(BaseModel):
     venue_id: UUID
     venue_name: str
     city: str
     address: str | None = None
     showtimes: list[ShowtimeSlotResponse]
-
-
-class MovieDetailsResponse(BaseModel):
-    id: UUID
-    title: str
-    original_title: str | None = None
-    language: str
-    duration_min: int
-    banner_url: str | None = None
-    certificate: str
-    release_date: datetime | None = None
-    poster_url: str | None = None
-    trailer_url: str | None = None
-    synopsis: str | None = None
-    status: str
-    venues: list[VenueShowtimesResponse]
-    genre: str | None = None
-
-
 class SeatProjectionResponse(BaseModel):
     seat_id: UUID
     number: int
@@ -70,16 +44,12 @@ class SeatProjectionResponse(BaseModel):
     label: str | None = None
     status: str
     price_paise: int
-
-
 class RowProjectionResponse(BaseModel):
     row_id: UUID
     label: str
     section: str | None = None
     price_paise: int
     seats: list[SeatProjectionResponse]
-
-
 class SeatMapResponse(BaseModel):
     showtime_id: UUID
     movie_id: UUID
@@ -90,8 +60,6 @@ class SeatMapResponse(BaseModel):
     format: str
     language: str
     rows: list[RowProjectionResponse]
-
-
 class AvailabilityResponse(BaseModel):
     showtime_id: UUID
     total_seats: int
@@ -99,12 +67,6 @@ class AvailabilityResponse(BaseModel):
     booked_seats: int
     blocked_seats: int
     locked_seats: int = 0
-
-
-
-
-
-
 class CreateMovieRequest(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     original_title: str | None = None
@@ -113,8 +75,6 @@ class CreateMovieRequest(BaseModel):
     certificate: str = Field(default="UA")
     poster_url: str | None = None
     synopsis: str | None = None
-
-
 class UpdateMovieRequest(BaseModel):
     title: str | None = None
     original_title: str | None = None
@@ -123,42 +83,28 @@ class UpdateMovieRequest(BaseModel):
     certificate: str | None = None
     poster_url: str | None = None
     synopsis: str | None = None
-
-
 class CreateScreenRequest(BaseModel):
     venue_id: UUID
     name: str = Field(min_length=1, max_length=100)
-
-
 class ApplyLayoutRequest(BaseModel):
     text_grid: str = Field(
         description="Text grid specification (e.g. 'A: 1111 2 1111')"
     )
     default_price_paise: int = Field(default=29000, ge=0)
     section: str | None = None  
-
-
 class AdminApplyLayoutRequest(ApplyLayoutRequest):
     override_reason: str = Field(min_length=5, description="Audit reason for admin layout override")
-
-
 class CreateShowtimeRequest(BaseModel):
     screen_id: UUID
     movie_id: UUID
     starts_at: datetime
     language: str = Field(default="Malayalam")
     format: str = Field(default="2D")  
-
-
 class BlockSeatsRequest(BaseModel):
     seat_ids: list[UUID] = Field(min_length=1)
     reason: str = Field(default="Maintenance / VIP Hold")
-
-
 class UnblockSeatsRequest(BaseModel):
     seat_ids: list[UUID] = Field(min_length=1)
-
-
 class ContentStatusUpdateRequest(BaseModel):
     status: str  
 class CreateVenueRequest(BaseModel):
@@ -168,3 +114,36 @@ class CreateVenueRequest(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     timezone: str = "Asia/Kolkata"
+ALLOWED_HASHTAGS = {
+    "DirectionWorks", "Entertaining", "Interesting", "NiceStory",
+    "Timepass", "CoolMusic", "OneTimeWatch", "Fun", "QuiteNice",
+    "OkDirection", "GoodActing", "GoodMusic", "NiceStory",
+    "HitMovie", "OneTimeWatch", "Enjoyable", "LovelyMusic", "FunWatch",
+    "SuperDirection", "GreatActing", "WowMusic", "AwesomeStory",
+    "Blockbuster", "Rocking", "Inspiring", "Wellmade", "Unbelievable",
+}
+class CreateReviewRequest(BaseModel):
+    rating: float = Field(ge=0, le=10)
+    hashtags: list[str] = Field(default_factory=list, max_length=10)
+    @field_validator("rating")
+    @classmethod
+    def half_step(cls, v: float) -> float:
+        if round(v * 2) != v * 2:
+            raise ValueError("rating must be a multiple of 0.5")
+        return v
+    @field_validator("hashtags")
+    @classmethod
+    def known_hashtags(cls, v: list[str]) -> list[str]:
+        unknown = [h for h in v if h not in ALLOWED_HASHTAGS]
+        if unknown:
+            raise ValueError(f"Unknown hashtags: {unknown}")
+        return list(dict.fromkeys(v))  
+class ReviewResponse(BaseModel):
+    id: UUID
+    movie_id: UUID
+    user_id: UUID
+    rating: float
+    hashtags: list[str]
+    created_at: datetime
+    updated_at: datetime
+    model_config = {"from_attributes": True}

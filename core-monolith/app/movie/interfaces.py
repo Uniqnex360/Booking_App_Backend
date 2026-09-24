@@ -26,9 +26,9 @@ class MovieStatus(str, enum.Enum):
     COMPLETED = "COMPLETED"
 
 
-# ---------------------------------------------------------------------------
-# Enums
-# ---------------------------------------------------------------------------
+
+
+
 
 class SeatStatus(str, enum.Enum):
     AVAILABLE = "AVAILABLE"
@@ -36,9 +36,8 @@ class SeatStatus(str, enum.Enum):
     BLOCKED = "BLOCKED"
 
 
-# ---------------------------------------------------------------------------
-# Value Objects / DTOs
-# ---------------------------------------------------------------------------
+
+
 
 @dataclass(frozen=True, slots=True)
 class MovieSummaryDTO:
@@ -50,13 +49,14 @@ class MovieSummaryDTO:
     certificate: str
     release_date: datetime | None
     poster_url: str | None
-    banner_url: str | None 
-    trailer_url: str | None 
+    banner_url: str | None
+    trailer_url: str | None
     status: str
-    synopsis: str | None = None 
-    genre: str | None = None    
-
-
+    synopsis: str | None = None
+    rating: float | None = None
+    rating_count: int = 0
+    genre: str | None = None
+    
 @dataclass(frozen=True, slots=True)
 class ShowtimeSlotDTO:
     id: UUID
@@ -76,7 +76,15 @@ class VenueShowtimesDTO:
     address: str | None
     showtimes: list[ShowtimeSlotDTO]
 
-
+@dataclass(frozen=True, slots=True)
+class MovieReviewDTO:
+    id: UUID
+    user_id: UUID
+    movie_id: UUID
+    rating: float
+    hashtags: list[str]
+    created_at: datetime
+    updated_at: datetime
 @dataclass(frozen=True, slots=True)
 class MovieDetailsDTO:
     id: UUID
@@ -87,13 +95,14 @@ class MovieDetailsDTO:
     certificate: str
     release_date: datetime | None
     poster_url: str | None
-    banner_url: str | None 
+    banner_url: str | None
     trailer_url: str | None
     synopsis: str | None
     status: str
     venues: list[VenueShowtimesDTO]
-    genre: str | None = None   
-    
+    rating: float | None = None
+    rating_count: int = 0
+    genre: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,9 +148,9 @@ class ShowtimeAvailabilityDTO:
     locked_seats: int = 0
 
 
-# ---------------------------------------------------------------------------
-# Domain Exceptions
-# ---------------------------------------------------------------------------
+
+
+
 
 class MovieNotFoundError(EntityNotFoundError):
     """Movie entity not found."""
@@ -183,9 +192,9 @@ class SeatAlreadyBookedError(DomainError):
     """Seat is already booked and cannot be blocked."""
 
 
-# ---------------------------------------------------------------------------
-# Repository Port
-# ---------------------------------------------------------------------------
+
+
+
 
 @runtime_checkable
 class IMovieRepository(Protocol):
@@ -207,7 +216,15 @@ class IMovieRepository(Protocol):
     async def get_showtime_availability(
         self, showtime_id: UUID
     ) -> ShowtimeAvailabilityDTO | None: ...
+    async def upsert_review(
+        self, user_id: UUID, movie_id: UUID, rating: float, hashtags: list[str]
+    ) -> MovieReviewDTO: ...
 
+    async def get_review_for_user(
+        self, user_id: UUID, movie_id: UUID
+    ) -> MovieReviewDTO | None: ...
+
+    async def recompute_movie_rating(self, movie_id: UUID) -> tuple[float | None, int]: ...
     async def create_movie(
         self,
         *,
