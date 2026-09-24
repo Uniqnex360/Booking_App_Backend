@@ -9,7 +9,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.movie.interfaces import (
     MovieDetailsDTO,
-    MovieReviewDTO,
     MovieNotFoundError,
     MovieSummaryDTO,
     PartnerOwnershipError,
@@ -33,7 +32,6 @@ from app.movie.models import (
     MovieStatus,
     Screen,
     ScreenRow,
-    MovieReview,
     Seat,
     SeatState,
     SeatStateStatus,
@@ -121,64 +119,7 @@ class MovieRepository:
             for m in movies
         ]
         return dtos, total
-    def _to_review_dto(self, m: MovieReview) -> MovieReviewDTO:
-        return MovieReviewDTO(
-            id=m.id,
-            user_id=m.user_id,
-            movie_id=m.movie_id,
-            rating=float(m.rating),
-            hashtags=list(m.hashtags or []),
-            created_at=m.created_at,
-            updated_at=m.updated_at,
-        )
-    async def get_review_for_user(
-        self, user_id: UUID, movie_id: UUID
-    ) -> MovieReviewDTO | None:
-        stmt = select(MovieReview).where(
-            MovieReview.user_id == user_id, MovieReview.movie_id == movie_id
-        )
-        row = (await self._session.execute(stmt)).scalar_one_or_none()
-        return self._to_review_dto(row) if row else None
-    async def upsert_review(
-        self, user_id: UUID, movie_id: UUID, rating: float, hashtags: list[str]
-    ) -> MovieReviewDTO:
-        stmt = select(MovieReview).where(
-            MovieReview.user_id == user_id, MovieReview.movie_id == movie_id
-        )
-        existing = (await self._session.execute(stmt)).scalar_one_or_none()
-        if existing:
-            existing.rating = rating
-            existing.hashtags = hashtags
-            await self._session.flush()
-            await self._session.commit()
-            return self._to_review_dto(existing)
-        review = MovieReview(
-            id=uuid.uuid4(),
-            user_id=user_id,
-            movie_id=movie_id,
-            rating=rating,
-            hashtags=hashtags,
-        )
-        self._session.add(review)
-        await self._session.flush()
-        await self._session.commit()
-        return self._to_review_dto(review)
-    async def recompute_movie_rating(
-        self, movie_id: UUID
-    ) -> tuple[float | None, int]:
-        stmt = select(
-            func.avg(MovieReview.rating), func.count(MovieReview.id)
-        ).where(MovieReview.movie_id == movie_id)
-        avg, count = (await self._session.execute(stmt)).one()
-        movie = (
-            await self._session.execute(select(Movie).where(Movie.id == movie_id))
-        ).scalar_one_or_none()
-        if movie is not None:
-            movie.rating = float(avg) if avg is not None else None
-            movie.rating_count = int(count or 0)
-            await self._session.flush()
-            await self._session.commit()
-        return (float(avg) if avg is not None else None, int(count or 0))
+    
     async def get_movie_details(self, movie_id: UUID) -> MovieDetailsDTO | None:
         stmt = select(Movie).where(
             Movie.id == movie_id,
@@ -396,6 +337,7 @@ class MovieRepository:
             genre=movie.genre,
             status=movie.status,
         )
+    
     async def update_movie(
         self, movie_id: UUID, partner_id: UUID, updates: dict
     ) -> MovieSummaryDTO:

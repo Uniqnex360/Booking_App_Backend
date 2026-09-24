@@ -2,7 +2,6 @@ from __future__ import annotations
 from datetime import date
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
-from app.movie.schemas import CreateReviewRequest, ReviewResponse
 from app.auth.dependencies import require_role
 from app.auth.interfaces import User as AuthUserDomain
 from app.movie.dependencies import get_movie_service
@@ -56,34 +55,7 @@ from app.partner.dependencies import required_approved_partner
 from app.partner.interfaces import Partner
 from app.shared.schemas import PaginatedResponse, PaginationMeta
 movie_router = APIRouter(tags=["Movie"])
-from app.auth.dependencies import get_current_user
-@movie_router.post("/movies/{id}/reviews", response_model=ReviewResponse)
-async def submit_review(
-    id: UUID,
-    body: CreateReviewRequest,
-    current_user: AuthUserDomain = Depends(get_current_user),
-    movie_service: MovieService = Depends(get_movie_service),
-):
-    try:
-        review = await movie_service.submit_review(
-            user_id=current_user.id,
-            movie_id=id,
-            rating=body.rating,
-            hashtags=body.hashtags,
-        )
-        return ReviewResponse.model_validate(review, from_attributes=True)
-    except MovieNotFoundError as exc:
-        raise MovieNotFoundHTTPError(str(exc))
-@movie_router.get("/movies/{id}/reviews/me", response_model=ReviewResponse | None)
-async def get_my_review(
-    id: UUID,
-    current_user: AuthUserDomain = Depends(get_current_user),
-    movie_service: MovieService = Depends(get_movie_service),
-):
-    review = await movie_service.get_my_review(current_user.id, id)
-    if review is None:
-        return None
-    return ReviewResponse.model_validate(review, from_attributes=True)
+
 @movie_router.get("/movies", response_model=PaginatedResponse[MovieSummaryResponse])
 async def list_movies(
     city: str | None = Query(None),

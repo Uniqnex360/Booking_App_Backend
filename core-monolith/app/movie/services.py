@@ -3,7 +3,6 @@ from datetime import date, datetime
 from uuid import UUID
 from app.movie.interfaces import (
     IMovieRepository,
-    MovieReviewDTO,
     MovieDetailsDTO,
     MovieNotFoundError,
     MovieNotPublishedError,
@@ -14,6 +13,7 @@ from app.movie.interfaces import (
 )
 from app.movie.layout_parser import parse_text_grid
 class MovieService:
+    
     async def release_expired_locks(self, booking_id: UUID) -> int:
         return await self._repo.release_expired_locks(booking_id)
     async def create_venue(
@@ -83,19 +83,8 @@ class MovieService:
             banner_url=banner_url,
             synopsis=synopsis,
         )
-    async def submit_review(
-        self, user_id: UUID, movie_id: UUID, rating: float, hashtags: list[str]
-    ) -> MovieReviewDTO:
-        movie = await self._repo.get_movie_details(movie_id)
-        if movie is None:
-            raise MovieNotFoundError(f"Movie '{movie_id}' not found")
-        review = await self._repo.upsert_review(user_id, movie_id, rating, hashtags)
-        await self._repo.recompute_movie_rating(movie_id)
-        return review
-    async def get_my_review(
-        self, user_id: UUID, movie_id: UUID
-    ) -> MovieReviewDTO | None:
-        return await self._repo.get_review_for_user(user_id, movie_id)
+    
+    
     async def update_movie(
         self, movie_id: UUID, partner_id: UUID, updates: dict
     ) -> MovieSummaryDTO:

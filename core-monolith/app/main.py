@@ -11,6 +11,7 @@ from app.admin.routes import router as admin_router
 from app.movie.routes import movie_router
 from app.booking.routes import router as booking_router
 from app.payment.routes import router as payment_router
+from app.review.routes import router as review_router
 
 from slowapi.errors import RateLimitExceeded
 from app.auth.exceptions import (
@@ -64,6 +65,7 @@ app.include_router(booking_router, prefix="/v1")
 app.include_router(payment_router, prefix="/v1")
 app.include_router(movie_router, prefix="/v1")
 app.include_router(admin_router, prefix="/v1")
+app.include_router(review_router, prefix="/v1")
 
 @app.get("/")
 async def root():
