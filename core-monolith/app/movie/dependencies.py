@@ -1,6 +1,3 @@
-"""
-Composition Root for Movie Module.
-"""
 
 from __future__ import annotations
 

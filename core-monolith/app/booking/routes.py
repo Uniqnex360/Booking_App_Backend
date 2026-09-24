@@ -60,7 +60,7 @@ async def create_provider_hold(
         )
     try:
         booking = await booking_service.create_hold(
-            user_id=current_user.id,
+            user_id=current_user.id if current_user else None,
             showtime_id=payload.showtime_id,
             seat_ids=payload.seat_ids,
             idem_key=idempotency_key,
@@ -105,7 +105,7 @@ async def commit_booking(
     payment_ref = payload.payment_ref if payload else None
     try:
         booking = await booking_service.commit_booking(
-            user_id=current_user.id,
+            user_id=current_user.id if current_user else None,
             booking_id=booking_id,
             payment_ref=payment_ref,
         )
@@ -139,7 +139,7 @@ async def delete_provider_hold(
 ):
     try:
         await booking_service.cancel_hold(
-            user_id=current_user.id, booking_id=booking_id
+            user_id=current_user.id if current_user else None, booking_id=booking_id
         )
         return JSONResponse(status_code=status.HTTP_204_NO_CONTENT, content=None)
     except BookingNotFoundError:
