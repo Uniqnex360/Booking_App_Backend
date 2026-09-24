@@ -4,8 +4,11 @@ from datetime import date, datetime, time
 from app.shared.timeutil import utcnow
 from uuid import UUID
 from zoneinfo import ZoneInfo
+from app.movie.tmdb_client import search_and_get_rating
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
+import logging
+logger = logging.getLogger(__name__)
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.movie.interfaces import (
     MovieDetailsDTO,
@@ -111,6 +114,7 @@ class MovieRepository:
                 poster_url=m.poster_url,
                 banner_url=m.banner_url,
                 rating=float(m.rating) if m.rating is not None else None,
+                external_rating=float(m.external_rating) if m.external_rating is not None else None,
                 rating_count=m.rating_count,
                 trailer_url=m.trailer_url,  
                 synopsis=m.synopsis, 
@@ -162,6 +166,19 @@ class MovieRepository:
                     status=st.status,
                 )
             )
+        if movie.external_id is None:
+            try:
+                year = movie.release_date.year if movie.release_date else None
+                match = await search_and_get_rating(movie.title, year)
+                if match is not None:
+                    tmdb_id, rating = match
+                    movie.external_id = tmdb_id
+                    movie.external_rating = rating
+                    movie.external_rating_fetched_at = utcnow()
+                    await self._session.commit()
+                    await self._session.refresh(movie)
+            except Exception as e:
+                logger.warning("TMDB enrichment failed for %s: %s", movie.title, e)
         return MovieDetailsDTO(
             id=movie.id,
             title=movie.title,
@@ -173,7 +190,7 @@ class MovieRepository:
             release_date=movie.release_date,
             poster_url=movie.poster_url,
             banner_url=movie.banner_url,
-            
+            external_rating=float(movie.external_rating) if movie.external_rating is not None else None,
             rating=float(movie.rating) if movie.rating is not None else None,
             rating_count=movie.rating_count,
             trailer_url=movie.trailer_url,

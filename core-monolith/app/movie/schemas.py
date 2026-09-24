@@ -14,6 +14,7 @@ class MovieBaseResponse(BaseModel):
     banner_url: str | None = None
     trailer_url: str | None = None
     synopsis: str | None = None
+    external_rating: float | None = None
     rating: float | None = None
     rating_count: int = 0
     genre: str | None = None

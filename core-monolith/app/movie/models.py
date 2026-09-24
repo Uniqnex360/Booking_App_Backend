@@ -104,6 +104,9 @@ class Movie(Base):
     )
     rating = Column(Numeric(3, 1), nullable=True)
     rating_count = Column(Integer, nullable=False, server_default="0")
+    external_rating = Column(Numeric(3, 1), nullable=True)
+    external_id = Column(String, nullable=True, index=True)
+    external_rating_fetched_at = Column(TZDateTime, nullable=True)
     partner_id = Column(sa.Uuid, nullable=False, index=True)
     created_at = Column(TZDateTime, nullable=False, default=utcnow)
     updated_at = Column(

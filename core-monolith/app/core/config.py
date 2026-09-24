@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     BCRYPT_ROUND: int = 12
+    TMDB_BEARER_TOKEN: str | None = None
+    TMDB_BASE: str | None = None
     MAX_LOGIN_ATTEMPTS: int = 5
     RATE_LIMIT_WINDOW: int = 60
     ALLOWED_HOSTS: List[str] = [""]

@@ -38,6 +38,8 @@ class MovieSummaryDTO:
     rating: float | None = None
     rating_count: int = 0
     genre: str | None = None
+    external_rating: float | None = None
+
 @dataclass(frozen=True, slots=True)
 class ShowtimeSlotDTO:
     id: UUID
@@ -71,8 +73,10 @@ class MovieDetailsDTO:
     status: str
     venues: list[VenueShowtimesDTO]
     rating: float | None = None
+    external_rating: float | None = None
     rating_count: int = 0
     genre: str | None = None
+    
 @dataclass(frozen=True, slots=True)
 class SeatProjectionDTO:
     seat_id: UUID
