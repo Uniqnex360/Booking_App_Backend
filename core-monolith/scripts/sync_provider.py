@@ -473,6 +473,7 @@ async def _sync_one_provider(
     for st in pvr_showtimes:
         title = st["movie_title"]
         poster_url = st.get("poster_url") or DEFAULT_POSTER
+        banner_url = st.get("banner_url")   
 
         movie = movies_by_title.get(title)
         if not movie:
@@ -490,6 +491,7 @@ async def _sync_one_provider(
                 status="PUBLISHED",
                 partner_id=partner_id,
                 poster_url=poster_url,
+                banner_url=banner_url,
                 release_date=release_date,
                 genre=st.get("genre"),
                 synopsis=f"Now showing: {title}",

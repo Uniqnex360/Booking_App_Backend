@@ -50,6 +50,7 @@ class MovieSummaryDTO:
     certificate: str
     release_date: datetime | None
     poster_url: str | None
+    banner_url: str | None 
     status: str
     genre: str | None = None    
 
@@ -84,6 +85,7 @@ class MovieDetailsDTO:
     certificate: str
     release_date: datetime | None
     poster_url: str | None
+    banner_url: str | None 
     trailer_url: str | None
     synopsis: str | None
     status: str
@@ -214,6 +216,7 @@ class IMovieRepository(Protocol):
         certificate: str,
         partner_id: UUID,
         poster_url: str | None = None,
+        banner_url: str | None = None,      
         synopsis: str | None = None,
     ) -> MovieSummaryDTO: ...
 

@@ -135,6 +135,7 @@ class Movie(Base):
     certificate = Column(String, nullable=False)
     release_date = Column(DateTime(timezone=True), nullable=True)
     poster_url = Column(Text, nullable=True)
+    banner_url = Column(Text, nullable=True)
     trailer_url = Column(Text, nullable=True)
     synopsis = Column(Text, nullable=True)
     genre = Column(String(120), nullable=True)    

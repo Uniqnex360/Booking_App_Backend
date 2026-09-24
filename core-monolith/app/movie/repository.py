@@ -193,6 +193,7 @@ class MovieRepository:
                 certificate=m.certificate,
                 release_date=m.release_date,
                 poster_url=m.poster_url,
+                banner_url=m.banner_url,
                 status=m.status,
             )
             for m in movies
@@ -255,6 +256,7 @@ class MovieRepository:
             certificate=movie.certificate,
             release_date=movie.release_date,
             poster_url=movie.poster_url,
+            banner_url=movie.banner_url,
             trailer_url=movie.trailer_url,
             synopsis=movie.synopsis,
             status=movie.status,
@@ -404,6 +406,7 @@ class MovieRepository:
         certificate: str,
         partner_id: UUID,
         poster_url: str | None = None,
+        banner_url: str | None = None,      
         synopsis: str | None = None,
     ) -> MovieSummaryDTO:
         movie = Movie(
@@ -416,6 +419,7 @@ class MovieRepository:
             status=MovieStatus.DRAFT.value,
             partner_id=partner_id,
             poster_url=poster_url,
+            banner_url=banner_url,
             synopsis=synopsis,
         )
         self._session.add(movie)
@@ -430,6 +434,7 @@ class MovieRepository:
             certificate=movie.certificate,
             release_date=movie.release_date,
             poster_url=movie.poster_url,
+            banner_url=movie.banner_url,
             genre=movie.genre,
             status=movie.status,
         )
@@ -461,6 +466,7 @@ class MovieRepository:
             certificate=movie.certificate,
             release_date=movie.release_date,
             poster_url=movie.poster_url,
+            banner_url=movie.banner_url,
             genre=movie.genre,
             status=movie.status,
         )
@@ -487,6 +493,7 @@ class MovieRepository:
             certificate=movie.certificate,
             release_date=movie.release_date,
             poster_url=movie.poster_url,
+            banner_url=movie.banner_url,
             status=movie.status,
         )
 

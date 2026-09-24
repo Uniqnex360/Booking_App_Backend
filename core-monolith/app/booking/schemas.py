@@ -126,6 +126,7 @@ class MovieBookingDetail(BaseBookingDetail):
             **base,
             movie_title=movie.title,
             poster_url=movie.poster_url,
+            banner_url=movie.banner_url,
             certificate=movie.certificate,
             duration_min=movie.duration_min,
             language=st.language or movie.language,

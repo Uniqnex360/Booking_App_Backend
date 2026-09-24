@@ -98,6 +98,7 @@ async def list_movies(
             certificate=m.certificate,
             release_date=m.release_date,
             poster_url=m.poster_url,
+            banner_url=m.banner_url,
             status=m.status,
         )
         for m in items
@@ -126,6 +127,7 @@ async def get_movie_details(
             release_date=dto.release_date,
             genre=dto.genre,
             poster_url=dto.poster_url,
+            banner_url=dto.banner_url,  
             trailer_url=dto.trailer_url,
             synopsis=dto.synopsis,
             status=dto.status,

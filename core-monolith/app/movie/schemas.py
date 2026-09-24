@@ -48,6 +48,7 @@ class MovieDetailsResponse(BaseModel):
     original_title: str | None = None
     language: str
     duration_min: int
+    banner_url: str | None = None
     certificate: str
     release_date: datetime | None = None
     poster_url: str | None = None

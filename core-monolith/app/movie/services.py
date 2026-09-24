@@ -95,6 +95,7 @@ class MovieService:
         certificate: str,
         partner_id: UUID,
         poster_url: str | None = None,
+        banner_url: str | None = None,      
         synopsis: str | None = None,
     ) -> MovieSummaryDTO:
         return await self._repo.create_movie(
@@ -105,6 +106,7 @@ class MovieService:
             certificate=certificate,
             partner_id=partner_id,
             poster_url=poster_url,
+            banner_url=banner_url,
             synopsis=synopsis,
         )
 
