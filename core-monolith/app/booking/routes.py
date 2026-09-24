@@ -61,6 +61,8 @@ async def create_provider_hold(
     try:
         booking = await booking_service.create_hold(
             user_id=current_user.id if current_user else None,
+            contact_email=payload.contact_email,
+            contact_phone=payload.contact_phone,
             showtime_id=payload.showtime_id,
             seat_ids=payload.seat_ids,
             idem_key=idempotency_key,
