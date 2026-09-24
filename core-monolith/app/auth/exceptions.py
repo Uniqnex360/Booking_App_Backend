@@ -9,12 +9,7 @@ class DuplicateEmailError(HTTPException):
             detail="An account with this email already exists"
         )
 
-class AccountNotFoundError(HTTPException):
-    def __init__(self):
-        super().__init__(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No account found with that email address.",
-        )
+
 class InvalidCredentialsError(HTTPException):
     def __init__(self, detail: str = "Invalid email or password"):
         super().__init__(
@@ -31,7 +26,7 @@ class UserNotFoundError(HTTPException):
     def __init__(self):
         super().__init__(
             status_code=status.HTTP_404_NOT_FOUND, 
-            detail="User not found or registration session expired."
+            detail="User not found."
         )
 
 
