@@ -20,7 +20,8 @@ class MovieSummaryResponse(BaseModel):
     certificate: str
     release_date: datetime | None = None
     poster_url: str | None = None
-    banner_url: str | None = None       
+    banner_url: str | None = None   
+    synopsis: str | None = None   
     trailer_url: str | None = None   
     status: str
     genre: str | None = None

@@ -53,6 +53,7 @@ class MovieSummaryDTO:
     banner_url: str | None 
     trailer_url: str | None 
     status: str
+    synopsis: str | None = None 
     genre: str | None = None    
 
 
