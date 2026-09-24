@@ -51,6 +51,7 @@ class MovieSummaryDTO:
     release_date: datetime | None
     poster_url: str | None
     banner_url: str | None 
+    trailer_url: str | None 
     status: str
     genre: str | None = None    
 
