@@ -1,26 +1,31 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 import uuid
 
-from sqlalchemy import select, and_, update, func
+from sqlalchemy import select, and_, update, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from app.auth.models import User as UserORM, RefreshToken as RefreshTokenORM, OTPCode as OTPCodeORM
+from app.auth.models import (
+    User as UserORM,
+    RefreshToken as RefreshTokenORM,
+    OTPCode as OTPCodeORM,
+    PasswordReset as PasswordResetModel,
+)
 
 from app.auth.interfaces import (
-    User as UserDomain, 
+    User as UserDomain,
     RefreshToken as RefreshTokenDomain,
+    PasswordResetRow,
     OTPCodes as OTPCodesDomain,
-    IUserRepository, 
-    IRefreshTokenRepository, 
+    IUserRepository,
+    IRefreshTokenRepository,
     IOTPCodesRepository,
     RepositoryError,
     IPasswordResetRepository,
     DuplicateError,
-    NotFoundError
+    NotFoundError,
 )
-
 class SQLAlchemyPasswordResetRepository(IPasswordResetRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -203,12 +208,16 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
             user_agent=orm.user_agent
         )
     async def revoke_all_for_user(self, user_id: uuid.UUID) -> None:
-        await self.session.execute(
-            update(RefreshTokenModel)
-            .where(RefreshTokenModel.user_id == user_id)
-            .values(is_revoked=True)
-        )
-        await self.session.commit()
+        try:
+            await self.db.execute(
+                update(RefreshTokenORM)
+                .where(RefreshTokenORM.user_id == user_id)
+                .values(is_revoked=True)
+            )
+            await self.db.commit()
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            raise RepositoryError(f"Failed to revoke user tokens: {e}")
     async def get_by_hash(self, token_hash: str, lock: bool = False) -> Optional[RefreshTokenDomain]:
       
         try:
@@ -263,17 +272,7 @@ class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
             await self.db.rollback()
             raise RepositoryError(f"Failed to revoke token: {e}")
     
-    async def revoke_all_for_user(self, user_id: uuid.UUID) -> None:
-        try:
-            await self.db.execute(
-                update(RefreshTokenORM)
-                .where(RefreshTokenORM.user_id == user_id)
-                .values(is_revoked=True)
-            )
-            await self.db.commit()
-        except SQLAlchemyError as e:
-            await self.db.rollback()
-            raise RepositoryError(f"Failed to revoke user tokens: {e}")
+    
     
     async def revoke_by_family(self, family: uuid.UUID) -> None:
         try:
