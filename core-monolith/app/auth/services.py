@@ -8,6 +8,7 @@ from app.shared.hashing import sha256_hex
 
 from app.auth.interfaces import (
     IUserRepository,
+    INotificationService,
     IRefreshTokenRepository,
     IAuthenticationStrategy,
     ITokenService,
