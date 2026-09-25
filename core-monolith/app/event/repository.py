@@ -51,6 +51,7 @@ class SQLAlchemyEventRepository(IEventRepository):
             starts_at=orm.starts_at,
             ends_at=orm.ends_at,
             description=orm.description,
+            poster_image_url=orm.poster_image_url,
             is_online=orm.is_online,
             online_link=orm.online_link,
             status=EventStatus(orm.status),
@@ -73,6 +74,7 @@ class SQLAlchemyEventRepository(IEventRepository):
                 starts_at=event.starts_at,
                 ends_at=event.ends_at,
                 description=event.description,
+                poster_image_url=event.poster_image_url,  
                 is_online=event.is_online,
                 online_link=event.online_link,
                 status=event.status.value
