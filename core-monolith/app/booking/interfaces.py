@@ -46,6 +46,8 @@ class TierInfo:
     capacity: int
     sales_open_at: Optional[datetime]
     sales_close_at: Optional[datetime]
+    event_ends_at: Optional[datetime] = None
+    event_starts_at: Optional[datetime] = None
 @dataclass(frozen=True)
 class Booking:
     id: UUID
@@ -78,6 +80,9 @@ class SoldOutError(DomainError):
 class EventNotBookableError(DomainError):
     def __init__(self) -> None:
         super().__init__("Event is not in a bookable state (must be PUBLISHED)")
+class EventConcludedError(DomainError):
+    def __init__(self, message: str = "This event has already ended") -> None:
+        super().__init__(message)
 class TierInactiveError(DomainError):
     def __init__(self) -> None:
         super().__init__("This ticket tier is currently inactive")

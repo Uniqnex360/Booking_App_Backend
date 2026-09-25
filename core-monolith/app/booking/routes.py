@@ -19,6 +19,7 @@ from app.booking.dependencies import get_booking_service, get_movie_booking_serv
 from app.booking.interfaces import (
     BookingNotCancellableError,
     BookingNotFoundError,
+    EventConcludedError,
     EventNotBookableError,
     IllegalBookingTransition,
     QuantityExceedsMaxError,
@@ -368,7 +369,7 @@ async def create_or_confirm_booking(
         raise HTTPException(status_code=409, detail=str(exc))
     except SoldOutError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
-    except (EventNotBookableError, TierInactiveError, SalesClosedError, ValidationError) as exc:
+    except (EventNotBookableError, EventConcludedError, TierInactiveError, SalesClosedError, ValidationError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except QuantityExceedsMaxError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

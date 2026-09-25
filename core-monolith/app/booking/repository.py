@@ -238,6 +238,8 @@ class TierCounterRepository(ITierCounterRepository):
             capacity=tier.capacity,
             sales_open_at=tier.sales_open_at,
             sales_close_at=tier.sales_close_at,
+            event_ends_at=event.ends_at,
+            event_starts_at=event.starts_at,
         )
 
     async def ensure_counter_row(self, tier_id: UUID):

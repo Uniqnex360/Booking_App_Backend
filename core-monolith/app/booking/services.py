@@ -19,6 +19,7 @@ from app.booking.interfaces import (
     BookingNotCancellableError,
     BookingNotFoundError,
     BookingStatus,
+    EventConcludedError,
     EventNotBookableError,
     IBookingRepository,
     ITierCounterRepository,
@@ -463,6 +464,13 @@ class BookingService:
             raise QuantityExceedsMaxError()
 
         now = utcnow()
+        if tier.event_ends_at:
+            event_end = tier.event_ends_at
+            if event_end.tzinfo is None:
+                event_end = event_end.replace(tzinfo=timezone.utc)
+            if now >= event_end:
+                raise EventConcludedError()
+
         if tier.sales_open_at and now < tier.sales_open_at:
             raise SalesClosedError()
         if tier.sales_close_at and now > tier.sales_close_at:
