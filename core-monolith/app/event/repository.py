@@ -54,6 +54,15 @@ class SQLAlchemyEventRepository(IEventRepository):
             poster_image_url=orm.poster_image_url,
             is_online=orm.is_online,
             online_link=orm.online_link,
+            is_outdoor=orm.is_outdoor,
+            is_fast_filling=orm.is_fast_filling,
+            is_must_attend=orm.is_must_attend,
+            is_unmissable=orm.is_unmissable,
+            is_kids_allowed=orm.is_kids_allowed,
+            is_masterclass=orm.is_masterclass,
+            is_new_year_party=orm.is_new_year_party,
+            language=orm.language,
+            tags=list(orm.tags or []),
             status=EventStatus(orm.status),
             ticket_categories=categories,
             published_at=orm.published_at,
@@ -77,7 +86,16 @@ class SQLAlchemyEventRepository(IEventRepository):
                 poster_image_url=event.poster_image_url,  
                 is_online=event.is_online,
                 online_link=event.online_link,
-                status=event.status.value
+                status=event.status.value,
+                is_outdoor=event.is_outdoor,
+                is_fast_filling=event.is_fast_filling,
+                is_must_attend=event.is_must_attend,
+                is_unmissable=event.is_unmissable,
+                is_kids_allowed=event.is_kids_allowed,
+                language=event.language,
+                tags=event.tags or [],
+                is_masterclass=event.is_masterclass,
+                is_new_year_party=event.is_new_year_party,
             )
             for cat in event.ticket_categories:
                 orm.ticket_categories.append(TicketCategoryORM(

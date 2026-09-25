@@ -24,6 +24,15 @@ class EventUpdateRequest(_PosterUrlMixin):
     venue_name: Optional[str] = None
     venue_address: Optional[str] = None
     city: Optional[str] = None
+    is_outdoor: Optional[bool] = None
+    is_fast_filling: Optional[bool] = None
+    is_must_attend: Optional[bool] = None
+    is_unmissable: Optional[bool] = None
+    is_kids_allowed: Optional[bool] = None
+    is_masterclass: Optional[bool] = None
+    is_new_year_party: Optional[bool] = None
+    language: Optional[str] = None
+    tags: List[str] = []
 
 
 class EventCreateRequest(_PosterUrlMixin):
@@ -39,7 +48,15 @@ class EventCreateRequest(_PosterUrlMixin):
     online_link: Optional[str] = None
     cancellation_policy: CancellationPolicy = CancellationPolicy.FLEXIBLE
     ticket_categories: List[TicketCategoryBase]
-
+    is_outdoor: bool = False
+    is_fast_filling: bool = False
+    is_must_attend: bool = False
+    is_unmissable: bool = False
+    is_kids_allowed: bool = False
+    is_masterclass: bool = False
+    is_new_year_party: bool = False
+    language: Optional[str] = None
+    tags: List[str] = []
 
 class EventStatusUpdateRequest(BaseModel):
     status: EventStatus
@@ -64,6 +81,15 @@ class EventResponse(BaseModel):
     ends_at: datetime
     status: EventStatus
     poster_image_url: Optional[str]
+    is_outdoor: bool = False
+    is_fast_filling: bool = False
+    is_must_attend: bool = False
+    is_unmissable: bool = False
+    is_kids_allowed: bool = False
+    is_masterclass: bool = False
+    language: Optional[str] = None
+    tags: List[str] = []
+    is_new_year_party: bool = False
 
     class Config:
         from_attributes = True
@@ -72,3 +98,12 @@ class EventResponse(BaseModel):
 class EventDetailResponse(EventResponse):
     description: Optional[str]
     ticket_categories: List[TicketCategoryBase]
+    is_outdoor: bool = False
+    is_fast_filling: bool = False
+    is_must_attend: bool = False
+    is_unmissable: bool = False
+    is_kids_allowed: bool = False
+    is_masterclass: bool = False
+    is_new_year_party: bool = False
+    language: Optional[str] = None
+    tags: List[str] = []

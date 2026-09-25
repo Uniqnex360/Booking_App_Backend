@@ -80,6 +80,15 @@ class Event:
     cancellation_reason: Optional[str] = None
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
+    is_outdoor: bool = False
+    is_fast_filling: bool = False
+    is_must_attend: bool = False
+    is_unmissable: bool = False
+    is_kids_allowed: bool = False
+    is_masterclass: bool = False
+    is_new_year_party: bool = False
+    language: Optional[str] = None
+    tags: List[str] = field(default_factory=list)
     
     ticket_categories: List[TicketCategory] = field(default_factory=list)
 

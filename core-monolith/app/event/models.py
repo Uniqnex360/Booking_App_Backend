@@ -1,6 +1,6 @@
 import uuid
 from sqlalchemy.dialects.postgresql import UUID
-
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey, Numeric, Integer, CheckConstraint, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -27,7 +27,16 @@ class EventORM(Base):
     ends_at = Column(DateTime(timezone=True), nullable=False)
     doors_open_at = Column(DateTime(timezone=True), nullable=True)
     age_restriction = Column(String(20), nullable=True)
-    is_online = Column(Boolean, nullable=False, default=False)
+    is_outdoor = Column(Boolean, nullable=False, default=False, server_default="false")
+    is_fast_filling = Column(Boolean, nullable=False, default=False, server_default="false")
+    is_must_attend = Column(Boolean, nullable=False, default=False, server_default="false")
+    is_unmissable = Column(Boolean, nullable=False, default=False, server_default="false")
+    is_kids_allowed = Column(Boolean, nullable=False, default=False, server_default="false")
+    is_masterclass = Column(Boolean, nullable=False, default=False, server_default="false")
+    is_new_year_party = Column(Boolean, nullable=False, default=False, server_default="false")
+    language = Column(String(50), nullable=True)
+    tags = Column(ARRAY(String(50)), nullable=False, server_default="{}")
+    is_online = Column(Boolean, nullable=False, default=False, server_default="false")  
     online_link = Column(String(500), nullable=True)
     poster_image_url = Column(String(500), nullable=True)
     cancellation_policy = Column(String(30), nullable=False, default="FLEXIBLE")
