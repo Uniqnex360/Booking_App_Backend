@@ -33,7 +33,8 @@ class EventService:
         self.event_repo = event_repo
         self.partner_repo = partner_repo
         self.clock = clock or (lambda: datetime.now(timezone.utc))
-
+    async def list_venues(self, city: Optional[str] = None):
+        return await self.event_repo.list_venues(city=city)
     async def create_event(self, partner_id: uuid.UUID, data: dict) -> Event:
         print("DEBUG keys:", list(data.keys()))
         print("DEBUG poster:", repr(data.get("poster_image_url")))

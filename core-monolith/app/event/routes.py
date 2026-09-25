@@ -6,14 +6,16 @@ from app.event.schemas import (
     EventCreateRequest,EventUpdateRequest,
     EventStatusUpdateRequest,
 )
+
 from app.event.dependencies import get_event_service
 from app.event.services import EventService
 from app.partner.dependencies import required_approved_partner
 from app.partner.interfaces import Partner
-from app.shared.response import success_response
+from app.shared.response import success_response,error_response
 from app.shared.exceptions import ForbiddenError
-
+import logging
 router = APIRouter(prefix="/events", tags=["Event"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -28,7 +30,21 @@ async def create_event(
     print("DEBUG route poster:", repr(data.poster_image_url))
     event = await service.create_event(partner.id, data.model_dump())
     return success_response(data=event, message="Event created as PENDING_APPROVAL", code=201)
-
+@router.get("/venues")
+async def list_venues(
+    city: Optional[str] = None,
+    service: EventService = Depends(get_event_service),
+):
+    try:
+        venues = await service.list_venues(city=city)
+        return success_response(data={"items": venues})
+    except Exception as exc:
+        logger.error("Failed to list venues: %s", exc)
+        return error_response(
+            "VENUE_LIST_FAILED",
+            "Failed to load venues",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 @router.get("")
 async def list_events(

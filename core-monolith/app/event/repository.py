@@ -105,7 +105,28 @@ class SQLAlchemyEventRepository(IEventRepository):
         result = await self.db.execute(stmt)
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
-
+    async def list_venues(self, city: Optional[str] = None):
+        stmt = (
+            select(
+                EventORM.venue_name,
+                EventORM.venue_address,
+                EventORM.city,
+            )
+            .where(EventORM.status == EventStatus.PUBLISHED.value)
+            .distinct()
+        )
+        if city:
+            stmt = stmt.where(func.lower(EventORM.city) == city.lower())
+        stmt = stmt.order_by(EventORM.venue_name)
+        rows = (await self.db.execute(stmt)).all()
+        return [
+            {
+                "venue_name": r.venue_name,
+                "venue_address": r.venue_address,
+                "city": r.city,
+            }
+            for r in rows
+        ]
     async def list_published(self, city: Optional[str], category: Optional[EventCategory], 
                              date_from: Optional[date], date_to: Optional[date], 
                              price_max_paise: Optional[int], page: int, limit: int) -> Tuple[List[Event], int]:
