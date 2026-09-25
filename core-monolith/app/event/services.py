@@ -35,6 +35,8 @@ class EventService:
         self.clock = clock or (lambda: datetime.now(timezone.utc))
 
     async def create_event(self, partner_id: uuid.UUID, data: dict) -> Event:
+        print("DEBUG keys:", list(data.keys()))
+        print("DEBUG poster:", repr(data.get("poster_image_url")))
         partner = await self.partner_repo.get_by_id(partner_id)
         if not partner:
             raise NotFoundError("Partner not found")

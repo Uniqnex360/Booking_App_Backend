@@ -25,7 +25,7 @@ async def create_event(
     p_type = partner.partner_type.value if hasattr(partner.partner_type, "value") else str(partner.partner_type)
     if p_type.lower() not in ("event_organiser", "event_organizer"):
         raise ForbiddenError("Only event organisers can create events")
-    
+    print("DEBUG route poster:", repr(data.poster_image_url))
     event = await service.create_event(partner.id, data.model_dump())
     return success_response(data=event, message="Event created as PENDING_APPROVAL", code=201)
 
