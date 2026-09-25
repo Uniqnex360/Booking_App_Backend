@@ -1,6 +1,4 @@
-"""
-PVR Theatre Provider Adapter implementing ITheatreProvider with httpx.AsyncClient.
-"""
+
 
 from __future__ import annotations
 
@@ -307,7 +305,14 @@ class PVRProvider(ITheatreProvider):
                     raise ProviderUnavailable(f"PVR 5xx on release: {resp.status_code}")
         except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
             raise ProviderUnavailable(f"PVR release call failed: {exc}") from exc
-
+    async def cancel_booking(self, provider_booking_id: str) -> None:
+        resp = await self._request_with_retry(
+            "POST", f"/v1/bookings/{provider_booking_id}/cancel"
+        )
+        if resp.status_code not in (200, 204, 404) and resp.status_code >= 500:
+            raise ProviderUnavailable(
+                f"PVR 5xx on cancel booking {provider_booking_id}: {resp.status_code}"
+            )
     async def hold_state(self, hold_id: str) -> ProviderHoldState:
         resp = await self._get_with_retry(f"/v1/holds/{hold_id}")
         if resp.status_code != 200:

@@ -1,4 +1,3 @@
-"""Booking service for self-hosted movie/seat bookings (showtime + seat_ids)."""
 
 from __future__ import annotations
 
@@ -19,12 +18,31 @@ from app.movie.interfaces import (
 )
 from app.movie.models import Movie, MovieSoldCount, MovieStatus, Screen, ScreenRow, Seat, SeatState, SeatStateStatus, Showtime, ShowtimeStatus
 from app.shared.timeutil import utcnow
-
+import logging
+logger = logging.getLogger(__name__)
 
 class MovieBookingService:
     def __init__(self, session: AsyncSession):
         self.session = session
-
+    async def _resolve_provider_client(self, showtime_id: UUID):
+        from app.movie.models import Showtime as ShowtimeModel
+        from app.shared.providers.registry import (
+            ProviderRegistryModel,
+            create_provider_client,
+        )
+        st = (await self.session.execute(
+            select(ShowtimeModel).where(ShowtimeModel.id == showtime_id)
+        )).scalar_one_or_none()
+        if not st or not st.provider_id:
+            return None
+        registry = (await self.session.execute(
+            select(ProviderRegistryModel).where(
+                ProviderRegistryModel.id == st.provider_id
+            )
+        )).scalar_one_or_none()
+        if not registry:
+            return None
+        return create_provider_client(registry)
     async def create_booking(
         self,
         user_id: UUID,
@@ -32,7 +50,7 @@ class MovieBookingService:
         seat_ids: list[UUID],
         idempotency_key: Optional[str] = None,
     ) -> BookingModel:
-        # 1. Idempotency first
+        
         if idempotency_key:
             existing = await self.session.execute(
                 select(BookingModel).where(
@@ -44,7 +62,7 @@ class MovieBookingService:
             if row:
                 return row
 
-        # 2. Showtime check: must be SELF-HOSTED (provider_id IS NULL)
+        
         st_stmt = select(Showtime, Movie).join(Movie, Showtime.movie_id == Movie.id).where(Showtime.id == showtime_id)
         st_res = await self.session.execute(st_stmt)
         st_row = st_res.first()
@@ -55,11 +73,11 @@ class MovieBookingService:
         if showtime.provider_id is not None:
             raise ValidationError("Showtime is provider-backed. Use /v1/bookings/hold instead.")
 
-        # 3. Status checks
+        
         if showtime.status != ShowtimeStatus.ACTIVE.value:
             raise ValidationError("Showtime is not ACTIVE")
 
-        # 4. Validate seat_ids non-empty, unique, len <= 10, belong to this screen
+        
         if not seat_ids:
             raise ValidationError("Must select at least 1 seat")
         if len(seat_ids) != len(set(seat_ids)):
@@ -107,7 +125,7 @@ class MovieBookingService:
                 )
             await self.session.flush()
 
-            # Update movie_sold_counts lazily per row
+            
             for seat, row in rows:
                 sold_row = (await self.session.execute(
                     select(MovieSoldCount).where(
@@ -166,8 +184,33 @@ class MovieBookingService:
             if sold_row and sold_row.sold_count > 0:
                 sold_row.sold_count -= 1
 
-        await self.session.execute(
+                await self.session.execute(
             delete(SeatState).where(SeatState.booking_id == booking_id)
         )
         await self.session.commit()
+
+        if row.provider_id and row.provider_booking_id and row.showtime_id:
+            try:
+                provider = await self._resolve_provider_client(row.showtime_id)
+                if provider is not None:
+                    await provider.cancel_booking(row.provider_booking_id)
+                    logger.info(
+                        "Provider cancel succeeded for booking %s "
+                        "(provider_booking_id=%s)",
+                        row.id, row.provider_booking_id,
+                    )
+                else:
+                    logger.warning(
+                        "No provider client resolvable for booking %s "
+                        "(provider_id=%s, showtime_id=%s)",
+                        row.id, row.provider_id, row.showtime_id,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Provider cancel failed for booking %s "
+                    "(provider_id=%s, provider_booking_id=%s): %s — "
+                    "local cancel stands, reconciliation required",
+                    row.id, row.provider_id, row.provider_booking_id, exc,
+                )
+
         return row

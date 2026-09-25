@@ -115,7 +115,14 @@ class PVRProvider(ITheatreProvider):
                     await asyncio.sleep(20.0 if attempt == 0 else 40.0)
                     continue
         raise ProviderUnavailable(f"PVR upstream unreachable on GET {path}: {last_exc}")
-
+    async def cancel_booking(self, provider_booking_id: str) -> None:
+        resp = await self._request_with_retry(
+            "POST", f"/v1/bookings/{provider_booking_id}/cancel"
+        )
+        if resp.status_code not in (200, 204, 404) and resp.status_code >= 500:
+            raise ProviderUnavailable(
+                f"PVR 5xx on cancel booking {provider_booking_id}: {resp.status_code}"
+            )
     async def list_showtimes(self, target_date: date) -> list[ProviderShowtime]:
         resp = await self._get_with_retry(
             "/v1/showtimes", params={"date": target_date.isoformat()}
