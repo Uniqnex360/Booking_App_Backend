@@ -11,7 +11,13 @@ class TicketCategoryBase(BaseModel):
     capacity: int = Field(..., gt=0)
     description: Optional[str] = None
     max_per_booking: int = Field(6, gt=0)
-
+class EventUpdateRequest(BaseModel):
+    title: Optional[str] = Field(None, min_length=2, max_length=150)
+    description: Optional[str] = None
+    venue_name: Optional[str] = None
+    venue_address: Optional[str] = None
+    city: Optional[str] = None
+    poster_image_url: Optional[str] = None
 class EventCreateRequest(BaseModel):
     title: str = Field(..., min_length=2, max_length=150)
     category: EventCategory

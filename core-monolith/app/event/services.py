@@ -138,7 +138,7 @@ class EventService:
                 raise EventLockedError("Events cannot be edited within 24 hours of the start time.")
 
         for key, value in patch_data.items():
-            if value is not None and hasattr(event, key):
+            if hasattr(event, key):
                 setattr(event, key, value)
 
         return await self.event_repo.update(event)

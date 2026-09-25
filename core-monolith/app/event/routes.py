@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
 
 from app.event.schemas import (
-    EventCreateRequest,
+    EventCreateRequest,EventUpdateRequest,
     EventStatusUpdateRequest,
 )
 from app.event.dependencies import get_event_service
@@ -59,18 +59,17 @@ async def get_event_by_id(
     event = await service.get_event_details(event_id)
     return success_response(data=event, message="Event details fetched")
 
-
 @router.patch("/{event_id}")
 async def update_event(
     event_id: uuid.UUID,
-    data: dict,
+    data: EventUpdateRequest,
     partner: Partner = Depends(required_approved_partner),
     service: EventService = Depends(get_event_service)
 ):
-    event = await service.update_event(partner.id, event_id, data)
+    event = await service.update_event(
+        partner.id, event_id, data.model_dump(exclude_unset=True)
+    )
     return success_response(data=event, message="Event updated successfully")
-
-
 @router.delete("/{event_id}")
 async def delete_or_cancel_event(
     event_id: uuid.UUID,
