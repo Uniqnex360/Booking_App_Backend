@@ -75,7 +75,7 @@ class EventService:
             starts_at=starts_at,
             ends_at=ends_at,
             description=data.get('description'),
-            poster_image_url=data.get('poster_image_url'), 
+            poster_image_url=str(data["poster_image_url"]) if data.get("poster_image_url") else None,
             is_online=data.get('is_online', False),
             online_link=data.get('online_link'),
             status=EventStatus.PENDING_APPROVAL
@@ -138,8 +138,11 @@ class EventService:
                 raise EventLockedError("Events cannot be edited within 24 hours of the start time.")
 
         for key, value in patch_data.items():
-            if hasattr(event, key):
-                setattr(event, key, value)
+            if not hasattr(event, key):
+                continue
+            if key == "poster_image_url" and value is not None:
+                value = str(value)
+            setattr(event, key, value)
 
         return await self.event_repo.update(event)
 

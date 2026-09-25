@@ -1,9 +1,10 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, AnyHttpUrl
 from datetime import datetime, date, time
 from decimal import Decimal
 from typing import List, Optional
 import uuid
 from app.event.interfaces import EventStatus, EventCategory, CancellationPolicy
+
 
 class TicketCategoryBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
@@ -11,14 +12,21 @@ class TicketCategoryBase(BaseModel):
     capacity: int = Field(..., gt=0)
     description: Optional[str] = None
     max_per_booking: int = Field(6, gt=0)
-class EventUpdateRequest(BaseModel):
+
+
+class _PosterUrlMixin(BaseModel):
+    poster_image_url: Optional[AnyHttpUrl] = None
+
+
+class EventUpdateRequest(_PosterUrlMixin):
     title: Optional[str] = Field(None, min_length=2, max_length=150)
     description: Optional[str] = None
     venue_name: Optional[str] = None
     venue_address: Optional[str] = None
     city: Optional[str] = None
-    poster_image_url: Optional[str] = None
-class EventCreateRequest(BaseModel):
+
+
+class EventCreateRequest(_PosterUrlMixin):
     title: str = Field(..., min_length=2, max_length=150)
     category: EventCategory
     description: Optional[str] = None
@@ -30,19 +38,20 @@ class EventCreateRequest(BaseModel):
     is_online: bool = False
     online_link: Optional[str] = None
     cancellation_policy: CancellationPolicy = CancellationPolicy.FLEXIBLE
-    poster_image_url: Optional[str] = None
     ticket_categories: List[TicketCategoryBase]
+
 
 class EventStatusUpdateRequest(BaseModel):
     status: EventStatus
     cancellation_reason: Optional[str] = None
 
-    @field_validator('cancellation_reason')
+    @field_validator("cancellation_reason")
     @classmethod
     def reason_required_for_cancel(cls, v, info):
-        if info.data.get('status') == EventStatus.CANCELLED and not v:
+        if info.data.get("status") == EventStatus.CANCELLED and not v:
             raise ValueError("Cancellation reason is required when status is CANCELLED")
         return v
+
 
 class EventResponse(BaseModel):
     id: uuid.UUID
@@ -55,9 +64,10 @@ class EventResponse(BaseModel):
     ends_at: datetime
     status: EventStatus
     poster_image_url: Optional[str]
-    
+
     class Config:
         from_attributes = True
+
 
 class EventDetailResponse(EventResponse):
     description: Optional[str]
