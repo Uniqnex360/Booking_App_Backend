@@ -1,4 +1,6 @@
 from __future__ import annotations
+import logging
+logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel, Field
 
@@ -9,15 +11,17 @@ from uuid import UUID
 from app.booking.schemas import BookingDetailResponse 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import JSONResponse
-from app.auth.dependencies import get_current_user,get_current_user_optional
+from app.auth.dependencies import get_current_user,get_current_user_optional,get_notification_service
 from app.auth.interfaces import User as AuthUserDomain
 from app.providers.base import HoldAlreadyCommitted
+
 from app.booking.dependencies import get_booking_service, get_movie_booking_service
 from app.booking.interfaces import (
     BookingNotCancellableError,
     BookingNotFoundError,
     EventNotBookableError,
     IllegalBookingTransition,
+    INotificationService,
     QuantityExceedsMaxError,
     SalesClosedError,
     ShowtimeDisabledError,
@@ -373,13 +377,13 @@ async def create_or_confirm_booking(
         raise HTTPException(status_code=404, detail=str(exc))
 
     return {"booking": {"id": str(booking.id)}}
-
 @router.patch("/bookings/{booking_id}/cancel")
 async def cancel_legacy_booking(
     booking_id: UUID,
     current_user: AuthUserDomain = Depends(get_current_user),
     booking_service: BookingService = Depends(get_booking_service),
     movie_booking_service: MovieBookingService = Depends(get_movie_booking_service),
+    notification: INotificationService = Depends(get_notification_service),
 ):
     try:
         booking = await movie_booking_service.cancel_booking(booking_id, current_user.id)
@@ -392,6 +396,20 @@ async def cancel_legacy_booking(
             raise HTTPException(status_code=409, detail=str(exc))
     except BookingNotCancellableError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
+
+   
+    contact_email = getattr(booking, "contact_email", None)
+    if contact_email:
+        try:
+            await notification.send_email(
+                email=contact_email,
+                subject=f"Your booking was cancelled — {booking.ref_code}",
+                body=booking_service._cancellation_email_body(booking),
+                content_type="html",
+            )
+        except Exception as exc:
+            logger.warning("Cancellation email failed for booking %s: %s", booking.id, exc)
+
     return {"booking": {"id": str(booking.id), "status": "CANCELLED"}}
 
 @router.get("/bookings", status_code=status.HTTP_200_OK)

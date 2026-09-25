@@ -64,20 +64,80 @@ class BookingService:
         self.session = session
         self._notification = notification
     
-    
+    def _cancellation_email_body(self, booking: Booking) -> str:
+        from datetime import timezone
+        from zoneinfo import ZoneInfo
+
+        dt = booking.created_at
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        booked_on_ist = dt.astimezone(ZoneInfo("Asia/Kolkata")).strftime(
+            "%A, %d %B %Y at %I:%M %p"
+        )
+        amount_formatted = f"₹{booking.total_paise / 100:.2f}"
+        ref_code = booking.ref_code or "—"
+
+        return f"""\
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0a0a0a; color: #f5f5f5; margin: 0; padding: 20px; }}
+            .card {{ max-width: 520px; margin: 0 auto; background: #171717; border-radius: 16px; border: 1px solid #262626; overflow: hidden; }}
+            .header {{ background: linear-gradient(135deg, #7f1d1d, #991b1b); color: #ffffff; padding: 24px; }}
+            .header h1 {{ margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 1px; }}
+            .header .sub {{ font-family: monospace; font-size: 14px; font-weight: bold; opacity: 0.9; margin-top: 4px; }}
+            .body {{ padding: 24px; }}
+            .headline {{ font-size: 20px; font-weight: bold; color: #ffffff; margin: 0 0 8px 0; }}
+            .muted {{ color: #a3a3a3; font-size: 14px; margin-bottom: 20px; }}
+            .info-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; background: #262626; padding: 16px; border-radius: 12px; margin-bottom: 20px; }}
+            .info-label {{ font-size: 11px; text-transform: uppercase; color: #737373; font-weight: bold; }}
+            .info-val {{ font-size: 14px; color: #f5f5f5; font-weight: bold; margin-top: 2px; }}
+            .refund {{ background: #1c1917; border-left: 3px solid #f59e0b; padding: 12px 16px; border-radius: 8px; font-size: 13px; color: #d4d4d4; margin-bottom: 20px; }}
+            .footer {{ text-align: center; color: #525252; font-size: 12px; margin-top: 20px; }}
+        </style>
+        </head>
+        <body>
+        <div class="card">
+            <div class="header">
+            <h1>Booking Cancelled</h1>
+            <div class="sub">REF: {ref_code}</div>
+            </div>
+            <div class="body">
+            <div class="headline">Your booking has been cancelled</div>
+            <div class="muted">We've released your seats back to the pool.</div>
+
+            <div class="info-grid">
+                <div>
+                <div class="info-label">Booked on</div>
+                <div class="info-val">{booked_on_ist}</div>
+                </div>
+                <div>
+                <div class="info-label">Total Paid</div>
+                <div class="info-val">{amount_formatted}</div>
+                </div>
+            </div>
+
+            <div class="refund">
+                If you paid for this booking, a refund will be processed to your
+                original payment method within 5–7 business days.
+            </div>
+
+            <div class="footer">
+                Didn't request this? Contact support and we'll sort it out.
+            </div>
+            </div>
+        </div>
+        </body>
+        </html>
+        """
     def _ticket_email_body(self, booking: Booking, showtime_at=None) -> str:
 
         from datetime import timezone
         from zoneinfo import ZoneInfo
 
-        # Booking has: id, user_id, status, total_paise, created_at, currency,
-        # showtime_id, provider_id, provider_hold_id, provider_booking_id,
-        # held_until, ref_code, barcode, idempotency_key, seat_refs, seat_codes,
-        # contact_email, contact_phone.
-        #
-        # Movie title, cinema, screen, and starts_at are NOT on the Booking object.
-        # If you want them in the email, fetch them before calling this method and
-        # pass them in, or build a lookup here. Placeholders below.
+        
 
         dt = showtime_at or booking.held_until or booking.created_at
         if dt.tzinfo is None:
