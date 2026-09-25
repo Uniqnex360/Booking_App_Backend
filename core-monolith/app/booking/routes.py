@@ -12,7 +12,7 @@ from app.booking.schemas import BookingDetailResponse
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from app.auth.dependencies import get_current_user,get_current_user_optional,get_notification_service
-from app.auth.interfaces import User as AuthUserDomain
+from app.auth.interfaces import User as AuthUserDomain,INotificationService
 from app.providers.base import HoldAlreadyCommitted
 
 from app.booking.dependencies import get_booking_service, get_movie_booking_service
@@ -21,7 +21,6 @@ from app.booking.interfaces import (
     BookingNotFoundError,
     EventNotBookableError,
     IllegalBookingTransition,
-    INotificationService,
     QuantityExceedsMaxError,
     SalesClosedError,
     ShowtimeDisabledError,
