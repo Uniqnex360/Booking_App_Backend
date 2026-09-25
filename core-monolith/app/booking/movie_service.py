@@ -162,7 +162,14 @@ class MovieBookingService:
 
         if not row or row.user_id != user_id:
             raise BookingNotFoundError()
-
+        if row.showtime_id:
+            st = (await self.session.execute(
+                select(Showtime).where(Showtime.id == row.showtime_id)
+            )).scalar_one_or_none()
+            if st and st.starts_at <= utcnow():
+                raise BookingNotCancellableError(
+                    "Cannot cancel a booking for a showtime that has already started"
+                )
         if row.status != "CONFIRMED":
             raise BookingNotCancellableError()
 
@@ -184,7 +191,7 @@ class MovieBookingService:
             if sold_row and sold_row.sold_count > 0:
                 sold_row.sold_count -= 1
 
-                await self.session.execute(
+        await self.session.execute(
             delete(SeatState).where(SeatState.booking_id == booking_id)
         )
         await self.session.commit()

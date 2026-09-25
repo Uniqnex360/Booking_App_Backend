@@ -4,8 +4,6 @@ from fastapi import APIRouter, Depends, Query, status
 
 from app.event.schemas import (
     EventCreateRequest,
-    EventResponse,
-    EventDetailResponse,
     EventStatusUpdateRequest,
 )
 from app.event.dependencies import get_event_service

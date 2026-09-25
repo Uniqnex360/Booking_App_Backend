@@ -75,6 +75,7 @@ class EventService:
             starts_at=starts_at,
             ends_at=ends_at,
             description=data.get('description'),
+            poster_image_url=data.get('poster_image_url'), 
             is_online=data.get('is_online', False),
             online_link=data.get('online_link'),
             status=EventStatus.PENDING_APPROVAL

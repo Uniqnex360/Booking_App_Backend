@@ -24,6 +24,7 @@ class EventCreateRequest(BaseModel):
     is_online: bool = False
     online_link: Optional[str] = None
     cancellation_policy: CancellationPolicy = CancellationPolicy.FLEXIBLE
+    poster_image_url: Optional[str] = None
     ticket_categories: List[TicketCategoryBase]
 
 class EventStatusUpdateRequest(BaseModel):
