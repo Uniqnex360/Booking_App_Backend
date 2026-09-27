@@ -38,7 +38,6 @@ from app.shared.providers.base import (
     HoldAlreadyCommitted,
     HoldExpiredRemote,
     ITheatreProvider,
-    ProviderContractError,
     ProviderHold,
     ProviderSeatMap,
     ProviderTicket,
@@ -815,7 +814,7 @@ class BookingService:
         try:
             seat_map = await provider.seat_map(provider_showtime_ref)
             return seat_map, True
-        except (ProviderUnavailable, ProviderContractError):
+        except ProviderUnavailable:
             return None, False
 
     async def reconcile_bookings(self, target_date: date) -> dict[str, Any]:
