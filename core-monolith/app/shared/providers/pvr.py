@@ -79,14 +79,14 @@ class PVRProvider(ITheatreProvider):
                 )
                 if resp.status_code >= 500:
                     if attempt < 2:
-                        await asyncio.sleep(0.1 * (2**attempt))
+                        await asyncio.sleep(0.5 * (2 ** attempt))
                         continue
                     raise ProviderUnavailable(f"PVR upstream 5xx on GET {path}: {resp.status_code}")
                 return resp
             except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
                 last_exc = exc
                 if attempt < 2:
-                    await asyncio.sleep(0.1 * (2**attempt))
+                    await asyncio.sleep(0.5 * (2 ** attempt))
                     continue
         raise ProviderUnavailable(f"PVR upstream unreachable on GET {path}: {last_exc}")
 
