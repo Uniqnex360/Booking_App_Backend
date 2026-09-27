@@ -36,7 +36,9 @@ from app.auth.schemas import (
     UserLoginRequest, 
     RefreshTokenRequest,
     VerifyOTPRequest,
-    UserMeResponse
+    UserMeResponse,
+    EmailOTPRequest,
+    EmailOTPVerifyRequest,
 )
 from app.auth.exceptions import DuplicateEmailError, UserNotFoundError
 
@@ -224,6 +226,90 @@ async def get_me(current_user: UserDomain = Depends(get_current_user)):
 #         ],
 #         message="Users list fetched.",
 #     )
+@router.post("/email-otp/send")
+@limiter.limit("5/minute")
+async def send_email_otp(
+    request: Request,
+    payload: EmailOTPRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+    otp_service: IOTPService = Depends(get_otp_service),
+):
+    email = payload.email.lower().strip()
+    existing = await auth_service.user_repo.get_by_email(email)
+    if existing:
+        user = existing
+    else:
+        new_user = UserDomain(
+            id=uuid.uuid4(),
+            full_name=payload.full_name or email.split("@")[0],
+            email=email,
+            password_hash=auth_service.password_hasher.hash(str(uuid.uuid4())),
+            role=UserRole.USER,
+            is_active=True,
+            is_verified=False
+        )
+        user = await auth_service.user_repo.create(new_user)
+
+    otp_sent = False
+    try:
+        result = await otp_service.generate_and_send(user, method="EMAIL")
+        otp_sent = True if result is None else bool(result)
+    except Exception as exc:
+        logger.error("OTP delivery failed for %s: %s", email, exc)
+
+    if otp_sent:
+        return success_response(
+            data={"user_id": str(user.id), "email": user.email, "otp_sent": True},
+            message=f"Verification OTP sent to {email}",
+        )
+    return success_response(
+        data={"user_id": str(user.id), "email": user.email, "otp_sent": False},
+        message="Could not send OTP right now. Please try again.",
+    )
+
+
+@router.post("/email-otp/verify")
+@limiter.limit("10/minute")
+async def verify_email_otp(
+    request: Request,
+    payload: EmailOTPVerifyRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+    otp_service: IOTPService = Depends(get_otp_service),
+):
+    if not payload.user_id and not payload.email:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Either user_id or email must be provided.")
+
+    user = None
+    if payload.user_id:
+        user = await auth_service.user_repo.get_by_id(payload.user_id)
+    elif payload.email:
+        user = await auth_service.user_repo.get_by_email(payload.email.lower().strip())
+
+    if not user:
+        raise UserNotFoundError()
+
+    await otp_service.verify(user.id, payload.otp_code, method="EMAIL")
+
+    if not user.is_verified or not user.is_active:
+        user.is_active = True
+        user.is_verified = True
+        user = await auth_service.user_repo.update(user)
+
+    ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    access, refresh = await auth_service.login_user(user, ip, user_agent)
+
+    data = {
+        "access_token": access,
+        "refresh_token": refresh,
+        "token_type": "Bearer",
+        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        "user": UserMeResponse.model_validate(user, from_attributes=True),
+    }
+    return success_response(data=data, message="Email verified and logged in successfully.")
+
+
 @router.post("/forgot-password")
 @limiter.limit("3/minute")
 async def forgot_password(

@@ -109,3 +109,12 @@ class OTPRequestRequest(BaseModel):
 class OTPVerifyRequest(BaseModel):
     phone: NormalizedPhone
     code: str = Field(..., min_length=6, max_length=6)
+class EmailOTPRequest(BaseModel):
+    email: NormalizedEmail
+    full_name: Optional[str] = None
+
+
+class EmailOTPVerifyRequest(BaseModel):
+    user_id: Optional[uuid.UUID] = None
+    email: Optional[NormalizedEmail] = None
+    otp_code: str = Field(..., min_length=6, max_length=6)
