@@ -285,21 +285,6 @@ DEFAULT_POSTER = (
     "?w=800&auto=format&fit=crop&q=80"
 )
 
-CURATED_POSTER_BANNER_MAP: dict[str, dict[str, str]] = {
-    "marco": {
-        "poster_url": "https://image.tmdb.org/t/p/original/6Nj8Y1A9lcReqZZvRHOSiO3iTl6.jpg",
-        "banner_url": "https://image.tmdb.org/t/p/original/a6RkQIOZ6wThQOEDv6lHsfH53hD.jpg",
-    },
-    "amaran": {
-        "poster_url": "https://image.tmdb.org/t/p/original/eCB06m1KUGilEOlIzb40nkQhVY0.jpg",
-        "banner_url": "https://image.tmdb.org/t/p/original/7cNE2qydew1c8fqnlhWjkE3DHc2.jpg",
-    },
-    "deadpool & wolverine": {
-        "poster_url": "https://image.tmdb.org/t/p/original/8cdWjvZQUExUUTzyp4t6EDMubfO.jpg",
-        "banner_url": "https://image.tmdb.org/t/p/original/by8z9Fe8y7p4jo2YlW2SZDnptyT.jpg",
-    },
-}
-
 CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
     "aavesham": {
         "cast": [
@@ -476,33 +461,6 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {"name": "Ravi Basrur", "role": "Musician", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Sushin_Shyam.jpg/330px-Sushin_Shyam.jpg"},
             {"name": "Chandru Selvaraj", "role": "Cinematographer", "photo_url": "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=300&auto=format&fit=crop&q=80"},
             {"name": "Shameer Muhammed", "role": "Editor", "photo_url": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80"},
-        ],
-    },
-    "amaran": {
-        "cast": [
-            {"name": "Sivakarthikeyan", "role": "Major Mukund Varadarajan", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Sivakarthikeyan_at_Doctor_success_meet.jpg/330px-Sivakarthikeyan_at_Doctor_success_meet.jpg"},
-            {"name": "Sai Pallavi", "role": "Indhu Rebecca Varghese", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Sai_Pallavi_at_Gargi_press_meet.jpg/330px-Sai_Pallavi_at_Gargi_press_meet.jpg"},
-            {"name": "Bhuvan Arora", "role": "Sepoy Vikram Singh", "photo_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Rahul Bose", "role": "Col. Amit Singh Shekhawat", "photo_url": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80"},
-        ],
-        "crew": [
-            {"name": "Rajkumar Periasamy", "role": "Director & Writer", "photo_url": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Kamal Haasan", "role": "Producer", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Kamal_Haasan_at_the_Vikram_Press_Meet_%28cropped%29.jpg/330px-Kamal_Haasan_at_the_Vikram_Press_Meet_%28cropped%29.jpg"},
-            {"name": "G. V. Prakash Kumar", "role": "Musician", "photo_url": "https://images.unsplash.com/photo-1513956589380-bad6acb9b9d4?w=300&auto=format&fit=crop&q=80"},
-            {"name": "CH Sai", "role": "Cinematographer", "photo_url": "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=300&auto=format&fit=crop&q=80"},
-        ],
-    },
-    "deadpool & wolverine": {
-        "cast": [
-            {"name": "Ryan Reynolds", "role": "Wade Wilson / Deadpool", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Deadpool_2_Japan_Premiere_Red_Carpet_Ryan_Reynolds_%28cropped%29.jpg/330px-Deadpool_2_Japan_Premiere_Red_Carpet_Ryan_Reynolds_%28cropped%29.jpg"},
-            {"name": "Hugh Jackman", "role": "Logan / Wolverine", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Logan_Japan_Premiere_Red_Carpet_Hugh_Jackman_%28cropped%29.jpg/330px-Logan_Japan_Premiere_Red_Carpet_Hugh_Jackman_%28cropped%29.jpg"},
-            {"name": "Emma Corrin", "role": "Cassandra Nova", "photo_url": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Matthew Macfadyen", "role": "Mr. Paradox", "photo_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80"},
-        ],
-        "crew": [
-            {"name": "Shawn Levy", "role": "Director & Producer", "photo_url": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Kevin Feige", "role": "Producer", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Kevin_Feige_by_Gage_Skidmore.jpg/330px-Kevin_Feige_by_Gage_Skidmore.jpg"},
-            {"name": "Rob Simonsen", "role": "Musician", "photo_url": "https://images.unsplash.com/photo-1513956589380-bad6acb9b9d4?w=300&auto=format&fit=crop&q=80"},
         ],
     },
 }
@@ -730,25 +688,8 @@ async def _sync_one_provider(
 
     for st in pvr_showtimes:
         title = st["movie_title"]
-        t_clean = (title or "").lower().strip()
-        curated_media = CURATED_POSTER_BANNER_MAP.get(t_clean, {})
-        poster_url = st.get("poster_url") or curated_media.get("poster_url") or DEFAULT_POSTER
-        banner_url = st.get("banner_url") or curated_media.get("banner_url")
-        raw_lang = st.get("language") or "Malayalam"
-
-        starts_at_dt = datetime.fromisoformat(st["starts_at"].replace("Z", "+00:00"))
-        cinema_name = st.get("cinema_name") or "Unknown Cinema"
-        city = st.get("city") or "Kochi"
-        screen_name = st.get("screen_name") or "Screen 1"
-        screen = screens_by_key[(cinema_name, city, screen_name)]
-
-        # Determine individual screening language
-        if "," in raw_lang:
-            langs = [l.strip() for l in raw_lang.split(",") if l.strip()]
-            idx = (starts_at_dt.hour + int(screen_name[-1] if screen_name[-1].isdigit() else 0)) % len(langs)
-            screening_lang = langs[idx]
-        else:
-            screening_lang = raw_lang
+        poster_url = st.get("poster_url") or DEFAULT_POSTER
+        banner_url = st.get("banner_url")   
 
         movie = movies_by_title.get(title)
         if not movie:
@@ -757,11 +698,10 @@ async def _sync_one_provider(
                 datetime(release_year, 1, 1, tzinfo=timezone.utc)
                 if release_year else None
             )
-            cast, crew = resolve_movie_cast_and_crew(title, st.get("cast"), st.get("crew"))
             movie = Movie(
                 id=uuid.uuid4(),
                 title=title,
-                language=raw_lang,
+                language=st.get("language", "Malayalam"),
                 duration_min=st.get("duration_min", 150),
                 certificate=st.get("certificate", "UA"),
                 status="PUBLISHED",
@@ -771,20 +711,13 @@ async def _sync_one_provider(
                 release_date=release_date,
                 genre=st.get("genre"),
                 synopsis=f"Now showing: {title}",
-                cast_json=cast,
-                crew_json=crew,
+                cast_json=st.get("cast") or [],
+                crew_json=st.get("crew") or [],
             )
             new_movies.append(movie)
             movies_by_title[title] = movie
         else:
-            if poster_url and poster_url != DEFAULT_POSTER:
-                movie.poster_url = poster_url
-            if banner_url:
-                movie.banner_url = banner_url
-            if raw_lang:
-                movie.language = raw_lang
-            if st.get("certificate"):
-                movie.certificate = st.get("certificate")
+            movie.poster_url = poster_url
             movie.genre = st.get("genre")
             release_year = st.get("release_year")
             if release_year:
@@ -792,16 +725,14 @@ async def _sync_one_provider(
             # Only overwrite cast/crew if the provider actually sends them
             if st.get("cast"):
                 movie.cast_json = st["cast"]
-            elif not movie.cast_json:
-                cast, _ = resolve_movie_cast_and_crew(title, None, None)
-                if cast:
-                    movie.cast_json = cast
             if st.get("crew"):
                 movie.crew_json = st["crew"]
-            elif not movie.crew_json:
-                _, crew = resolve_movie_cast_and_crew(title, None, None)
-                if crew:
-                    movie.crew_json = crew
+
+        cinema_name = st.get("cinema_name") or "Unknown Cinema"
+        city = st.get("city") or "Kochi"
+        screen_name = st.get("screen_name") or "Screen 1"
+        screen = screens_by_key[(cinema_name, city, screen_name)]
+        starts_at_dt = datetime.fromisoformat(st["starts_at"].replace("Z", "+00:00"))
 
         existing_st = showtimes_by_ref.get(st["id"])
         if not existing_st:
@@ -810,7 +741,7 @@ async def _sync_one_provider(
                 screen_id=screen.id,
                 movie_id=movie.id,
                 starts_at=starts_at_dt,
-                language=screening_lang,
+                language=st.get("language", "Malayalam"),
                 format="2D",
                 status="ACTIVE",
                 partner_id=partner_id,
@@ -820,7 +751,6 @@ async def _sync_one_provider(
         else:
             existing_st.screen_id = screen.id
             existing_st.starts_at = starts_at_dt
-            existing_st.language = screening_lang
             existing_st.provider_id = provider.id
             existing_st.status = "ACTIVE"
 
