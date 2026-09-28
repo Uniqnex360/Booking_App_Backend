@@ -77,26 +77,37 @@ class MovieRepository:
         page: int = 1,
         limit: int = 20,
     ) -> tuple[list[MovieSummaryDTO], int]:
-        stmt = select(Movie).where(Movie.status == MovieStatus.PUBLISHED.value)
-        if language:
-            stmt = stmt.where(Movie.language == language)
-        stmt = stmt.join(Showtime, Showtime.movie_id == Movie.id).join(
-            Screen, Showtime.screen_id == Screen.id
+        showtime_subq = (
+            select(Showtime.movie_id)
+            .join(Screen, Showtime.screen_id == Screen.id)
+            .where(Showtime.starts_at > utcnow())
         )
-        stmt = stmt.where(Showtime.starts_at > utcnow())
         if city:
-            stmt = stmt.join(Venue, Screen.venue_id == Venue.id).where(
+            showtime_subq = showtime_subq.join(Venue, Screen.venue_id == Venue.id).where(
                 Venue.city == city
             )
         if format:
-            stmt = stmt.where(Showtime.format == format)
+            showtime_subq = showtime_subq.where(Showtime.format == format)
         if target_date:
             tz = ZoneInfo("Asia/Kolkata")
             start_dt = datetime.combine(target_date, time.min, tzinfo=tz).astimezone(ZoneInfo("UTC"))
             end_dt = datetime.combine(target_date, time.max, tzinfo=tz).astimezone(ZoneInfo("UTC"))
-            stmt = stmt.where(Showtime.starts_at.between(start_dt, end_dt))
-        stmt = stmt.distinct()
-        count_stmt = select(func.count()).select_from(stmt.subquery())
+            showtime_subq = showtime_subq.where(Showtime.starts_at.between(start_dt, end_dt))
+
+        stmt = select(Movie).where(
+            Movie.status == MovieStatus.PUBLISHED.value,
+            Movie.id.in_(showtime_subq),
+        )
+        if language:
+            stmt = stmt.where(Movie.language == language)
+
+        count_stmt = select(func.count(Movie.id)).where(
+            Movie.status == MovieStatus.PUBLISHED.value,
+            Movie.id.in_(showtime_subq),
+        )
+        if language:
+            count_stmt = count_stmt.where(Movie.language == language)
+
         total = (await self._session.execute(count_stmt)).scalar() or 0
         offset = (page - 1) * limit
         stmt = stmt.order_by(Movie.created_at.desc()).offset(offset).limit(limit)
