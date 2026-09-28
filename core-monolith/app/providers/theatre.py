@@ -14,6 +14,7 @@ from app.providers.base import (
     HoldAlreadyCommitted,
     HoldExpiredRemote,
     ITheatreProvider,
+    InvalidSeatSelectionRemote,
     ProviderContractError,
     ProviderHold,
     ProviderHoldState,
@@ -25,6 +26,7 @@ from app.providers.base import (
     ProviderTicketSeat,
     ProviderUnavailable,
     SeatUnavailableRemote,
+    ShowtimeNotFoundRemote,
 )
 
 logger = logging.getLogger(__name__)
@@ -159,7 +161,7 @@ class PVRProvider(ITheatreProvider):
     async def seat_map(self, showtime_ref: str) -> ProviderSeatMap:
         resp = await self._get_with_retry(f"/v1/showtimes/{showtime_ref}/seats")
         if resp.status_code == 404:
-            raise ProviderContractError(f"Showtime {showtime_ref} not found on provider", resp.text)
+            raise ShowtimeNotFoundRemote(showtime_ref, resp.text)
         if resp.status_code != 200:
             raise ProviderContractError(
                 f"Unexpected status {resp.status_code} fetching seat map", resp.text
@@ -238,6 +240,22 @@ class PVRProvider(ITheatreProvider):
                 )
             except Exception as exc:
                 raise ProviderContractError(f"Failed to parse hold 201 response: {exc}", resp.text) from exc
+
+        if resp.status_code == 404:
+            raise ShowtimeNotFoundRemote(showtime_ref, resp.text)
+
+        if resp.status_code in (400, 422):
+            msg = "Invalid seat selection on provider"
+            try:
+                data = resp.json()
+                detail = data.get("detail")
+                if isinstance(detail, str):
+                    msg = detail
+                elif isinstance(detail, list) and detail:
+                    msg = detail[0].get("msg", msg)
+            except Exception:
+                pass
+            raise InvalidSeatSelectionRemote(msg)
 
         if resp.status_code == 409:
             try:

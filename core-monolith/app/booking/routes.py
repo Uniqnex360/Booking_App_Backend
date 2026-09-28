@@ -41,6 +41,8 @@ from app.booking.services import BookingService
 from app.movie.interfaces import SeatAlreadyBookedError, SeatNotFoundError
 from app.providers.base import (
     HoldExpiredRemote,
+    ProviderContractError,
+    ProviderError,
     ProviderUnavailable,
     SeatUnavailableRemote,
 )
@@ -101,6 +103,10 @@ async def create_provider_hold(
         return error_response("SHOWTIME_DISABLED", str(exc), status.HTTP_400_BAD_REQUEST)
     except ProviderUnavailable as exc:
         return error_response("PROVIDER_UNAVAILABLE", str(exc), status.HTTP_502_BAD_GATEWAY)
+    except ProviderContractError as exc:
+        return error_response("PROVIDER_CONTRACT_ERROR", str(exc), status.HTTP_502_BAD_GATEWAY)
+    except ProviderError as exc:
+        return error_response("PROVIDER_ERROR", str(exc), status.HTTP_502_BAD_GATEWAY)
 @router.post("/bookings/{booking_id}/commit", status_code=status.HTTP_200_OK)
 async def commit_booking(
     booking_id: UUID,
@@ -137,6 +143,10 @@ async def commit_booking(
         return error_response("HOLD_ALREADY_COMMITTED", str(exc), status.HTTP_409_CONFLICT)
     except ProviderUnavailable as exc:
         return error_response("PROVIDER_UNAVAILABLE", str(exc), status.HTTP_502_BAD_GATEWAY)
+    except ProviderContractError as exc:
+        return error_response("PROVIDER_CONTRACT_ERROR", str(exc), status.HTTP_502_BAD_GATEWAY)
+    except ProviderError as exc:
+        return error_response("PROVIDER_ERROR", str(exc), status.HTTP_502_BAD_GATEWAY)
 @router.delete("/bookings/hold/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_provider_hold(
     booking_id: UUID,

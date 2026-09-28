@@ -38,11 +38,13 @@ from app.shared.providers.base import (
     HoldAlreadyCommitted,
     HoldExpiredRemote,
     ITheatreProvider,
+    InvalidSeatSelectionRemote,
     ProviderHold,
     ProviderSeatMap,
     ProviderTicket,
     ProviderUnavailable,
     SeatUnavailableRemote,
+    ShowtimeNotFoundRemote,
 )
 from app.auth.interfaces import INotificationService
 
@@ -593,12 +595,17 @@ class BookingService:
             raise ValidationError(f"Cannot hold more than {MAX_SEATS_PER_BOOKING} seats")
 
         provider_showtime_ref = st.provider_showtime_ref or str(st.id)
-        remote_hold: ProviderHold = await provider.hold(
-            showtime_ref=provider_showtime_ref,
-            seat_refs=seat_ids,
-            idem_key=idem_key,
-            end_user_ref=str(user_id) if user_id else (contact_email or contact_phone or "guest"),
-        )
+        try:
+            remote_hold: ProviderHold = await provider.hold(
+                showtime_ref=provider_showtime_ref,
+                seat_refs=seat_ids,
+                idem_key=idem_key,
+                end_user_ref=str(user_id) if user_id else (contact_email or contact_phone or "guest"),
+            )
+        except ShowtimeNotFoundRemote as exc:
+            raise ShowtimeNotFoundError(str(exc)) from exc
+        except InvalidSeatSelectionRemote as exc:
+            raise ValidationError(str(exc)) from exc
 
         booking_id = uuid.uuid4()
         now = utcnow()

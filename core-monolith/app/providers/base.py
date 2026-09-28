@@ -96,6 +96,15 @@ class ProviderContractError(ProviderError):
         truncated = (raw_body[:500] + "...") if raw_body and len(raw_body) > 500 else raw_body
         super().__init__(f"{message} (raw: {truncated})")
         self.raw_body = truncated
+class ShowtimeNotFoundRemote(ProviderError):
+    """Showtime was not found on the upstream provider."""
+    def __init__(self, showtime_ref: str, message: str | None = None) -> None:
+        super().__init__(message or f"Showtime {showtime_ref} not found on provider")
+        self.showtime_ref = showtime_ref
+class InvalidSeatSelectionRemote(ProviderError):
+    """The requested seat selection was rejected by the upstream provider."""
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
 class ITheatreProvider(ABC):
     @abstractmethod
     async def list_showtimes(self, target_date: date) -> list[ProviderShowtime]:
