@@ -286,183 +286,943 @@ DEFAULT_POSTER = (
 )
 
 CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
-    "aavesham": {
-        "cast": [
-            {"name": "Fahadh Faasil", "role": "Ranga", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Fahadh_Faasil_2019.jpg/330px-Fahadh_Faasil_2019.jpg"},
-            {"name": "Hipzster", "role": "Aju", "photo_url": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Mithun Jai Shankar", "role": "Bibi", "photo_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Roshan Shanavas", "role": "Shanthan", "photo_url": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Sajin Gopu", "role": "Amban", "photo_url": "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Mansoor Ali Khan", "role": "Reddy", "photo_url": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Ashish Vidyarthi", "role": "Executive Director", "photo_url": "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=300&auto=format&fit=crop&q=80"},
-        ],
-        "crew": [
-            {"name": "Jithu Madhavan", "role": "Director & Writer", "photo_url": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Nazriya Nazim", "role": "Producer", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Nazriya_Nazim_at_neram_audio_launch.jpg/330px-Nazriya_Nazim_at_neram_audio_launch.jpg"},
-            {"name": "Anwar Rasheed", "role": "Producer", "photo_url": "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Sushin Shyam", "role": "Musician", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Sushin_Shyam.jpg/330px-Sushin_Shyam.jpg"},
-            {"name": "Sameer Thahir", "role": "Cinematographer", "photo_url": "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Vivek Harshan", "role": "Editor", "photo_url": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80"},
-        ],
-    },
-    "manjummel boys": {
-        "cast": [
-            {"name": "Soubin Shahir", "role": "Kuttan", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/Soubin_Shahir_2019.jpg/330px-Soubin_Shahir_2019.jpg"},
-            {"name": "Sreenath Bhasi", "role": "Subhash", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Sreenath_Bhasi_latest_.jpg/330px-Sreenath_Bhasi_latest_.jpg"},
-            {"name": "Balu Varghese", "role": "Sixen", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Balu_Varghese_at_SBCE.jpg/330px-Balu_Varghese_at_SBCE.jpg"},
-            {"name": "Ganapathi", "role": "Krishnakumar", "photo_url": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Jean Paul Lal", "role": "Siju David", "photo_url": "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Deepak Parambol", "role": "Sudhi", "photo_url": "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Abhiram Radhakrishnan", "role": "Anil", "photo_url": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&auto=format&fit=crop&q=80"},
-        ],
-        "crew": [
-            {"name": "Chidambaram", "role": "Director & Writer", "photo_url": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Babu Shahir", "role": "Producer", "photo_url": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Shawn Antony", "role": "Producer", "photo_url": "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Sushin Shyam", "role": "Musician", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Sushin_Shyam.jpg/330px-Sushin_Shyam.jpg"},
-            {"name": "Shyju Khalid", "role": "Cinematographer", "photo_url": "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Vivek Harshan", "role": "Editor", "photo_url": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80"},
-        ],
-    },
-    "bramayugam": {
-        "cast": [
-            {"name": "Mammootty", "role": "Kodumon Potti", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Mammootty%2C_2022.jpg/330px-Mammootty%2C_2022.jpg"},
-            {"name": "Arjun Ashokan", "role": "Thevan", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/Arjun_Ashokan_2026.jpg/330px-Arjun_Ashokan_2026.jpg"},
-            {"name": "Sidharth Bharathan", "role": "The Cook", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Sidharth_Bharathan_2017.jpg/330px-Sidharth_Bharathan_2017.jpg"},
-            {"name": "Amalda Liz", "role": "Yakshi", "photo_url": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Manikandan R. Achari", "role": "Chathan", "photo_url": "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=300&auto=format&fit=crop&q=80"},
-        ],
-        "crew": [
-            {"name": "Rahul Sadasivan", "role": "Director & Writer", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/RahulSpic_2024_-_jpg_%28cropped%29.jpg/330px-RahulSpic_2024_-_jpg_%28cropped%29.jpg"},
-            {"name": "Chakravarthy Ramachandra", "role": "Producer", "photo_url": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&auto=format&fit=crop&q=80"},
-            {"name": "S. Sashikanth", "role": "Producer", "photo_url": "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Christo Xavier", "role": "Musician", "photo_url": "https://images.unsplash.com/photo-1513956589380-bad6acb9b9d4?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Shehnad Jalal", "role": "Cinematographer", "photo_url": "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Shafique Mohamed Ali", "role": "Editor", "photo_url": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80"},
-        ],
-    },
     "kingdom": {
         "cast": [
-            {"name": "Vijay Deverakonda", "role": "Suriya", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/8/84/Vijay_Devarakonda_snapped_during_Liger_promotions.jpg"},
-            {"name": "Bhagyashri Borse", "role": "Maya", "photo_url": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Satyadev Kancharana", "role": "Vikram", "photo_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Jagapathi Babu", "role": "Dharma", "photo_url": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Sunil", "role": "Raghava", "photo_url": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80"},
+            {
+                "name": "Vijay Deverakonda",
+                "role": "Soori",
+                "photo_url": "https://image.tmdb.org/t/p/w300/8oVIWyIoFUal8SJFnmCUtkkm1HP.jpg"
+            },
+            {
+                "name": "Satyadev Kancharana",
+                "role": "Siva",
+                "photo_url": "https://image.tmdb.org/t/p/w300/uIf1HM99iDVf9vdJwXPMgggOHkA.jpg"
+            },
+            {
+                "name": "Venkitesh V P",
+                "role": "Murugan",
+                "photo_url": "https://image.tmdb.org/t/p/w300/wX72uREcCwXiUIbZMpxtkHLoC2O.jpg"
+            },
+            {
+                "name": "Bhagyashri Borse",
+                "role": "Madhu",
+                "photo_url": "https://image.tmdb.org/t/p/w300/3gVgbXl0YC1xxrFatf0pEkFbK4Q.jpg"
+            },
+            {
+                "name": "Ronit Kamra",
+                "role": "Jr Suri",
+                "photo_url": "https://image.tmdb.org/t/p/w300/A90xgEIR02s85z5SzMlOUZ8z0YB.jpg"
+            },
+            {
+                "name": "Baburaj",
+                "role": "Odiyappan",
+                "photo_url": "https://image.tmdb.org/t/p/w300/nuJ7GhTfuBrlGBWeMPIYr59O8kP.jpg"
+            },
+            {
+                "name": "Ayyappa P. Sharma",
+                "role": "Divi Bhairagi",
+                "photo_url": null
+            },
+            {
+                "name": "Bhanu Prakashan",
+                "role": "Young Siva",
+                "photo_url": null
+            },
+            {
+                "name": "Sriram Reddy Polasane",
+                "role": "David",
+                "photo_url": null
+            },
+            {
+                "name": "Manish Chaudhary",
+                "role": "Jayaprakash",
+                "photo_url": "https://image.tmdb.org/t/p/w300/1l4vmA0IJQLieebZWOOCAFu4ra6.jpg"
+            }
         ],
         "crew": [
-            {"name": "Gowtam Tinnanuri", "role": "Director & Writer", "photo_url": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Naga Vamsi S.", "role": "Producer", "photo_url": "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Anirudh Ravichander", "role": "Musician", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Anirudh_Ravichander_at_Audi_Ritz_Style_Awards_2017_%28cropped%29.jpg/330px-Anirudh_Ravichander_at_Audi_Ritz_Style_Awards_2017_%28cropped%29.jpg"},
-            {"name": "Girish Gangadharan", "role": "Cinematographer", "photo_url": "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Navin Nooli", "role": "Editor", "photo_url": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80"},
-        ],
-    },
-    "vaazha": {
-        "cast": [
-            {"name": "Jeemon George", "role": "Ajo", "photo_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Hashir", "role": "Vishnu", "photo_url": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Alan", "role": "Moosa", "photo_url": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Vinayak", "role": "Vivek", "photo_url": "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Jagadish", "role": "Father", "photo_url": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Kottayam Nazeer", "role": "Principal", "photo_url": "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=300&auto=format&fit=crop&q=80"},
-        ],
-        "crew": [
-            {"name": "Anand Menen", "role": "Director", "photo_url": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Vipin Das", "role": "Writer & Producer", "photo_url": "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Ankit Menon", "role": "Musician", "photo_url": "https://images.unsplash.com/photo-1513956589380-bad6acb9b9d4?w=300&auto=format&fit=crop&q=80"},
-        ],
-    },
-    "i am game": {
-        "cast": [
-            {"name": "Prithviraj Sukumaran", "role": "David Koshy", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/4/48/Prithviraj_at_Aiyyaa_event.jpg"},
-            {"name": "Nayanthara", "role": "Ananya", "photo_url": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Tovino Thomas", "role": "Neil", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Tovino_Thomas_At_The_%E2%80%98Maari_2%E2%80%99_Press_Meet.jpg/330px-Tovino_Thomas_At_The_%E2%80%98Maari_2%E2%80%99_Press_Meet.jpg"},
-            {"name": "Indrajith Sukumaran", "role": "Roy", "photo_url": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Suraj Venjaramoodu", "role": "Mathew", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Photo_of_Suraj_captured_by_Ujwal_Rajeev.jpg/330px-Photo_of_Suraj_captured_by_Ujwal_Rajeev.jpg"},
-        ],
-        "crew": [
-            {"name": "Jeethu Joseph", "role": "Director", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Jeethu_Joseph_%28director%29_%282019%29.jpg/330px-Jeethu_Joseph_%28director%29_%282019%29.jpg"},
-            {"name": "Antony Perumbavoor", "role": "Producer", "photo_url": "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Jakes Bejoy", "role": "Musician", "photo_url": "https://images.unsplash.com/photo-1513956589380-bad6acb9b9d4?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Satheesh Kurup", "role": "Cinematographer", "photo_url": "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=300&auto=format&fit=crop&q=80"},
-        ],
-    },
-    "the final whistle": {
-        "cast": [
-            {"name": "Christian Bale", "role": "Coach Marcus", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Christian_Bale-7837.jpg/330px-Christian_Bale-7837.jpg"},
-            {"name": "Florence Pugh", "role": "Dr. Clara Evans", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Florence_Pugh_at_the_2024_Toronto_International_Film_Festival_13_%28cropped_2_%E2%80%93_color_adjusted%29.jpg/330px-Florence_Pugh_at_the_2024_Toronto_International_Film_Festival_13_%28cropped_2_%E2%80%93_color_adjusted%29.jpg"},
-            {"name": "John Boyega", "role": "Leo Stone", "photo_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Woody Harrelson", "role": "General Vance", "photo_url": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&auto=format&fit=crop&q=80"},
-        ],
-        "crew": [
-            {"name": "Ridley Scott", "role": "Director", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Ridley_Scott_At_BFI_-_BFI_Southbank_-_Saturday_4th_October_2025.jpg/330px-Ridley_Scott_At_BFI_-_BFI_Southbank_-_Saturday_4th_October_2025.jpg"},
-            {"name": "Hans Zimmer", "role": "Musician", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Hans-Zimmer-profile.jpg/330px-Hans-Zimmer-profile.jpg"},
-        ],
+            {
+                "name": "Suryadevara Naga Vamsi",
+                "role": "Producer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/hLJpBV45WFqS3sYxS3zmBhcHAoq.jpg"
+            },
+            {
+                "name": "Gowtam Tinnanuri",
+                "role": "Director",
+                "photo_url": "https://image.tmdb.org/t/p/w300/yA5HYmJGGwMXqMRAXrzHbkJNAfv.jpg"
+            },
+            {
+                "name": "Girish Gangadharan",
+                "role": "Director of Photography",
+                "photo_url": "https://image.tmdb.org/t/p/w300/l0prBtRT58P3uHVYPMivXnJwIFT.jpg"
+            },
+            {
+                "name": "Naveen Nooli",
+                "role": "Editor",
+                "photo_url": "https://image.tmdb.org/t/p/w300/dTYIRplqzKtT6LB8uONcIcsJz6I.jpg"
+            },
+            {
+                "name": "Sai Soujanya",
+                "role": "Producer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/apJYXLrq71B80HKyjYS1ksAx7ID.jpg"
+            },
+            {
+                "name": "Anirudh Ravichander",
+                "role": "Original Music Composer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/xKvlrZpRaXkm2K2ZiXpqgrEedUU.jpg"
+            },
+            {
+                "name": "Jomon T. John",
+                "role": "Director of Photography",
+                "photo_url": "https://image.tmdb.org/t/p/w300/q8p2iKw928tQ7ssuHx7gsPQQG8N.jpg"
+            }
+        ]
     },
     "last whistle": {
         "cast": [
-            {"name": "Christian Bale", "role": "Coach Marcus", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Christian_Bale-7837.jpg/330px-Christian_Bale-7837.jpg"},
-            {"name": "Florence Pugh", "role": "Dr. Clara Evans", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Florence_Pugh_at_the_2024_Toronto_International_Film_Festival_13_%28cropped_2_%E2%80%93_color_adjusted%29.jpg/330px-Florence_Pugh_at_the_2024_Toronto_International_Film_Festival_13_%28cropped_2_%E2%80%93_color_adjusted%29.jpg"},
-            {"name": "John Boyega", "role": "Leo Stone", "photo_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80"},
+            {
+                "name": "Christian Bale",
+                "role": "Coach Marcus",
+                "photo_url": "https://image.tmdb.org/t/p/w300/7Pxez9J8fuPd2Mn9kex13YALrCQ.jpg"
+            },
+            {
+                "name": "Florence Pugh",
+                "role": "Dr. Clara Evans",
+                "photo_url": "https://image.tmdb.org/t/p/w300/2URrZb95t3kY6pLroKny3Enmabp.jpg"
+            },
+            {
+                "name": "John Boyega",
+                "role": "Leo Stone",
+                "photo_url": "https://image.tmdb.org/t/p/w300/3153CfpgZQXTzCY0i74WpJumMQe.jpg"
+            }
         ],
         "crew": [
-            {"name": "Ridley Scott", "role": "Director", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Ridley_Scott_At_BFI_-_BFI_Southbank_-_Saturday_4th_October_2025.jpg/330px-Ridley_Scott_At_BFI_-_BFI_Southbank_-_Saturday_4th_October_2025.jpg"},
-            {"name": "Hans Zimmer", "role": "Musician", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Hans-Zimmer-profile.jpg/330px-Hans-Zimmer-profile.jpg"},
+            {
+                "name": "Ridley Scott",
+                "role": "Director",
+                "photo_url": "https://image.tmdb.org/t/p/w300/zABJmN9opmqD4orWl3KSdCaSo7Q.jpg"
+            },
+            {
+                "name": "Hans Zimmer",
+                "role": "Original Music Composer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/tpQnDeHY15szIXvpnhlprufz4d.jpg"
+            }
+        ]
+    },
+    "the final whistle": {
+        "cast": [
+            {
+                "name": "Christian Bale",
+                "role": "Coach Marcus",
+                "photo_url": "https://image.tmdb.org/t/p/w300/7Pxez9J8fuPd2Mn9kex13YALrCQ.jpg"
+            },
+            {
+                "name": "Florence Pugh",
+                "role": "Dr. Clara Evans",
+                "photo_url": "https://image.tmdb.org/t/p/w300/2URrZb95t3kY6pLroKny3Enmabp.jpg"
+            },
+            {
+                "name": "John Boyega",
+                "role": "Leo Stone",
+                "photo_url": "https://image.tmdb.org/t/p/w300/3153CfpgZQXTzCY0i74WpJumMQe.jpg"
+            },
+            {
+                "name": "Woody Harrelson",
+                "role": "General Vance",
+                "photo_url": "https://image.tmdb.org/t/p/w300/igxYDQBbTEdAqaJxaW6ffqswmUU.jpg"
+            }
         ],
+        "crew": [
+            {
+                "name": "Ridley Scott",
+                "role": "Director",
+                "photo_url": "https://image.tmdb.org/t/p/w300/zABJmN9opmqD4orWl3KSdCaSo7Q.jpg"
+            },
+            {
+                "name": "Hans Zimmer",
+                "role": "Original Music Composer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/tpQnDeHY15szIXvpnhlprufz4d.jpg"
+            }
+        ]
+    },
+    "amaran": {
+        "cast": [
+            {
+                "name": "Sivakarthikeyan",
+                "role": "Major Mukund Varadarajan",
+                "photo_url": "https://image.tmdb.org/t/p/w300/jgy9y3V8QqZmu5r8sMxrGCzXuyp.jpg"
+            },
+            {
+                "name": "Sai Pallavi",
+                "role": "Indhu Rebecca Varghese",
+                "photo_url": "https://image.tmdb.org/t/p/w300/qAPdGKUIUEzLibdgVCey7oKvvME.jpg"
+            },
+            {
+                "name": "Rahul Bose",
+                "role": "Colonel Amit Singh Dabas",
+                "photo_url": "https://image.tmdb.org/t/p/w300/6T0xhsganOB8SI48HCGd99XKj9l.jpg"
+            },
+            {
+                "name": "Bhuvan Arora",
+                "role": "Vikram Singh",
+                "photo_url": "https://image.tmdb.org/t/p/w300/AtEfX9ta8LZTWh7yZ4dVc2wpIRO.jpg"
+            },
+            {
+                "name": "Lallu Prasath",
+                "role": "Ravi Shankar",
+                "photo_url": "https://image.tmdb.org/t/p/w300/f6TVtddrbG1Qk1brFASrpPehpQh.jpg"
+            },
+            {
+                "name": "Anbu Thasan",
+                "role": "Sepoy",
+                "photo_url": "https://image.tmdb.org/t/p/w300/ycX5zV4CVOoSMnM3wkoOndZHaP7.jpg"
+            },
+            {
+                "name": "Shreekumar",
+                "role": "Michael",
+                "photo_url": "https://image.tmdb.org/t/p/w300/rgpQi9g4h4EzQQv7fXKhnEGWLq5.jpg"
+            },
+            {
+                "name": "Shyamaprasad",
+                "role": "R. Varadarajan",
+                "photo_url": "https://image.tmdb.org/t/p/w300/7XmS8tF5OGt7y9YdpyySIWBECkH.jpg"
+            },
+            {
+                "name": "Shyam Mohan",
+                "role": "Indhu's brother",
+                "photo_url": "https://image.tmdb.org/t/p/w300/wqUndf8mfVUxKtus68hrh7dlBhX.jpg"
+            },
+            {
+                "name": "Paul T Baby",
+                "role": "Andrews",
+                "photo_url": null
+            }
+        ],
+        "crew": [
+            {
+                "name": "C. H. Sai",
+                "role": "Director of Photography",
+                "photo_url": null
+            },
+            {
+                "name": "R. Kalaivanan",
+                "role": "Editor",
+                "photo_url": null
+            },
+            {
+                "name": "Rajkumar Periasamy",
+                "role": "Director",
+                "photo_url": null
+            },
+            {
+                "name": "Kamal Haasan",
+                "role": "Producer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/17zscZgz4wOlGDd3Gziw4YbI3G.jpg"
+            },
+            {
+                "name": "R. Mahendran",
+                "role": "Producer",
+                "photo_url": null
+            },
+            {
+                "name": "G. V. Prakash Kumar",
+                "role": "Original Music Composer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/ArX3l6CdNo0sGI8b6PFYveR9Azm.jpg"
+            },
+            {
+                "name": "Vivek Krishnani",
+                "role": "Producer",
+                "photo_url": null
+            }
+        ]
+    },
+    "manjummel boys": {
+        "cast": [
+            {
+                "name": "Soubin Shahir",
+                "role": "Siju 'Kuttan' David",
+                "photo_url": "https://image.tmdb.org/t/p/w300/eFMA1PFOpDtiJ5MlkSAMexvTPsl.jpg"
+            },
+            {
+                "name": "Sreenath Bhasi",
+                "role": "Subash",
+                "photo_url": "https://image.tmdb.org/t/p/w300/oPsXUtaE0ZslhaGRdtww0ZpMRe7.jpg"
+            },
+            {
+                "name": "Balu Varghese",
+                "role": "Sixen John",
+                "photo_url": "https://image.tmdb.org/t/p/w300/v1Ydyfxe3bFxXiHB4cU5Hmoh5hV.jpg"
+            },
+            {
+                "name": "Ganapathi S. Poduval",
+                "role": "Krishnakumar 'Kannan'",
+                "photo_url": "https://image.tmdb.org/t/p/w300/15g6TQroqoLmcK1E8CniGZjm72l.jpg"
+            },
+            {
+                "name": "Lal Jr.",
+                "role": "Siju John",
+                "photo_url": "https://image.tmdb.org/t/p/w300/2QoAFcXlCwZNlYy6gTr3S2GY39o.jpg"
+            },
+            {
+                "name": "Deepak Parambol",
+                "role": "Sudheesh",
+                "photo_url": "https://image.tmdb.org/t/p/w300/unP6XX7SDtatBVuVG8CVhwQTAQ5.jpg"
+            },
+            {
+                "name": "Abhiram Radhakrishnan",
+                "role": "Anil",
+                "photo_url": "https://image.tmdb.org/t/p/w300/8AjTvCsrPkiOLYblggiMlUAketU.jpg"
+            },
+            {
+                "name": "Arun Kurian",
+                "role": "Sujith",
+                "photo_url": "https://image.tmdb.org/t/p/w300/7jFTigCmJV3xH0fKSkv1wbdbdKo.jpg"
+            },
+            {
+                "name": "Chandu Salimkumar",
+                "role": "Abhilash",
+                "photo_url": "https://image.tmdb.org/t/p/w300/1FVTLZWJi7acmNYQYdnkWsld9nr.jpg"
+            },
+            {
+                "name": "Vishnu Reghu",
+                "role": "Jinsen",
+                "photo_url": "https://image.tmdb.org/t/p/w300/gGnA8Fxi4QYyxobWxLCtKDVF9nL.jpg"
+            }
+        ],
+        "crew": [
+            {
+                "name": "Shyju Khalid",
+                "role": "Director of Photography",
+                "photo_url": "https://image.tmdb.org/t/p/w300/pp5QwB4fx0zONvNT6WlTm2pb7tq.jpg"
+            },
+            {
+                "name": "Chidambaram",
+                "role": "Director",
+                "photo_url": "https://image.tmdb.org/t/p/w300/fwRYox7fTSVurHJJnsAQCUJ7Jzt.jpg"
+            },
+            {
+                "name": "Soubin Shahir",
+                "role": "Producer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/eFMA1PFOpDtiJ5MlkSAMexvTPsl.jpg"
+            },
+            {
+                "name": "Sushin Shyam",
+                "role": "Original Music Composer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/d9gCNGQGmQIfbPl8cDcbVe13AsN.jpg"
+            },
+            {
+                "name": "Vivek Harshan",
+                "role": "Editor",
+                "photo_url": "https://image.tmdb.org/t/p/w300/zWZoAzJHfovG4ox16QiUVZLN9HA.jpg"
+            },
+            {
+                "name": "Babu Shahir",
+                "role": "Producer",
+                "photo_url": null
+            },
+            {
+                "name": "Shawn Antony",
+                "role": "Producer",
+                "photo_url": null
+            }
+        ]
+    },
+    "aavesham": {
+        "cast": [
+            {
+                "name": "Fahadh Faasil",
+                "role": "Ranjith 'Ranga' Gangadharan",
+                "photo_url": "https://image.tmdb.org/t/p/w300/wmkwZWFHqMptqdt4HacMIAe8OBP.jpg"
+            },
+            {
+                "name": "Hipster",
+                "role": "Aju",
+                "photo_url": "https://image.tmdb.org/t/p/w300/zUKB1gDZiCLB3u1zEnp8W7UtYCU.jpg"
+            },
+            {
+                "name": "Mithun Jai Sankar",
+                "role": "Bibi",
+                "photo_url": "https://image.tmdb.org/t/p/w300/r3ynMua2UoFlLnEP8PEEe3x2PnT.jpg"
+            },
+            {
+                "name": "Roshan Shanavas",
+                "role": "Shanthan",
+                "photo_url": "https://image.tmdb.org/t/p/w300/lotiqK0sfK4rZKV6tHvHrg9Cty3.jpg"
+            },
+            {
+                "name": "Sajin Gopu",
+                "role": "Amban",
+                "photo_url": "https://image.tmdb.org/t/p/w300/l8kpWfPvD7Gzp2LgvRSWVRsrxWd.jpg"
+            },
+            {
+                "name": "Midhun Midhutty",
+                "role": "Kuttettan",
+                "photo_url": null
+            },
+            {
+                "name": "Krishna Kumar",
+                "role": "Nanjappa",
+                "photo_url": null
+            },
+            {
+                "name": "Freestyle Krishna",
+                "role": "Bruce-Lee",
+                "photo_url": null
+            },
+            {
+                "name": "Himanshu",
+                "role": "Jacky",
+                "photo_url": null
+            },
+            {
+                "name": "Mansoor Ali Khan",
+                "role": "Reddy",
+                "photo_url": "https://image.tmdb.org/t/p/w300/bXNi9n6Y4dz85xdLnjxquKHleuZ.jpg"
+            }
+        ],
+        "crew": [
+            {
+                "name": "Sameer Thahir",
+                "role": "Director of Photography",
+                "photo_url": "https://image.tmdb.org/t/p/w300/m7Cr6VhwS5wYRWxBpGkX4oUwxFw.jpg"
+            },
+            {
+                "name": "Jithu Madhavan",
+                "role": "Writer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/hw3v8VDPlMBdVDweSKH5IcLgdGP.jpg"
+            },
+            {
+                "name": "Anwar Rasheed",
+                "role": "Producer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/670MKLVvf3zQCQ2474T3mGigiBU.jpg"
+            },
+            {
+                "name": "Sushin Shyam",
+                "role": "Original Music Composer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/d9gCNGQGmQIfbPl8cDcbVe13AsN.jpg"
+            },
+            {
+                "name": "Vivek Harshan",
+                "role": "Editor",
+                "photo_url": "https://image.tmdb.org/t/p/w300/zWZoAzJHfovG4ox16QiUVZLN9HA.jpg"
+            },
+            {
+                "name": "Nazriya Nazim",
+                "role": "Producer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/eXTaWA5jp7kW7gupWt6bGCKE4DI.jpg"
+            },
+            {
+                "name": "Fahadh Faasil",
+                "role": "Producer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/wmkwZWFHqMptqdt4HacMIAe8OBP.jpg"
+            }
+        ]
+    },
+    "i am game": {
+        "cast": [
+            {
+                "name": "Prithviraj Sukumaran",
+                "role": "David Koshy",
+                "photo_url": "https://image.tmdb.org/t/p/w300/1xhG42QU8tMQRTDdP1Ed3y9GRvm.jpg"
+            },
+            {
+                "name": "Nayanthara",
+                "role": "Ananya",
+                "photo_url": "https://image.tmdb.org/t/p/w300/sYUzvjsSsqeOgBblSzda6ZwwbEa.jpg"
+            },
+            {
+                "name": "Tovino Thomas",
+                "role": "Neil",
+                "photo_url": "https://image.tmdb.org/t/p/w300/uySCXY4TZxEDcVJD8WOjDQmMHc9.jpg"
+            },
+            {
+                "name": "Indrajith Sukumaran",
+                "role": "Roy",
+                "photo_url": "https://image.tmdb.org/t/p/w300/32YxjXVmgkPCVKUQAkNqWUGbBIl.jpg"
+            },
+            {
+                "name": "Suraj Venjaramoodu",
+                "role": "Mathew",
+                "photo_url": "https://image.tmdb.org/t/p/w300/2FUs0wmR3eHBd8g4GVbCmhkUzeI.jpg"
+            }
+        ],
+        "crew": [
+            {
+                "name": "Jeethu Joseph",
+                "role": "Director",
+                "photo_url": "https://image.tmdb.org/t/p/w300/47Hqs5fHKFU0uRb0qIJOncAcqNl.jpg"
+            },
+            {
+                "name": "Antony Perumbavoor",
+                "role": "Producer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/3jyOxhNgNljnuGJeEx9Yth9zjoP.jpg"
+            },
+            {
+                "name": "Jakes Bejoy",
+                "role": "Original Music Composer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/n1JPfYACCoK6wzXUGITLvw3ku7F.jpg"
+            }
+        ]
+    },
+    "vaazha": {
+        "cast": [
+            {
+                "name": "Siju Sunny",
+                "role": "Ajo Thomas",
+                "photo_url": "https://image.tmdb.org/t/p/w300/85mAvBMgIVo0C8kkeuEgsbLfifZ.jpg"
+            },
+            {
+                "name": "Joemon Jyothir",
+                "role": "Moosa",
+                "photo_url": "https://image.tmdb.org/t/p/w300/prwllSgqHxG5c8yQGtXGnH5LbPh.jpg"
+            },
+            {
+                "name": "Safwan",
+                "role": "Vishwam",
+                "photo_url": null
+            },
+            {
+                "name": "Amith Mohan Rajeswari",
+                "role": "Vishnu Radhakrishnan",
+                "photo_url": "https://image.tmdb.org/t/p/w300/x64tksObwq5TlKZ2pZmDawMwAq4.jpg"
+            },
+            {
+                "name": "Ajin Joy",
+                "role": "Ajin",
+                "photo_url": "https://image.tmdb.org/t/p/w300/flaXVOZYukvtbzmQb4S8qPZSwvX.jpg"
+            },
+            {
+                "name": "Azees Nedumangad",
+                "role": "Thomachan",
+                "photo_url": "https://image.tmdb.org/t/p/w300/zsPdTjTxeFtwjqG7tIJrFcF45V5.jpg"
+            },
+            {
+                "name": "Kottayam Nazeer",
+                "role": "Radhakrishnan",
+                "photo_url": "https://image.tmdb.org/t/p/w300/vN0cHxgDIE5DKUeL2F0nmIhTIoZ.jpg"
+            },
+            {
+                "name": "Noby Marcose",
+                "role": "Ibrahim",
+                "photo_url": "https://image.tmdb.org/t/p/w300/o2E8IhRc7T3kyZeebXC5nX3Bepz.jpg"
+            },
+            {
+                "name": "Meenakshi Unnikrishnan",
+                "role": "Maya",
+                "photo_url": "https://image.tmdb.org/t/p/w300/vEBiMtuPMRz6MvaB1q8Pjs4tajy.jpg"
+            },
+            {
+                "name": "Anuraj OB",
+                "role": "Abdul Kalam",
+                "photo_url": "https://image.tmdb.org/t/p/w300/3sOaLataDZ8o9mIGTcv7HxaawLt.jpg"
+            }
+        ],
+        "crew": [
+            {
+                "name": "Harris Desom",
+                "role": "Producer",
+                "photo_url": null
+            },
+            {
+                "name": "Vipin Das",
+                "role": "Producer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/nSvwYnZT6DgSJMJBR9qgF3AP4kg.jpg"
+            },
+            {
+                "name": "Anand Menen",
+                "role": "Director",
+                "photo_url": "https://image.tmdb.org/t/p/w300/m2LryP6KuvYziyORvmIS8DCKUzk.jpg"
+            },
+            {
+                "name": "Aravind Puthussery",
+                "role": "Director of Photography",
+                "photo_url": null
+            },
+            {
+                "name": "Adarsh Narayan",
+                "role": "Producer",
+                "photo_url": null
+            },
+            {
+                "name": "Kannan Mohan",
+                "role": "Editor",
+                "photo_url": null
+            },
+            {
+                "name": "Electronic Kili",
+                "role": "Music",
+                "photo_url": "https://image.tmdb.org/t/p/w300/6QtRyFXDdnkr1dUhQidtqHIZLps.jpg"
+            },
+            {
+                "name": "Rajat Prakash",
+                "role": "Music",
+                "photo_url": null
+            }
+        ]
+    },
+    "deadpool & wolverine": {
+        "cast": [
+            {
+                "name": "Ryan Reynolds",
+                "role": "Wade Wilson / Deadpool / Nicepool",
+                "photo_url": "https://image.tmdb.org/t/p/w300/trzgptffGvAlAT6MEu01fz47cLW.jpg"
+            },
+            {
+                "name": "Hugh Jackman",
+                "role": "Logan / Wolverine",
+                "photo_url": "https://image.tmdb.org/t/p/w300/4Xujtewxqt6aU0Y81tsS9gkjizk.jpg"
+            },
+            {
+                "name": "Emma Corrin",
+                "role": "Cassandra Nova",
+                "photo_url": "https://image.tmdb.org/t/p/w300/hp5KW9RpavorNnsQxybB0qBEnyd.jpg"
+            },
+            {
+                "name": "Matthew Macfadyen",
+                "role": "Mr. Paradox",
+                "photo_url": "https://image.tmdb.org/t/p/w300/sFaIfkykJdftwrc3BdEfpdg2mYW.jpg"
+            },
+            {
+                "name": "Dafne Keen",
+                "role": "Laura / X-23",
+                "photo_url": "https://image.tmdb.org/t/p/w300/34BhddK5z2YHjfppOleezVrQ7Jt.jpg"
+            },
+            {
+                "name": "Jon Favreau",
+                "role": "Happy Hogan",
+                "photo_url": "https://image.tmdb.org/t/p/w300/tnx7iMVydPQXGOoLsxXl84PXtbA.jpg"
+            },
+            {
+                "name": "Morena Baccarin",
+                "role": "Vanessa",
+                "photo_url": "https://image.tmdb.org/t/p/w300/4gyHyg6FJ1oFczOm5pmMkdEEo2J.jpg"
+            },
+            {
+                "name": "Rob Delaney",
+                "role": "Peter",
+                "photo_url": "https://image.tmdb.org/t/p/w300/xirfT1znRkkughLiPemKu3NhkKQ.jpg"
+            },
+            {
+                "name": "Leslie Uggams",
+                "role": "Blind Al",
+                "photo_url": "https://image.tmdb.org/t/p/w300/8zQO5GNWQwJG4we5AYfjopblRFe.jpg"
+            },
+            {
+                "name": "Jennifer Garner",
+                "role": "Elektra",
+                "photo_url": "https://image.tmdb.org/t/p/w300/eiX083VOa0RCGSgwENZgVi5MgDi.jpg"
+            }
+        ],
+        "crew": [
+            {
+                "name": "Shawn Levy",
+                "role": "Director",
+                "photo_url": "https://image.tmdb.org/t/p/w300/rpAvyeds9OztUQUUMmgg7eivfLY.jpg"
+            },
+            {
+                "name": "Rhett Reese",
+                "role": "Writer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/qmllR1OPT0wG0gGBrGF0bvgY2wZ.jpg"
+            },
+            {
+                "name": "Paul Wernick",
+                "role": "Writer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/eEJBp1R3kmVKYq8IT0xUGUMUKim.jpg"
+            },
+            {
+                "name": "Shane Reid",
+                "role": "Editor",
+                "photo_url": "https://image.tmdb.org/t/p/w300/idptgX7GBTwqcM7WKKaChThDFQN.jpg"
+            },
+            {
+                "name": "Ryan Reynolds",
+                "role": "Producer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/trzgptffGvAlAT6MEu01fz47cLW.jpg"
+            },
+            {
+                "name": "Lauren Shuler Donner",
+                "role": "Producer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/a0oY5BiS6ubJv3Mxh83XH8S4fH7.jpg"
+            },
+            {
+                "name": "Dean Zimmerman",
+                "role": "Editor",
+                "photo_url": "https://image.tmdb.org/t/p/w300/adIjjwmv9b4Rbufz9ggC54f56vc.jpg"
+            },
+            {
+                "name": "Zeb Wells",
+                "role": "Writer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/cfc4Y9MjnAMSr0Fs68M4nubvSIQ.jpg"
+            }
+        ]
     },
     "avengers: endgame encore": {
         "cast": [
-            {"name": "Robert Downey Jr.", "role": "Tony Stark / Iron Man", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/RobertDowneyJr-byPhilipRomano7_%28cropped%29.jpg/330px-RobertDowneyJr-byPhilipRomano7_%28cropped%29.jpg"},
-            {"name": "Chris Evans", "role": "Steve Rogers / Captain America", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Chris_Evans_at_the_2025_Toronto_International_Film_Festival_%28cropped%29.jpg/330px-Chris_Evans_at_the_2025_Toronto_International_Film_Festival_%28cropped%29.jpg"},
-            {"name": "Scarlett Johansson", "role": "Natasha Romanoff / Black Widow", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Scarlett_Johansson-8588.jpg/330px-Scarlett_Johansson-8588.jpg"},
-            {"name": "Chris Hemsworth", "role": "Thor", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/86/Chris_Hemsworth_-_Crime_101.jpg/330px-Chris_Hemsworth_-_Crime_101.jpg"},
-            {"name": "Mark Ruffalo", "role": "Bruce Banner / Hulk", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/Mark_Ruffalo_%2836201774756%29_%28cropped%29.jpg/330px-Mark_Ruffalo_%2836201774756%29_%28cropped%29.jpg"},
-            {"name": "Paul Rudd", "role": "Scott Lang / Ant-Man", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Paul_Rudd_and_Kate_Mara_at_the_2024_Toronto_International_Film_Festival_8_%28cropped%29.jpg/330px-Paul_Rudd_and_Kate_Mara_at_the_2024_Toronto_International_Film_Festival_8_%28cropped%29.jpg"},
-            {"name": "Benedict Cumberbatch", "role": "Doctor Strange", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Benedict_Cumberbatch-67555.jpg/330px-Benedict_Cumberbatch-67555.jpg"},
-            {"name": "Chadwick Boseman", "role": "T'Challa / Black Panther", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Chadwick_Boseman_by_Gage_Skidmore_July_2017_%28cropped%29.jpg/330px-Chadwick_Boseman_by_Gage_Skidmore_July_2017_%28cropped%29.jpg"},
-            {"name": "Tom Holland", "role": "Peter Parker / Spider-Man", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/TomHolland-byPhilipRomano.jpg/330px-TomHolland-byPhilipRomano.jpg"},
+            {
+                "name": "Robert Downey Jr.",
+                "role": "Tony Stark / Iron Man",
+                "photo_url": "https://image.tmdb.org/t/p/w300/5qHNjhtjMD4YWH3UP0rm4tKwxCL.jpg"
+            },
+            {
+                "name": "Chris Evans",
+                "role": "Steve Rogers / Captain America",
+                "photo_url": "https://image.tmdb.org/t/p/w300/3bOGNsHlrswhyW79uvIHH1V43JI.jpg"
+            },
+            {
+                "name": "Mark Ruffalo",
+                "role": "Bruce Banner / Hulk",
+                "photo_url": "https://image.tmdb.org/t/p/w300/5GilHMOt5PAQh6rlUKZzGmaKEI7.jpg"
+            },
+            {
+                "name": "Chris Hemsworth",
+                "role": "Thor",
+                "photo_url": "https://image.tmdb.org/t/p/w300/piQGdoIQOF3C1EI5cbYZLAW1gfj.jpg"
+            },
+            {
+                "name": "Scarlett Johansson",
+                "role": "Natasha Romanoff / Black Widow",
+                "photo_url": "https://image.tmdb.org/t/p/w300/tgxYh3jMs5bY2Ub4d2dcp9iaz1R.jpg"
+            },
+            {
+                "name": "Jeremy Renner",
+                "role": "Clint Barton / Hawkeye",
+                "photo_url": "https://image.tmdb.org/t/p/w300/yB84D1neTYXfWBaV0QOE9RF2VCu.jpg"
+            },
+            {
+                "name": "Josh Brolin",
+                "role": "Thanos",
+                "photo_url": "https://image.tmdb.org/t/p/w300/sX2etBbIkxRaCsATyw5ZpOVMPTD.jpg"
+            },
+            {
+                "name": "Don Cheadle",
+                "role": "James Rhodes / War Machine",
+                "photo_url": "https://image.tmdb.org/t/p/w300/umhTmcVF26qZKEpSfG1ZNpcbs9D.jpg"
+            },
+            {
+                "name": "Paul Rudd",
+                "role": "Scott Lang / Ant-Man",
+                "photo_url": "https://image.tmdb.org/t/p/w300/6jtwNOLKy0LdsRAKwZqgYMAfd5n.jpg"
+            },
+            {
+                "name": "Benedict Cumberbatch",
+                "role": "Doctor Strange",
+                "photo_url": "https://image.tmdb.org/t/p/w300/wz3MRiMmoz6b5X3oSzMRC9nLxY1.jpg"
+            }
         ],
         "crew": [
-            {"name": "Anthony & Joe Russo", "role": "Directors", "photo_url": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Kevin Feige", "role": "Producer", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Kevin_Feige_by_Gage_Skidmore.jpg/330px-Kevin_Feige_by_Gage_Skidmore.jpg"},
-            {"name": "Alan Silvestri", "role": "Musician", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/25/Alan_Silvestri_2009.jpg/330px-Alan_Silvestri_2009.jpg"},
-            {"name": "Trent Opaloch", "role": "Cinematographer", "photo_url": "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=300&auto=format&fit=crop&q=80"},
-        ],
-    },
-    "pradhama drishtiya kuttakkar": {
-        "cast": [
-            {"name": "Parvathy Thiruvothu", "role": "Actor", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/da/Actress_Parvathi.jpg/330px-Actress_Parvathi.jpg"},
-            {"name": "Mathew Thomas", "role": "Actor", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Mathew_Thomas_2020.jpg/330px-Mathew_Thomas_2020.jpg"},
-            {"name": "Sidharth Bharathan", "role": "Actor", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Sidharth_Bharathan_2017.jpg/330px-Sidharth_Bharathan_2017.jpg"},
-            {"name": "Unnimaya Prasad", "role": "Actor", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Unnimaya_Prasad.jpg/330px-Unnimaya_Prasad.jpg"},
-            {"name": "Vijayaraghavan", "role": "Actor", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/Vijayaraghavan.jpg/330px-Vijayaraghavan.jpg"},
-            {"name": "Azees Nedumangad", "role": "Actor", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Ratheesh_Raghunandan_and_Azeez_Nedumangadu.jpg/330px-Ratheesh_Raghunandan_and_Azeez_Nedumangadu.jpg"},
-        ],
-        "crew": [
-            {"name": "Shahad Nilambur", "role": "Director", "photo_url": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Arjun Selva", "role": "Producer", "photo_url": "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300&auto=format&fit=crop&q=80"},
-            {"name": "P. S. Subramanian", "role": "Writer", "photo_url": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Mujeeb Majeed", "role": "Musician", "photo_url": "https://images.unsplash.com/photo-1513956589380-bad6acb9b9d4?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Roby Varghese Raj", "role": "Cinematographer", "photo_url": "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Chaman Chacko", "role": "Editor", "photo_url": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80"},
-        ],
+            {
+                "name": "Kevin Feige",
+                "role": "Producer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/kCBqXZ5PT5udYGEj2wfTSFbLMvT.jpg"
+            },
+            {
+                "name": "Alan Silvestri",
+                "role": "Original Music Composer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/feUZ0Oc1MGJJbUronBbkHTmJzgy.jpg"
+            },
+            {
+                "name": "Christopher Markus",
+                "role": "Screenplay",
+                "photo_url": "https://image.tmdb.org/t/p/w300/7ooPNp0gnURxYkSSKF2etH7wpZP.jpg"
+            },
+            {
+                "name": "Stephen McFeely",
+                "role": "Screenplay",
+                "photo_url": "https://image.tmdb.org/t/p/w300/i9B6gFzExPsh5IEjD2nn4ym4lx2.jpg"
+            },
+            {
+                "name": "Jeffrey Ford",
+                "role": "Editor",
+                "photo_url": "https://image.tmdb.org/t/p/w300/fJePTuHsOeT8z4D6LFZlSMkDEqF.jpg"
+            },
+            {
+                "name": "Matthew Schmidt",
+                "role": "Editor",
+                "photo_url": null
+            },
+            {
+                "name": "Trent Opaloch",
+                "role": "Director of Photography",
+                "photo_url": "https://image.tmdb.org/t/p/w300/w8xfY8rGXdCx2zna0nLeVpx91lx.jpg"
+            },
+            {
+                "name": "Anthony Russo",
+                "role": "Director",
+                "photo_url": "https://image.tmdb.org/t/p/w300/xbINBnWn28YygYWUJ1aSAw0xPRv.jpg"
+            }
+        ]
     },
     "marco": {
         "cast": [
-            {"name": "Unni Mukundan", "role": "Marco Jr.", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Unni_Mukundan_at_Ira_Audio_Launch.jpg/330px-Unni_Mukundan_at_Ira_Audio_Launch.jpg"},
-            {"name": "Jagadish", "role": "Tony", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Jagadish_2019.jpg/330px-Jagadish_2019.jpg"},
-            {"name": "Siddique", "role": "George", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Siddique_Actor.jpg/330px-Siddique_Actor.jpg"},
-            {"name": "Kabir Duhan Singh", "role": "Isaac", "photo_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Anson Paul", "role": "Peter", "photo_url": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80"},
+            {
+                "name": "Unni Mukundan",
+                "role": "Marco Jr.",
+                "photo_url": "https://image.tmdb.org/t/p/w300/7Pn9GASysyTG6ZnPhsuRq4ESArC.jpg"
+            },
+            {
+                "name": "Siddique",
+                "role": "George D'Peter",
+                "photo_url": "https://image.tmdb.org/t/p/w300/tMv7QsmYlXAXtP75D3eIxXHpgTv.jpg"
+            },
+            {
+                "name": "Ishan Shoukath",
+                "role": "Victor D'Peter",
+                "photo_url": "https://image.tmdb.org/t/p/w300/xJicLr2st7kQT7fzPC2xAZnzGUx.jpg"
+            },
+            {
+                "name": "Jagadish",
+                "role": "Tony Issac",
+                "photo_url": "https://image.tmdb.org/t/p/w300/ml3XX5bWPIdHUPvqhW2MYYZ8H7Y.jpg"
+            },
+            {
+                "name": "Abhimanyu Thilakan",
+                "role": "Russell Issac",
+                "photo_url": "https://image.tmdb.org/t/p/w300/6X1X5aJi9JkF9nhNuy1bEY8RD05.jpg"
+            },
+            {
+                "name": "Kabir Duhan Singh",
+                "role": "Cyrus Issac",
+                "photo_url": "https://image.tmdb.org/t/p/w300/lAVAxFARP63oTHMYWpwHrWsXPWa.jpg"
+            },
+            {
+                "name": "Anson Paul",
+                "role": "Dev",
+                "photo_url": "https://image.tmdb.org/t/p/w300/tuuQTQFh4qMY7EOP9rgVlz0Y57y.jpg"
+            },
+            {
+                "name": "Ajit Koshy",
+                "role": "Jahangir",
+                "photo_url": "https://image.tmdb.org/t/p/w300/qR765VN5mOHfosx23NBMTxWuw6h.jpg"
+            },
+            {
+                "name": "Durva Thaker",
+                "role": "Isha",
+                "photo_url": null
+            },
+            {
+                "name": "Yukti Thareja",
+                "role": "Mariya",
+                "photo_url": "https://image.tmdb.org/t/p/w300/aUcMSWJMz5ur0AagUYC8jQBsV32.jpg"
+            }
         ],
         "crew": [
-            {"name": "Haneef Adeni", "role": "Director & Writer", "photo_url": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Shareef Muhammed", "role": "Producer", "photo_url": "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Ravi Basrur", "role": "Musician", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Sushin_Shyam.jpg/330px-Sushin_Shyam.jpg"},
-            {"name": "Chandru Selvaraj", "role": "Cinematographer", "photo_url": "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=300&auto=format&fit=crop&q=80"},
-            {"name": "Shameer Muhammed", "role": "Editor", "photo_url": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80"},
-        ],
+            {
+                "name": "Haneef Adeni",
+                "role": "Director",
+                "photo_url": "https://image.tmdb.org/t/p/w300/jsuiJYAvw5pGnkK9hMNg0ddtPm7.jpg"
+            },
+            {
+                "name": "Abdul Ghadaf",
+                "role": "Producer",
+                "photo_url": null
+            },
+            {
+                "name": "Shareef Muhammed",
+                "role": "Producer",
+                "photo_url": null
+            },
+            {
+                "name": "Ravi Basrur",
+                "role": "Original Music Composer",
+                "photo_url": "https://image.tmdb.org/t/p/w300/mlHRC8r4J3ZND7w80B59x3WeX1I.jpg"
+            },
+            {
+                "name": "Shameer Muhammed",
+                "role": "Editor",
+                "photo_url": "https://image.tmdb.org/t/p/w300/7dN5MFUDP0tiZXXLkTlJw5gutGD.jpg"
+            },
+            {
+                "name": "Chandru Selvaraj",
+                "role": "Director of Photography",
+                "photo_url": null
+            }
+        ]
     },
+    "bramayugam": {
+        "cast": [
+            {
+                "name": "Arjun Ashokan",
+                "role": "Thevan",
+                "photo_url": "https://image.tmdb.org/t/p/w300/fA9V9ImvGlLGQ9HWB68j8d8eo0J.jpg"
+            },
+            {
+                "name": "Mammootty",
+                "role": "Kodumon Potti",
+                "photo_url": "https://image.tmdb.org/t/p/w300/c5ewp9XtDIOwK5QWhwA7TD0GzqO.jpg"
+            },
+            {
+                "name": "Sidharth Bharathan",
+                "role": "Servant",
+                "photo_url": "https://image.tmdb.org/t/p/w300/4a13KELmZuB4NnRlOsdzMfo2K7j.jpg"
+            },
+            {
+                "name": "Manikandan Achari",
+                "role": "Koran",
+                "photo_url": "https://image.tmdb.org/t/p/w300/5yLbdEwBpSAUajsvLM9eY1fsymp.jpg"
+            },
+            {
+                "name": "Amalda Liz",
+                "role": "Yakshi",
+                "photo_url": "https://image.tmdb.org/t/p/w300/4FcPoRJtqMLVZ0E5cadiq4Hdr0J.jpg"
+            },
+            {
+                "name": "Aluva Sheeba Sebastian",
+                "role": "Thevan's Mother",
+                "photo_url": null
+            },
+            {
+                "name": "Akash Chandran",
+                "role": "Goblin",
+                "photo_url": null
+            },
+            {
+                "name": "Rafnas Rafeek",
+                "role": "Theyyam",
+                "photo_url": null
+            },
+            {
+                "name": "Sergi",
+                "role": "Portuguese Infantryman 2",
+                "photo_url": null
+            },
+            {
+                "name": "Andr\u00e8",
+                "role": "Portuguese Infantryman 1",
+                "photo_url": null
+            }
+        ],
+        "crew": [
+            {
+                "name": "Rahul Sadasivan",
+                "role": "Director",
+                "photo_url": "https://image.tmdb.org/t/p/w300/m61dA8W9fLdhgfLMdEPXalPYush.jpg"
+            },
+            {
+                "name": "Chakravarthy Ramachandra",
+                "role": "Producer",
+                "photo_url": null
+            },
+            {
+                "name": "S. Sashikanth",
+                "role": "Producer",
+                "photo_url": null
+            },
+            {
+                "name": "Shehnad Jalal",
+                "role": "Director of Photography",
+                "photo_url": "https://image.tmdb.org/t/p/w300/q589cqyiscSQ9sKD0bYJFlgzxfe.jpg"
+            },
+            {
+                "name": "Christo Xavier",
+                "role": "Original Music Composer",
+                "photo_url": null
+            },
+            {
+                "name": "Shafique Mohamed Ali",
+                "role": "Editor",
+                "photo_url": null
+            }
+        ]
+    }
 }
 
 
