@@ -11,6 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.movie.interfaces import (
+    CastCrewMemberDTO,
     MovieDetailsDTO,
     MovieNotFoundError,
     MovieSummaryDTO,
@@ -176,9 +177,22 @@ class MovieRepository:
                     movie.external_rating = rating
                     movie.external_rating_fetched_at = utcnow()
                     await self._session.commit()
-                    await self._session.refresh(movie)
             except Exception as e:
                 logger.warning("TMDB enrichment failed for %s: %s", movie.title, e)
+
+        def _parse_cast_crew(raw: list | None) -> list[CastCrewMemberDTO]:
+            if not raw or not isinstance(raw, list):
+                return []
+            result = []
+            for item in raw:
+                if isinstance(item, dict):
+                    result.append(CastCrewMemberDTO(
+                        name=item.get("name", ""),
+                        role=item.get("role", ""),
+                        photo_url=item.get("photo_url") or item.get("pic"),
+                    ))
+            return result
+
         return MovieDetailsDTO(
             id=movie.id,
             title=movie.title,
@@ -196,6 +210,8 @@ class MovieRepository:
             trailer_url=movie.trailer_url,
             synopsis=movie.synopsis,
             status=movie.status,
+            cast=_parse_cast_crew(movie.cast_json),
+            crew=_parse_cast_crew(movie.crew_json),
             venues=list(venues_map.values()),
         )
     async def get_seat_map(self, showtime_id: UUID) -> SeatMapDTO | None:

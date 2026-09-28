@@ -36,6 +36,7 @@ from app.movie.schemas import (
     ApplyLayoutRequest,
     AvailabilityResponse,
     BlockSeatsRequest,
+    CastCrewMemberResponse,
     ContentStatusUpdateRequest,
     CreateMovieRequest,
     CreateScreenRequest,
@@ -124,6 +125,14 @@ async def get_movie_details(
             rating_count=dto.rating_count,
             external_rating=dto.external_rating,
             status=dto.status,
+            cast=[
+                CastCrewMemberResponse(name=m.name, role=m.role, photo_url=m.photo_url)
+                for m in dto.cast
+            ],
+            crew=[
+                CastCrewMemberResponse(name=m.name, role=m.role, photo_url=m.photo_url)
+                for m in dto.crew
+            ],
             venues=[
                 VenueShowtimesResponse(
                     venue_id=v.venue_id,
