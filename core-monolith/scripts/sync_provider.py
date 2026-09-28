@@ -447,6 +447,22 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {"name": "Chaman Chacko", "role": "Editor", "photo_url": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80"},
         ],
     },
+    "marco": {
+        "cast": [
+            {"name": "Unni Mukundan", "role": "Marco Jr.", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Unni_Mukundan_at_Ira_Audio_Launch.jpg/330px-Unni_Mukundan_at_Ira_Audio_Launch.jpg"},
+            {"name": "Jagadish", "role": "Tony", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Jagadish_2019.jpg/330px-Jagadish_2019.jpg"},
+            {"name": "Siddique", "role": "George", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Siddique_Actor.jpg/330px-Siddique_Actor.jpg"},
+            {"name": "Kabir Duhan Singh", "role": "Isaac", "photo_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80"},
+            {"name": "Anson Paul", "role": "Peter", "photo_url": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80"},
+        ],
+        "crew": [
+            {"name": "Haneef Adeni", "role": "Director & Writer", "photo_url": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80"},
+            {"name": "Shareef Muhammed", "role": "Producer", "photo_url": "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=300&auto=format&fit=crop&q=80"},
+            {"name": "Ravi Basrur", "role": "Musician", "photo_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Sushin_Shyam.jpg/330px-Sushin_Shyam.jpg"},
+            {"name": "Chandru Selvaraj", "role": "Cinematographer", "photo_url": "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=300&auto=format&fit=crop&q=80"},
+            {"name": "Shameer Muhammed", "role": "Editor", "photo_url": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80"},
+        ],
+    },
 }
 
 
