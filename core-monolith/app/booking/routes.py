@@ -244,18 +244,58 @@ async def get_showtime_seat_map(
                 ],
             )
 
-        seat_map, is_available = await booking_service.get_provider_seat_map(showtime_id)
+        try:
+            seat_map, is_available = await booking_service.get_provider_seat_map(showtime_id)
+        except Exception:
+            seat_map, is_available = None, False
+
         if not is_available or seat_map is None:
-            return {
-                "status": "success",
-                "code": 200,
-                "data": {
-                    "showtime_id": str(showtime_id),
-                    "seats": [],
-                    "code": "SOURCE_UNAVAILABLE",
-                },
-                "message": "Provider upstream is currently unavailable",
-            }
+            try:
+                dto = await movie_service.get_seat_map(showtime_id)
+                from app.movie.schemas import SeatMapResponse as MovieSeatMapResponse, RowProjectionResponse, SeatProjectionResponse
+                return MovieSeatMapResponse(
+                    showtime_id=dto.showtime_id,
+                    movie_id=dto.movie_id,
+                    movie_title=dto.movie_title,
+                    venue_name=dto.venue_name,
+                    screen_name=dto.screen_name,
+                    starts_at=dto.starts_at,
+                    format=dto.format,
+                    language=dto.language,
+                    rows=[
+                        RowProjectionResponse(
+                            row_id=r.row_id,
+                            label=r.label,
+                            section=r.section,
+                            price_paise=r.price_paise,
+                            seats=[
+                                SeatProjectionResponse(
+                                    seat_id=s.seat_id,
+                                    number=s.number,
+                                    code=s.code,
+                                    x=s.x,
+                                    label=s.label,
+                                    status=s.status.value,
+                                    price_paise=s.price_paise,
+                                )
+                                for s in r.seats
+                            ],
+                        )
+                        for r in dto.rows
+                    ],
+                )
+            except Exception:
+                return {
+                    "status": "success",
+                    "code": 200,
+                    "data": {
+                        "showtime_id": str(showtime_id),
+                        "seats": [],
+                        "code": "SOURCE_UNAVAILABLE",
+                    },
+                    "message": "Provider upstream is currently unavailable",
+                }
+
         return success_response(
             data={
                 "showtime_id": seat_map.showtime_ref,
@@ -280,16 +320,51 @@ async def get_showtime_seat_map(
     except ShowtimeNotFoundError as exc:
         return error_response("SHOWTIME_NOT_FOUND", str(exc), status.HTTP_404_NOT_FOUND)
     except Exception as exc:
-        return {
-            "status": "success",
-            "code": 200,
-            "data": {
-                "showtime_id": str(showtime_id),
-                "seats": [],
-                "code": "SOURCE_UNAVAILABLE",
-            },
-            "message": f"Provider upstream error: {exc}",
-        }
+        try:
+            dto = await movie_service.get_seat_map(showtime_id)
+            from app.movie.schemas import SeatMapResponse as MovieSeatMapResponse, RowProjectionResponse, SeatProjectionResponse
+            return MovieSeatMapResponse(
+                showtime_id=dto.showtime_id,
+                movie_id=dto.movie_id,
+                movie_title=dto.movie_title,
+                venue_name=dto.venue_name,
+                screen_name=dto.screen_name,
+                starts_at=dto.starts_at,
+                format=dto.format,
+                language=dto.language,
+                rows=[
+                    RowProjectionResponse(
+                        row_id=r.row_id,
+                        label=r.label,
+                        section=r.section,
+                        price_paise=r.price_paise,
+                        seats=[
+                            SeatProjectionResponse(
+                                seat_id=s.seat_id,
+                                number=s.number,
+                                code=s.code,
+                                x=s.x,
+                                label=s.label,
+                                status=s.status.value,
+                                price_paise=s.price_paise,
+                            )
+                            for s in r.seats
+                        ],
+                    )
+                    for r in dto.rows
+                ],
+            )
+        except Exception:
+            return {
+                "status": "success",
+                "code": 200,
+                "data": {
+                    "showtime_id": str(showtime_id),
+                    "seats": [],
+                    "code": "SOURCE_UNAVAILABLE",
+                },
+                "message": f"Provider upstream error: {exc}",
+            }
 
 
 
