@@ -17,7 +17,6 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from app.shared.timeutil import TZDateTime, utcnow
@@ -97,8 +96,8 @@ class Movie(Base):
     banner_url = Column(Text, nullable=True)
     trailer_url = Column(Text, nullable=True)
     synopsis = Column(Text, nullable=True)
-    cast_json = Column(JSONB, nullable=True)
-    crew_json = Column(JSONB, nullable=True)
+    cast_json = Column(JSON, nullable=True)
+    crew_json = Column(JSON, nullable=True)
     genre = Column(String(120), nullable=True)    
     status = Column(
         String,

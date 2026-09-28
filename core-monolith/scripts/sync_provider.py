@@ -285,6 +285,13 @@ DEFAULT_POSTER = (
     "?w=800&auto=format&fit=crop&q=80"
 )
 
+CURATED_POSTER_BANNER_MAP: dict[str, dict[str, str]] = {
+    "marco": {
+        "poster_url": "https://image.tmdb.org/t/p/original/6Nj8Y1A9lcReqZZvRHOSiO3iTl6.jpg",
+        "banner_url": "https://image.tmdb.org/t/p/original/a6RkQIOZ6wThQOEDv6lHsfH53hD.jpg",
+    },
+}
+
 CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
     "aavesham": {
         "cast": [
@@ -688,8 +695,10 @@ async def _sync_one_provider(
 
     for st in pvr_showtimes:
         title = st["movie_title"]
-        poster_url = st.get("poster_url") or DEFAULT_POSTER
-        banner_url = st.get("banner_url")   
+        t_clean = (title or "").lower().strip()
+        curated_media = CURATED_POSTER_BANNER_MAP.get(t_clean, {})
+        poster_url = st.get("poster_url") or curated_media.get("poster_url") or DEFAULT_POSTER
+        banner_url = st.get("banner_url") or curated_media.get("banner_url")
 
         movie = movies_by_title.get(title)
         if not movie:
@@ -698,6 +707,7 @@ async def _sync_one_provider(
                 datetime(release_year, 1, 1, tzinfo=timezone.utc)
                 if release_year else None
             )
+            cast, crew = resolve_movie_cast_and_crew(title, st.get("cast"), st.get("crew"))
             movie = Movie(
                 id=uuid.uuid4(),
                 title=title,
@@ -711,13 +721,16 @@ async def _sync_one_provider(
                 release_date=release_date,
                 genre=st.get("genre"),
                 synopsis=f"Now showing: {title}",
-                cast_json=st.get("cast") or [],
-                crew_json=st.get("crew") or [],
+                cast_json=cast,
+                crew_json=crew,
             )
             new_movies.append(movie)
             movies_by_title[title] = movie
         else:
-            movie.poster_url = poster_url
+            if poster_url and poster_url != DEFAULT_POSTER:
+                movie.poster_url = poster_url
+            if banner_url:
+                movie.banner_url = banner_url
             movie.genre = st.get("genre")
             release_year = st.get("release_year")
             if release_year:
@@ -725,8 +738,16 @@ async def _sync_one_provider(
             # Only overwrite cast/crew if the provider actually sends them
             if st.get("cast"):
                 movie.cast_json = st["cast"]
+            elif not movie.cast_json:
+                cast, _ = resolve_movie_cast_and_crew(title, None, None)
+                if cast:
+                    movie.cast_json = cast
             if st.get("crew"):
                 movie.crew_json = st["crew"]
+            elif not movie.crew_json:
+                _, crew = resolve_movie_cast_and_crew(title, None, None)
+                if crew:
+                    movie.crew_json = crew
 
         cinema_name = st.get("cinema_name") or "Unknown Cinema"
         city = st.get("city") or "Kochi"
