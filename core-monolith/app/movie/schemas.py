@@ -2,12 +2,6 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
-
-class CastCrewMemberResponse(BaseModel):
-    name: str
-    role: str
-    photo_url: str | None = None
-
 class MovieBaseResponse(BaseModel):
     id: UUID
     title: str
@@ -29,8 +23,6 @@ class MovieSummaryResponse(MovieBaseResponse):
     pass
 class MovieDetailsResponse(MovieBaseResponse):
     venues: list[VenueShowtimesResponse]
-    cast: list[CastCrewMemberResponse] = []
-    crew: list[CastCrewMemberResponse] = []
 class ShowtimeSlotResponse(BaseModel):
     id: UUID
     screen_id: UUID

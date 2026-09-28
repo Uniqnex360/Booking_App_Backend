@@ -21,13 +21,6 @@ class SeatStatus(str, enum.Enum):
     AVAILABLE = "AVAILABLE"
     BOOKED = "BOOKED"
     BLOCKED = "BLOCKED"
-
-@dataclass(frozen=True, slots=True)
-class CastCrewMemberDTO:
-    name: str
-    role: str
-    photo_url: str | None = None
-
 @dataclass(frozen=True, slots=True)
 class MovieSummaryDTO:
     id: UUID
@@ -79,16 +72,10 @@ class MovieDetailsDTO:
     synopsis: str | None
     status: str
     venues: list[VenueShowtimesDTO]
-    cast: list[CastCrewMemberDTO] = None  # type: ignore[assignment]
-    crew: list[CastCrewMemberDTO] = None  # type: ignore[assignment]
     rating: float | None = None
     external_rating: float | None = None
     rating_count: int = 0
     genre: str | None = None
-
-    def __post_init__(self):
-        object.__setattr__(self, "cast", self.cast if self.cast is not None else [])
-        object.__setattr__(self, "crew", self.crew if self.crew is not None else [])
     
 @dataclass(frozen=True, slots=True)
 class SeatProjectionDTO:

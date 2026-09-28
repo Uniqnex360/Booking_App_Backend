@@ -10,7 +10,6 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
-    JSON,
     String,
     Text,
     Numeric,
@@ -96,8 +95,6 @@ class Movie(Base):
     banner_url = Column(Text, nullable=True)
     trailer_url = Column(Text, nullable=True)
     synopsis = Column(Text, nullable=True)
-    cast_json = Column(JSON, nullable=True)
-    crew_json = Column(JSON, nullable=True)
     genre = Column(String(120), nullable=True)    
     status = Column(
         String,
