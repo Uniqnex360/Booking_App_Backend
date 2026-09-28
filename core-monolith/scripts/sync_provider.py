@@ -495,6 +495,8 @@ async def _sync_one_provider(
                 release_date=release_date,
                 genre=st.get("genre"),
                 synopsis=f"Now showing: {title}",
+                cast_json=st.get("cast") or [],
+                crew_json=st.get("crew") or [],
             )
             new_movies.append(movie)
             movies_by_title[title] = movie
@@ -504,6 +506,11 @@ async def _sync_one_provider(
             release_year = st.get("release_year")
             if release_year:
                 movie.release_date = datetime(release_year, 1, 1, tzinfo=timezone.utc)
+            # Only overwrite cast/crew if the provider actually sends them
+            if st.get("cast"):
+                movie.cast_json = st["cast"]
+            if st.get("crew"):
+                movie.crew_json = st["crew"]
 
         cinema_name = st.get("cinema_name") or "Unknown Cinema"
         city = st.get("city") or "Kochi"
