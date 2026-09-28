@@ -11,7 +11,7 @@ from app.booking.schemas import BaseBookingDetail,EventBookingDetail,MovieBookin
 from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.movie.models import Screen, Showtime
+from app.movie.models import Showtime
 
 from app.booking.interfaces import (
     MAX_SEATS_PER_BOOKING,
@@ -591,16 +591,6 @@ class BookingService:
             raise ValidationError("Duplicate seats in request")
         if len(seat_ids) > MAX_SEATS_PER_BOOKING:
             raise ValidationError(f"Cannot hold more than {MAX_SEATS_PER_BOOKING} seats")
-
-        # Validate couple seat constraint: must be booked in pairs of 2
-        if st.screen_id:
-            screen_res = await self.session.execute(
-                select(Screen).where(Screen.id == st.screen_id)
-            )
-            screen_obj = screen_res.scalar_one_or_none()
-            if screen_obj and "couple" in screen_obj.name.lower():
-                if len(seat_ids) % 2 != 0:
-                    raise ValidationError("Couple seats can only be booked in pairs of 2")
 
         provider_showtime_ref = st.provider_showtime_ref or str(st.id)
         remote_hold: ProviderHold = await provider.hold(
