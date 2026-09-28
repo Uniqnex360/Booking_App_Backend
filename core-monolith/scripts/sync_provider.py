@@ -321,17 +321,17 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "Ayyappa P. Sharma",
                 "role": "Divi Bhairagi",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Bhanu Prakashan",
                 "role": "Young Siva",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Sriram Reddy Polasane",
                 "role": "David",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Manish Chaudhary",
@@ -494,24 +494,24 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "Paul T Baby",
                 "role": "Andrews",
-                "photo_url": null
+                "photo_url": None
             }
         ],
         "crew": [
             {
                 "name": "C. H. Sai",
                 "role": "Director of Photography",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "R. Kalaivanan",
                 "role": "Editor",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Rajkumar Periasamy",
                 "role": "Director",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Kamal Haasan",
@@ -521,7 +521,7 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "R. Mahendran",
                 "role": "Producer",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "G. V. Prakash Kumar",
@@ -531,7 +531,7 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "Vivek Krishnani",
                 "role": "Producer",
-                "photo_url": null
+                "photo_url": None
             }
         ]
     },
@@ -617,12 +617,12 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "Babu Shahir",
                 "role": "Producer",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Shawn Antony",
                 "role": "Producer",
-                "photo_url": null
+                "photo_url": None
             }
         ]
     },
@@ -656,22 +656,22 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "Midhun Midhutty",
                 "role": "Kuttettan",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Krishna Kumar",
                 "role": "Nanjappa",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Freestyle Krishna",
                 "role": "Bruce-Lee",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Himanshu",
                 "role": "Jacky",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Mansoor Ali Khan",
@@ -778,7 +778,7 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "Safwan",
                 "role": "Vishwam",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Amith Mohan Rajeswari",
@@ -820,7 +820,7 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "Harris Desom",
                 "role": "Producer",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Vipin Das",
@@ -835,17 +835,17 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "Aravind Puthussery",
                 "role": "Director of Photography",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Adarsh Narayan",
                 "role": "Producer",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Kannan Mohan",
                 "role": "Editor",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Electronic Kili",
@@ -855,7 +855,7 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "Rajat Prakash",
                 "role": "Music",
-                "photo_url": null
+                "photo_url": None
             }
         ]
     },
@@ -1037,7 +1037,7 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "Matthew Schmidt",
                 "role": "Editor",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Trent Opaloch",
@@ -1096,7 +1096,7 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "Durva Thaker",
                 "role": "Isha",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Yukti Thareja",
@@ -1113,12 +1113,12 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "Abdul Ghadaf",
                 "role": "Producer",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Shareef Muhammed",
                 "role": "Producer",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Ravi Basrur",
@@ -1133,7 +1133,7 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "Chandru Selvaraj",
                 "role": "Director of Photography",
-                "photo_url": null
+                "photo_url": None
             }
         ]
     },
@@ -1167,27 +1167,27 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "Aluva Sheeba Sebastian",
                 "role": "Thevan's Mother",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Akash Chandran",
                 "role": "Goblin",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Rafnas Rafeek",
                 "role": "Theyyam",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Sergi",
                 "role": "Portuguese Infantryman 2",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Andr\u00e8",
                 "role": "Portuguese Infantryman 1",
-                "photo_url": null
+                "photo_url": None
             }
         ],
         "crew": [
@@ -1199,12 +1199,12 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "Chakravarthy Ramachandra",
                 "role": "Producer",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "S. Sashikanth",
                 "role": "Producer",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Shehnad Jalal",
@@ -1214,12 +1214,12 @@ CURATED_MOVIE_CAST_CREW: dict[str, dict[str, list[dict]]] = {
             {
                 "name": "Christo Xavier",
                 "role": "Original Music Composer",
-                "photo_url": null
+                "photo_url": None
             },
             {
                 "name": "Shafique Mohamed Ali",
                 "role": "Editor",
-                "photo_url": null
+                "photo_url": None
             }
         ]
     }
