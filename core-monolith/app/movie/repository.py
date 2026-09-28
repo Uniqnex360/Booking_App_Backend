@@ -95,7 +95,7 @@ class MovieRepository:
             start_dt = datetime.combine(target_date, time.min, tzinfo=tz).astimezone(ZoneInfo("UTC"))
             end_dt = datetime.combine(target_date, time.max, tzinfo=tz).astimezone(ZoneInfo("UTC"))
             stmt = stmt.where(Showtime.starts_at.between(start_dt, end_dt))
-        stmt = stmt.distinct()
+        stmt = stmt.group_by(Movie.id)
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = (await self._session.execute(count_stmt)).scalar() or 0
         offset = (page - 1) * limit
