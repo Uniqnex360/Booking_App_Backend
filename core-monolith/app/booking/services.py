@@ -43,7 +43,6 @@ from app.shared.providers.base import (
     ProviderSeatMap,
     ProviderTicket,
     ProviderUnavailable,
-    ProviderContractError,
     SeatUnavailableRemote,
     ShowtimeNotFoundRemote,
 )
@@ -822,13 +821,7 @@ class BookingService:
         try:
             seat_map = await provider.seat_map(provider_showtime_ref)
             return seat_map, True
-        except (ProviderUnavailable, ShowtimeNotFoundRemote, ProviderContractError, Exception) as exc:
-            logger.warning(
-                "Provider seat map fetch failed for showtime %s (ref %s): %s",
-                showtime_id,
-                provider_showtime_ref,
-                exc,
-            )
+        except ProviderUnavailable:
             return None, False
 
     async def reconcile_bookings(self, target_date: date) -> dict[str, Any]:
