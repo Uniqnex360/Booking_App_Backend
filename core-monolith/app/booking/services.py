@@ -7,7 +7,7 @@ from datetime import date, datetime, timezone
 from typing import Optional, Any
 from uuid import UUID
 from app.booking.schemas import BaseBookingDetail,EventBookingDetail,MovieBookingDetail
-
+from datetime import timedelta
 from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -492,7 +492,9 @@ class BookingService:
             quantity=quantity,
             unit_price_paise=tier.price_paise,
             total_paise=total_paise,
-            status=BookingStatus.CONFIRMED,
+            status=BookingStatus.CONFIRMED if total_paise == 0 else BookingStatus.HELD,
+            held_until=None if total_paise == 0 else now + timedelta(minutes=10),
+            ref_code=f"BK{uuid.uuid4().hex[:8].upper()}",
             idempotency_key=idempotency_key,
             created_at=now,
         )
@@ -640,6 +642,48 @@ class BookingService:
                 if existing:
                     return existing
             raise
+    async def _commit_event_booking(self, booking: Booking, payment_ref: Optional[str]) -> Booking:
+        if booking.status == BookingStatus.CONFIRMED:
+            return booking  # already done, no 409
+        if booking.status != BookingStatus.HELD:
+            raise IllegalBookingTransition(booking.status.value, BookingStatus.CONFIRMED.value)
+        if not payment_ref:
+            raise ValidationError("payment_ref is required")
+
+        await self._verify_razorpay_payment(payment_ref, booking.total_paise)
+
+        ok = await self.booking_repo.update_status(
+            booking.id, BookingStatus.HELD, BookingStatus.CONFIRMED
+        )
+        if self.session:
+            await self.session.commit()
+        if not ok:
+            fresh = await self.booking_repo.get_by_id(booking.id)
+            if fresh and fresh.status == BookingStatus.CONFIRMED:
+                return fresh
+            raise IllegalBookingTransition(
+                fresh.status.value if fresh else "UNKNOWN", BookingStatus.CONFIRMED.value
+            )
+        return await self.booking_repo.get_by_id(booking.id)
+
+    async def _verify_razorpay_payment(self, payment_id: str, expected_paise: int) -> None:
+        import os, httpx
+        auth = (os.environ["RAZORPAY_KEY_ID"], os.environ["RAZORPAY_KEY_SECRET"])
+        base = f"https://api.razorpay.com/v1/payments/{payment_id}"
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.get(base, auth=auth)
+            if r.status_code != 200:
+                raise ValidationError("Payment not found")
+            p = r.json()
+            if p["amount"] != expected_paise or p["currency"] != "INR":
+                raise ValidationError("Payment amount mismatch")
+            if p["status"] == "authorized":
+                cap = await c.post(f"{base}/capture", auth=auth,
+                                json={"amount": expected_paise, "currency": "INR"})
+                if cap.status_code != 200:
+                    raise ValidationError("Payment capture failed")
+            elif p["status"] != "captured":
+                raise ValidationError("Payment not captured")
     async def commit_booking(
         self,
         user_id: UUID,
@@ -652,9 +696,11 @@ class BookingService:
         if booking.user_id is not None and booking.user_id != user_id:
             raise BookingNotFoundError()
 
+        if booking.tier_id and not booking.provider_id:
+            return await self._commit_event_booking(booking, payment_ref)
+
         if booking.status != BookingStatus.HELD:
             raise IllegalBookingTransition(booking.status.value, BookingStatus.CONFIRMED.value)
-
         if not booking.showtime_id or not booking.provider_id or not booking.provider_hold_id:
             raise ValidationError("Booking is missing provider hold details")
 
@@ -760,7 +806,15 @@ class BookingService:
 
         if booking.status not in (BookingStatus.HELD, BookingStatus.PENDING_CONFIRMATION):
             raise IllegalBookingTransition(booking.status.value, BookingStatus.CANCELLED.value)
-
+        if booking.tier_id and not booking.provider_id:
+            changed = await self.booking_repo.update_status(
+                booking.id, booking.status, BookingStatus.CANCELLED
+            )
+            if changed and booking.quantity:
+                await self.counter_repo.decrement(booking.tier_id, booking.quantity)
+            if self.session:
+                await self.session.commit()
+            return await self.booking_repo.get_by_id(booking.id)
         if booking.provider_id and booking.provider_hold_id and booking.showtime_id:
             try:
                 _, _, provider = await self._resolve_provider_and_showtime(booking.showtime_id)

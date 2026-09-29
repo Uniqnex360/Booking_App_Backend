@@ -135,6 +135,8 @@ async def commit_booking(
         )
     except BookingNotFoundError:
         return error_response("BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
+    except ValidationError as exc:
+        return error_response("PAYMENT_VERIFICATION_FAILED", str(exc), status.HTTP_402_PAYMENT_REQUIRED)
     except IllegalBookingTransition as exc:
         return error_response("ILLEGAL_BOOKING_TRANSITION", str(exc), status.HTTP_409_CONFLICT)
     except HoldExpiredRemote as exc:
@@ -386,7 +388,13 @@ async def create_or_confirm_booking(
     except (ShowtimeNotFoundError, SeatNotFoundError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
-    return {"booking": {"id": str(booking.id)}}
+    return {"booking": {
+    "id": str(booking.id),
+    "status": getattr(booking.status, "value", booking.status),
+    "ref_code": booking.ref_code,
+    "total_paise": booking.total_paise,
+    "currency": "INR",
+}}
 @router.patch("/bookings/{booking_id}/cancel")
 async def cancel_legacy_booking(
     booking_id: UUID,
