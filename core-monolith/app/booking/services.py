@@ -444,6 +444,7 @@ class BookingService:
         tier_id: UUID,
         quantity: int,
         idempotency_key: Optional[str] = None,
+        payment_id: Optional[str] = None,
     ) -> Booking:
         if quantity <= 0:
             raise ValidationError("Quantity must be greater than 0")
@@ -483,6 +484,8 @@ class BookingService:
         if not success:
             raise SoldOutError()
 
+        import secrets
+        generated_ref = f"EVT-{secrets.token_hex(4).upper()}"
         total_paise = tier.price_paise * quantity
         booking = Booking(
             id=uuid.uuid4(),
@@ -495,6 +498,9 @@ class BookingService:
             status=BookingStatus.CONFIRMED,
             idempotency_key=idempotency_key,
             created_at=now,
+            ref_code=generated_ref,
+            provider_booking_id=payment_id,
+            barcode=payment_id or generated_ref,
         )
 
         try:
