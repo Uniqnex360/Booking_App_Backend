@@ -374,7 +374,6 @@ async def create_or_confirm_booking(
                 tier_id=payload.tier_id,
                 quantity=payload.quantity,
                 idempotency_key=payload.idempotency_key,
-                payment_id=payload.payment_id,
             )
     except SeatAlreadyBookedError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
