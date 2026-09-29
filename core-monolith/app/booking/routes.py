@@ -369,11 +369,14 @@ async def create_or_confirm_booking(
                 idempotency_key=payload.idempotency_key,
             )
         else:
+            target_status = BookingStatus.CONFIRMED if payload.payment_id else BookingStatus.HELD
             booking = await booking_service.create_booking(
                 user_id=current_user.id,
                 tier_id=payload.tier_id,
                 quantity=payload.quantity,
                 idempotency_key=payload.idempotency_key,
+                payment_id=payload.payment_id,
+                status=target_status,
             )
     except SeatAlreadyBookedError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
@@ -386,7 +389,16 @@ async def create_or_confirm_booking(
     except (ShowtimeNotFoundError, SeatNotFoundError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
-    return {"booking": {"id": str(booking.id)}}
+    status_str = booking.status.value if hasattr(booking.status, "value") else str(booking.status)
+    return {
+        "booking": {
+            "id": str(booking.id),
+            "status": status_str,
+            "total_paise": booking.total_paise,
+            "currency": booking.currency,
+            "ref_code": booking.ref_code,
+        }
+    }
 @router.patch("/bookings/{booking_id}/cancel")
 async def cancel_legacy_booking(
     booking_id: UUID,

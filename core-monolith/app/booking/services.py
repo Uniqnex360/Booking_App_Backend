@@ -444,6 +444,8 @@ class BookingService:
         tier_id: UUID,
         quantity: int,
         idempotency_key: Optional[str] = None,
+        payment_id: Optional[str] = None,
+        status: Optional[BookingStatus] = None,
     ) -> Booking:
         if quantity <= 0:
             raise ValidationError("Quantity must be greater than 0")
@@ -483,7 +485,21 @@ class BookingService:
         if not success:
             raise SoldOutError()
 
+        import secrets
+        from datetime import timedelta
+
         total_paise = tier.price_paise * quantity
+
+        if total_paise == 0 or payment_id:
+            booking_status = BookingStatus.CONFIRMED
+        elif status is not None:
+            booking_status = status
+        else:
+            booking_status = BookingStatus.CONFIRMED
+
+        ref_code = f"EVT-{secrets.token_hex(4).upper()}" if booking_status == BookingStatus.CONFIRMED else None
+        held_until = now + timedelta(minutes=10) if booking_status == BookingStatus.HELD else None
+
         booking = Booking(
             id=uuid.uuid4(),
             user_id=user_id,
@@ -492,9 +508,13 @@ class BookingService:
             quantity=quantity,
             unit_price_paise=tier.price_paise,
             total_paise=total_paise,
-            status=BookingStatus.CONFIRMED,
+            status=booking_status,
             idempotency_key=idempotency_key,
             created_at=now,
+            held_until=held_until,
+            ref_code=ref_code,
+            provider_booking_id=payment_id,
+            barcode=payment_id or ref_code,
         )
 
         try:
@@ -517,11 +537,11 @@ class BookingService:
         if not b or b.user_id != user_id:
             raise BookingNotFoundError()
 
-        if b.status != BookingStatus.CONFIRMED:
-            raise BookingNotCancellableError("Only CONFIRMED bookings can be cancelled")
+        if b.status not in (BookingStatus.CONFIRMED, BookingStatus.HELD):
+            raise BookingNotCancellableError("Only CONFIRMED or HELD bookings can be cancelled")
 
         updated = await self.booking_repo.update_status(
-            booking_id, BookingStatus.CONFIRMED, BookingStatus.CANCELLED
+            booking_id, b.status, BookingStatus.CANCELLED
         )
         if not updated:
             raise BookingNotCancellableError()
@@ -654,6 +674,44 @@ class BookingService:
 
         if booking.status != BookingStatus.HELD:
             raise IllegalBookingTransition(booking.status.value, BookingStatus.CONFIRMED.value)
+
+        # Handle Event Booking commit
+        if booking.tier_id is not None:
+            import secrets
+            ref_code = booking.ref_code or f"EVT-{secrets.token_hex(4).upper()}"
+            updated_booking = Booking(
+                id=booking.id,
+                user_id=booking.user_id,
+                status=BookingStatus.CONFIRMED,
+                event_id=booking.event_id,
+                tier_id=booking.tier_id,
+                quantity=booking.quantity,
+                unit_price_paise=booking.unit_price_paise,
+                total_paise=booking.total_paise,
+                currency=booking.currency or "INR",
+                ref_code=ref_code,
+                barcode=payment_ref or ref_code,
+                provider_booking_id=payment_ref,
+                idempotency_key=booking.idempotency_key,
+                created_at=booking.created_at,
+                held_until=None,
+                contact_email=booking.contact_email,
+                contact_phone=booking.contact_phone,
+            )
+            await self.booking_repo.update_booking(updated_booking)
+            if self.session:
+                await self.session.commit()
+            if self._notification and updated_booking.contact_email:
+                try:
+                    await self._notification.send_email(
+                        email=updated_booking.contact_email,
+                        subject=f"Your ticket is confirmed — {updated_booking.ref_code}",
+                        body=f"<p>Your tickets have been confirmed! Reference: {updated_booking.ref_code}</p>",
+                        content_type="html",
+                    )
+                except Exception as exc:
+                    logger.error("Ticket email failed for event booking %s: %s", updated_booking.id, exc)
+            return updated_booking
 
         if not booking.showtime_id or not booking.provider_id or not booking.provider_hold_id:
             raise ValidationError("Booking is missing provider hold details")
