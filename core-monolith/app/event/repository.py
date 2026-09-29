@@ -4,7 +4,7 @@ from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from datetime import date
-
+from sqlalchemy.orm import selectinload, defer
 from app.event.interfaces import (
     IEventRepository, ITicketCategoryRepository, 
     Event, TicketCategory, EventStatus, EventCategory
@@ -15,7 +15,6 @@ from app.shared.exceptions import RepositoryError
 class SQLAlchemyEventRepository(IEventRepository):
     def __init__(self, db: AsyncSession):
         self.db = db
-
     def _to_domain(self, orm: EventORM) -> Event:
         def _u(val):
             if val is None or isinstance(val, uuid.UUID):
@@ -38,7 +37,13 @@ class SQLAlchemyEventRepository(IEventRepository):
                 updated_at=cat.updated_at
             ) for cat in (orm.ticket_categories or [])
         ]
-        
+
+        from sqlalchemy import inspect as sa_inspect
+        unloaded = sa_inspect(orm).unloaded
+
+        def _g(name, default):
+            return default if name in unloaded else (getattr(orm, name) or default)
+
         return Event(
             id=_u(orm.id),
             partner_id=_u(orm.partner_id),
@@ -47,6 +52,14 @@ class SQLAlchemyEventRepository(IEventRepository):
             category=EventCategory(orm.category),
             venue_name=orm.venue_name,
             venue_address=orm.venue_address,
+            latitude=orm.latitude,
+            longitude=orm.longitude,
+            layout_image_url=_g("layout_image_url", None),
+            gallery_images=_g("gallery_images", []),
+            artists=_g("artists", []),
+            faqs=_g("faqs", []),
+            terms_and_conditions=_g("terms_and_conditions", []),
+            offline_promoter=_g("offline_promoter", None),
             city=orm.city,
             starts_at=orm.starts_at,
             ends_at=orm.ends_at,
@@ -79,6 +92,15 @@ class SQLAlchemyEventRepository(IEventRepository):
                 slug=event.slug,
                 category=event.category.value,
                 venue_name=event.venue_name,
+                venue_address=event.venue_address,
+                latitude=event.latitude,
+                longitude=event.longitude,
+                layout_image_url=event.layout_image_url,
+                gallery_images=event.gallery_images or [],
+                artists=event.artists or [],
+                faqs=event.faqs or [],
+                terms_and_conditions=event.terms_and_conditions or [],
+                offline_promoter=event.offline_promoter,
                 city=event.city,
                 starts_at=event.starts_at,
                 ends_at=event.ends_at,
@@ -152,7 +174,16 @@ class SQLAlchemyEventRepository(IEventRepository):
         if city: filters.append(EventORM.city == city)
         if category: filters.append(EventORM.category == category.value)
         
-        stmt = select(EventORM).where(and_(*filters)).options(selectinload(EventORM.ticket_categories))
+        stmt = (
+            select(EventORM)
+            .where(and_(*filters))
+            .options(
+                selectinload(EventORM.ticket_categories),
+                defer(EventORM.layout_image_url),
+                defer(EventORM.gallery_images),
+                defer(EventORM.artists),
+            )
+        )
         
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = (await self.db.execute(count_stmt)).scalar() or 0

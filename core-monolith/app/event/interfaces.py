@@ -73,6 +73,12 @@ class Event:
     is_online: bool = False
     online_link: Optional[str] = None
     poster_image_url: Optional[str] = None
+    layout_image_url: Optional[str] = None
+    gallery_images: List[str] = field(default_factory=list)
+    artists: List[dict] = field(default_factory=list)
+    faqs: List[dict] = field(default_factory=list)
+    terms_and_conditions: List[str] = field(default_factory=list)
+    offline_promoter: Optional[dict] = None
     cancellation_policy: CancellationPolicy = CancellationPolicy.FLEXIBLE
     status: EventStatus = EventStatus.DRAFT
     published_at: Optional[datetime] = None

@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.dialects.postgresql import ARRAY
-from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey, Numeric, Integer, CheckConstraint, UniqueConstraint
+from sqlalchemy import Column, String, Text, JSON, Boolean, DateTime, ForeignKey, Numeric, Integer, CheckConstraint, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -39,6 +39,12 @@ class EventORM(Base):
     is_online = Column(Boolean, nullable=False, default=False, server_default="false")  
     online_link = Column(String(500), nullable=True)
     poster_image_url = Column(String(500), nullable=True)
+    layout_image_url = Column(Text, nullable=True)
+    gallery_images = Column(JSON, nullable=True)
+    artists = Column(JSON, nullable=True)
+    faqs = Column(JSON, nullable=True)
+    terms_and_conditions = Column(JSON, nullable=True)
+    offline_promoter = Column(JSON, nullable=True)
     cancellation_policy = Column(String(30), nullable=False, default="FLEXIBLE")
     status = Column(String(30), nullable=False, default="DRAFT")
     published_at = Column(DateTime(timezone=True), nullable=True)

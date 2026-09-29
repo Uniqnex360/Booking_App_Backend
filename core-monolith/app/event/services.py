@@ -36,8 +36,6 @@ class EventService:
     async def list_venues(self, city: Optional[str] = None):
         return await self.event_repo.list_venues(city=city)
     async def create_event(self, partner_id: uuid.UUID, data: dict) -> Event:
-        print("DEBUG keys:", list(data.keys()))
-        print("DEBUG poster:", repr(data.get("poster_image_url")))
         partner = await self.partner_repo.get_by_id(partner_id)
         if not partner:
             raise NotFoundError("Partner not found")
@@ -81,6 +79,20 @@ class EventService:
             poster_image_url=str(data["poster_image_url"]) if data.get("poster_image_url") else None,
             is_online=data.get('is_online', False),
             online_link=data.get('online_link'),
+            layout_image_url=data.get('layout_image_url'),
+            gallery_images=data.get('gallery_images') or [],
+            latitude=data.get('latitude'),
+            longitude=data.get('longitude'),
+            layout_image_url=data.get('layout_image_url'),
+            gallery_images=data.get('gallery_images') or [],
+            artists=data.get('artists') or [],
+            faqs=data.get('faqs') or [],
+            terms_and_conditions=data.get('terms_and_conditions') or [],
+            offline_promoter=data.get('offline_promoter'),
+            artists=data.get('artists') or [],
+            faqs=data.get('faqs') or [],
+            terms_and_conditions=data.get('terms_and_conditions') or [],
+            offline_promoter=data.get('offline_promoter'),
             status=EventStatus.PENDING_APPROVAL
         )
 

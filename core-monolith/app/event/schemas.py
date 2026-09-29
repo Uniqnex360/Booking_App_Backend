@@ -4,7 +4,19 @@ from decimal import Decimal
 from typing import List, Optional
 import uuid
 from app.event.interfaces import EventStatus, EventCategory, CancellationPolicy
+class ArtistIn(BaseModel):
+    name: str
+    role: str | None = None
+    image_url: str | None = None
 
+class FaqIn(BaseModel):
+    question: str
+    answer: str
+
+class PromoterIn(BaseModel):
+    name: str | None = None
+    contact: str | None = None
+    details: str | None = None
 
 class TicketCategoryBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
@@ -28,6 +40,12 @@ class EventUpdateRequest(_PosterUrlMixin):
     is_fast_filling: Optional[bool] = None
     is_must_attend: Optional[bool] = None
     is_unmissable: Optional[bool] = None
+    layout_image_url: Optional[str] = None
+    gallery_images: Optional[List[str]] = None
+    artists: Optional[List[ArtistIn]] = None
+    faqs: Optional[List[FaqIn]] = None
+    terms_and_conditions: Optional[List[str]] = None
+    offline_promoter: Optional[PromoterIn] = None
     is_kids_allowed: Optional[bool] = None
     is_masterclass: Optional[bool] = None
     is_new_year_party: Optional[bool] = None
@@ -50,6 +68,14 @@ class EventCreateRequest(_PosterUrlMixin):
     ticket_categories: List[TicketCategoryBase]
     is_outdoor: bool = False
     is_fast_filling: bool = False
+    layout_image_url: Optional[str] = None
+    gallery_images: List[str] = Field(default_factory=list)
+    artists: List[ArtistIn] = Field(default_factory=list)
+    faqs: List[FaqIn] = Field(default_factory=list)
+    terms_and_conditions: List[str] = Field(default_factory=list)
+    offline_promoter: Optional[PromoterIn] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     is_must_attend: bool = False
     is_unmissable: bool = False
     is_kids_allowed: bool = False
