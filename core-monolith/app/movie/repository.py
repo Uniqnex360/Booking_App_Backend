@@ -95,11 +95,18 @@ class MovieRepository:
             start_dt = datetime.combine(target_date, time.min, tzinfo=tz).astimezone(ZoneInfo("UTC"))
             end_dt = datetime.combine(target_date, time.max, tzinfo=tz).astimezone(ZoneInfo("UTC"))
             stmt = stmt.where(Showtime.starts_at.between(start_dt, end_dt))
-        stmt = stmt.distinct()
-        count_stmt = select(func.count()).select_from(stmt.subquery())
+                # DISTINCT on id only (json columns cannot be compared in Postgres)
+        id_stmt = stmt.with_only_columns(Movie.id).distinct()
+        count_stmt = select(func.count()).select_from(id_stmt.subquery())
         total = (await self._session.execute(count_stmt)).scalar() or 0
         offset = (page - 1) * limit
-        stmt = stmt.order_by(Movie.created_at.desc()).offset(offset).limit(limit)
+        stmt = (
+            select(Movie)
+            .where(Movie.id.in_(id_stmt))
+            .order_by(Movie.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
         result = await self._session.execute(stmt)
         movies = result.scalars().all()
         dtos = [
