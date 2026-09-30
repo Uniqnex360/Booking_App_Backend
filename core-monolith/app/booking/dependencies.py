@@ -35,13 +35,18 @@ async def get_movie_booking_service(
 ) -> MovieBookingService:
     return MovieBookingService(session)
 
-
-async def get_booking_actor(
+async def resolve_actor(
     booking_id: UUID,
-    x_hold_token: str | None = Header(default=None, alias="X-Hold-Token"),
-    current_user: AuthUserDomain | None = Depends(get_current_user_optional),
-    booking_service: BookingService = Depends(get_booking_service),
+    x_hold_token: str | None,
+    current_user: AuthUserDomain | None,
+    booking_service: BookingService,
 ) -> Booking:
+    """Resolve the acting identity for a booking.
+
+    User-owned booking: requires current_user matching booking.user_id.
+    Guest-owned booking: requires matching X-Hold-Token.
+    Any mismatch or missing credential raises BookingNotFoundError (404).
+    """
     booking = await booking_service.get_booking_for_actor(booking_id)
     if booking is None:
         raise BookingNotFoundError()
@@ -59,3 +64,12 @@ async def get_booking_actor(
         raise BookingNotFoundError()
 
     return booking
+
+
+async def get_booking_actor(
+    booking_id: UUID,
+    x_hold_token: str | None = Header(default=None, alias="X-Hold-Token"),
+    current_user: AuthUserDomain | None = Depends(get_current_user_optional),
+    booking_service: BookingService = Depends(get_booking_service),
+) -> Booking:
+    return await resolve_actor(booking_id, x_hold_token, current_user, booking_service)

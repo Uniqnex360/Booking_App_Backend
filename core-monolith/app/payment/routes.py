@@ -2,7 +2,12 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Header, Request, status
 from fastapi.responses import JSONResponse
 
-from app.auth.dependencies import get_current_user
+from fastapi import APIRouter, Depends, Header, Request, status
+
+from app.auth.dependencies import get_current_user_optional
+from app.booking.dependencies import get_booking_service, resolve_actor
+from app.booking.interfaces import BookingNotFoundError
+from app.booking.services import BookingService
 from app.auth.interfaces import User as AuthUserDomain
 from app.payment.dependencies import get_payment_service
 from app.payment.interfaces import (
@@ -20,24 +25,32 @@ from app.payment.schemas import (
     VerifyPaymentRequest,
     RefundRequest,
 )
+from app.auth.dependencies import get_current_user
+
 from app.payment.services import PaymentService
 from app.shared.exceptions import EntityNotFoundError
 from app.shared.response import error_response, success_response
 
 router = APIRouter(tags=["Payments"])
 
-
 @router.post("/payments/order", status_code=status.HTTP_200_OK)
 async def create_order(
     payload: CreateOrderRequest,
-    current_user: AuthUserDomain = Depends(get_current_user),
+    x_hold_token: str | None = Header(default=None, alias="X-Hold-Token"),
+    current_user: AuthUserDomain | None = Depends(get_current_user_optional),
+    booking_service: BookingService = Depends(get_booking_service),
     payment_service: PaymentService = Depends(get_payment_service),
 ):
     try:
+        booking = await resolve_actor(
+            payload.booking_id, x_hold_token, current_user, booking_service
+        )
         data = await payment_service.create_payment_order(
-            user_id=current_user.id, booking_id=payload.booking_id
+            user_id=booking.user_id, booking_id=booking.id
         )
         return success_response(data=data, message="Payment order created successfully")
+    except BookingNotFoundError:
+        return error_response("BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
     except EntityNotFoundError:
         return error_response("PAYMENT_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
     except PaymentNotAvailableHere as exc:
@@ -49,22 +62,28 @@ async def create_order(
     except GatewayUnavailable as exc:
         return error_response("PAYMENT_GATEWAY_UNAVAILABLE", str(exc), status.HTTP_502_BAD_GATEWAY)
 
-
 @router.post("/payments/verify", status_code=status.HTTP_200_OK)
 async def verify_payment(
     payload: VerifyPaymentRequest,
-    current_user: AuthUserDomain = Depends(get_current_user),
+    x_hold_token: str | None = Header(default=None, alias="X-Hold-Token"),
+    current_user: AuthUserDomain | None = Depends(get_current_user_optional),
+    booking_service: BookingService = Depends(get_booking_service),
     payment_service: PaymentService = Depends(get_payment_service),
 ):
     try:
+        booking = await resolve_actor(
+            payload.booking_id, x_hold_token, current_user, booking_service
+        )
         data = await payment_service.verify_payment(
-            user_id=current_user.id,
-            booking_id=payload.booking_id,
+            user_id=booking.user_id,
+            booking_id=booking.id,
             razorpay_order_id=payload.razorpay_order_id,
             razorpay_payment_id=payload.razorpay_payment_id,
             razorpay_signature=payload.razorpay_signature,
         )
         return success_response(data=data, message="Payment verified and booking confirmed")
+    except BookingNotFoundError:
+        return error_response("BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
     except EntityNotFoundError:
         return error_response("PAYMENT_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
     except BookingNotPayable as exc:
@@ -73,7 +92,6 @@ async def verify_payment(
         return error_response("PAYMENT_VERIFICATION_FAILED", str(exc), status.HTTP_402_PAYMENT_REQUIRED)
     except GatewayUnavailable as exc:
         return error_response("PAYMENT_GATEWAY_UNAVAILABLE", str(exc), status.HTTP_502_BAD_GATEWAY)
-
 
 @router.post("/payments/refund", status_code=status.HTTP_200_OK)
 async def refund_payment(
