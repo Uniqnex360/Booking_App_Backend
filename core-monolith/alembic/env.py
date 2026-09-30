@@ -7,7 +7,8 @@ from sqlalchemy import pool
 from alembic import context
 
 sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), '..')))
-
+import app.fnb.models  # noqa: F401
+import app.review.models  # noqa: F401
 from dotenv import load_dotenv
 load_dotenv()
 from app.core.database import Base

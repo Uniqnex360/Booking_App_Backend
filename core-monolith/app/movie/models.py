@@ -52,6 +52,20 @@ class Screen(Base):
     venue_id = Column(sa.Uuid, ForeignKey("venues.id"), nullable=False)
     name = Column(String, nullable=False)
     total_seats = Column(Integer, nullable=False, server_default=sa.text("0"))
+    first_row_distance_m = Column(Numeric(4, 1), nullable=True)
+    row_pitch_m = Column(Numeric(3, 2), nullable=True)
+    panorama_url = Column(Text, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "first_row_distance_m IS NULL OR first_row_distance_m > 0",
+            name="ck_screens_first_row_distance",
+        ),
+        CheckConstraint(
+            "row_pitch_m IS NULL OR row_pitch_m > 0",
+            name="ck_screens_row_pitch",
+        ),
+    )
     venue = relationship("Venue", back_populates="screens")
     rows = relationship("ScreenRow", back_populates="screen", cascade="all, delete-orphan")
     showtimes = relationship("Showtime", back_populates="screen", cascade="all, delete-orphan")
