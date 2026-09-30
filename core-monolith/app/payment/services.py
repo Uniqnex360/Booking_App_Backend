@@ -89,14 +89,18 @@ class PaymentService:
         
         existing_payment = await self.payment_repo.get_by_booking_id(booking_id)
         if existing_payment and existing_payment.status == PaymentStatus.CREATED.value:
-            hold_exp_str = ctx["held_until"].isoformat() if ctx.get("held_until") else None  
-            return {
-                "order_id": existing_payment.order_id,
-                "key_id": _get_key_id(),
-                "amount_paise": existing_payment.amount_paise,
-                "currency": existing_payment.currency,
-                "hold_expires_at": hold_exp_str,
-            }
+            if existing_payment.amount_paise == ctx["total_paise"]:
+                hold_exp_str = ctx["held_until"].isoformat() if ctx.get("held_until") else None
+                return {
+                    "order_id": existing_payment.order_id,
+                    "key_id": _get_key_id(),
+                    "amount_paise": existing_payment.amount_paise,
+                    "currency": existing_payment.currency,
+                    "hold_expires_at": hold_exp_str,
+                }
+            await self.payment_repo.update_status(
+                existing_payment.id, PaymentStatus.EXPIRED
+            )
 
         
         if ctx.get("held_until"):  

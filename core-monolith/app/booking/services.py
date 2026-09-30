@@ -700,7 +700,10 @@ class BookingService:
             raise BookingNotFoundError()
         if booking.user_id is not None and booking.user_id != user_id:
             raise BookingNotFoundError()
-
+        if booking.provider_id is None and booking.showtime_id is not None:
+            raise ValidationError(
+                "Self-hosted bookings must be confirmed via /payments/verify"
+            )
         if booking.tier_id and not booking.provider_id:
             return await self._commit_event_booking(booking, payment_ref)
 
