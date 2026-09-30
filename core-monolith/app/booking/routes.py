@@ -174,6 +174,7 @@ async def replace_booking_contact(
     try:
         await booking_service.update_contact(
             booking_id=booking.id,
+            user_id=booking.user_id,
             contact_email=payload.contact_email,
             contact_phone=payload.contact_phone,
         )
@@ -184,6 +185,12 @@ async def replace_booking_contact(
     except BookingNotFoundError:
         return error_response(
             "BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND
+        )
+    except IllegalBookingTransition as exc:               # <-- add
+        return error_response(
+            "BOOKING_NOT_EDITABLE",
+            "Booking can no longer be edited",
+            status.HTTP_409_CONFLICT,
         )
 @router.post("/bookings/{booking_id}/commit", status_code=status.HTTP_200_OK)
 async def commit_booking(
