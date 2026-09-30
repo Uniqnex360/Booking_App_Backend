@@ -8,6 +8,8 @@ from app.movie.services import MovieService
 from datetime import date
 from uuid import UUID
 from app.booking.interfaces import Booking
+from app.fnb.schemas import ContactUpdateRequest
+from app.booking.interfaces import BookingStatus
 
 from app.booking.schemas import BookingDetailResponse 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
@@ -153,6 +155,36 @@ async def claim_guest_booking(
     return await booking_service.get_booking_detail(
         user_id=current_user.id, booking_id=booking_id
     )
+@router.patch(
+    "/bookings/{booking_id}/contact",
+    response_model=BookingDetailResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def replace_booking_contact(
+    payload: ContactUpdateRequest,
+    booking = Depends(get_booking_actor),
+    booking_service: BookingService = Depends(get_booking_service),
+):
+    if booking.status != BookingStatus.HELD:
+        return error_response(
+            "BOOKING_NOT_EDITABLE",
+            "Booking can no longer be edited",
+            status.HTTP_409_CONFLICT,
+        )
+    try:
+        await booking_service.update_contact(
+            booking_id=booking.id,
+            contact_email=payload.contact_email,
+            contact_phone=payload.contact_phone,
+        )
+        return await booking_service.get_booking_detail(
+            user_id=booking.user_id,
+            booking_id=booking.id,
+        )
+    except BookingNotFoundError:
+        return error_response(
+            "BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND
+        )
 @router.post("/bookings/{booking_id}/commit", status_code=status.HTTP_200_OK)
 async def commit_booking(
     payload: CommitBookingRequest | None = None,
