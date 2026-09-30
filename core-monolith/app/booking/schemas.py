@@ -80,6 +80,8 @@ from pydantic import BaseModel
 class BaseBookingDetail(BaseModel):
     type: str
     id: UUID
+    showtime_id: UUID | None = None      # <-- add
+    event_id: UUID | None = None  
     status: str
     total_paise: int
     currency: str
@@ -92,6 +94,8 @@ class BaseBookingDetail(BaseModel):
         return cls(
             type="MOVIE" if b.showtime_id else ("EVENT" if b.event_id else "UNKNOWN"),
             id=b.id,
+            showtime_id=b.showtime_id,        # <-- add
+            event_id=b.event_id,  
             status=b.status.value if hasattr(b.status, "value") else b.status,
             total_paise=b.total_paise,
             currency=b.currency,
