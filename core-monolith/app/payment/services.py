@@ -188,7 +188,11 @@ class PaymentService:
         )
         await self.booking_service.mark_paid(booking_id, razorpay_payment_id)
         await self.session.commit()
-
+        await self.booking_service.commit_booking(
+            user_id=user_id,
+            booking_id=booking_id,
+            payment_ref=razorpay_payment_id,
+        )
         return {
             "status": "PAID",
             "payment_id": razorpay_payment_id,
