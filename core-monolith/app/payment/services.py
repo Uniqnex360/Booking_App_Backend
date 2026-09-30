@@ -67,8 +67,7 @@ class PaymentService:
             raise EntityNotFoundError("Booking not found")
 
         
-        if ctx.get("is_provider"):
-            raise PaymentNotAvailableHere("Provider showtimes are not payable here")
+        
 
         if ctx.get("showtime_id"):
             m_svc = self.movie_service

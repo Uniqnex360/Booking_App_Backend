@@ -82,6 +82,7 @@ class BaseBookingDetail(BaseModel):
     id: UUID
     showtime_id: UUID | None = None      # <-- add
     event_id: UUID | None = None  
+    payment_mode: str | None = None   
     status: str
     total_paise: int
     currency: str
@@ -96,6 +97,7 @@ class BaseBookingDetail(BaseModel):
             id=b.id,
             showtime_id=b.showtime_id,        # <-- add
             event_id=b.event_id,  
+            payment_mode="PROVIDER" if b.provider_id else "ONLINE",
             status=b.status.value if hasattr(b.status, "value") else b.status,
             total_paise=b.total_paise,
             currency=b.currency,

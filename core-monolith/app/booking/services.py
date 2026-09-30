@@ -731,7 +731,7 @@ class BookingService:
 
         if booking.status != BookingStatus.HELD:
             raise IllegalBookingTransition(booking.status.value, BookingStatus.CONFIRMED.value)
-        if booking.provider_id is None and booking.showtime_id is not None:
+        if booking.showtime_id is not None:
             from app.payment.models import PaymentModel
             from sqlalchemy import select as _sel
             if not self.session:
