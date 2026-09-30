@@ -14,6 +14,10 @@ from fastapi.responses import JSONResponse
 from app.auth.dependencies import get_current_user,get_current_user_optional,get_notification_service
 from app.auth.interfaces import User as AuthUserDomain,INotificationService
 from app.providers.base import HoldAlreadyCommitted
+from app.fnb.interfaces import FnbItemNotFoundError, FnbItemWrongVenueError
+from app.fnb.schemas import FnbReplaceRequest
+from app.fnb.services import FnbService
+from app.fnb.dependencies import get_fnb_service
 
 from app.booking.dependencies import get_booking_service, get_movie_booking_service
 from app.booking.interfaces import (
@@ -395,6 +399,75 @@ async def create_or_confirm_booking(
     "total_paise": booking.total_paise,
     "currency": "INR",
 }}
+@router.get("/showtimes/{showtime_id}/fnb-menu", status_code=status.HTTP_200_OK)
+async def get_fnb_menu(
+    showtime_id: UUID,
+    fnb_service: FnbService = Depends(get_fnb_service),
+):
+    try:
+        items = await fnb_service.list_menu_for_showtime(showtime_id)
+        return success_response(
+            data={
+                "items": [
+                    {
+                        "id": str(i.id),
+                        "name": i.name,
+                        "description": i.description,
+                        "price_paise": i.price_paise,
+                        "image_url": i.image_url,
+                        "is_veg": i.is_veg,
+                        "category": i.category,
+                    }
+                    for i in items
+                ]
+            },
+            message="F&B menu fetched",
+        )
+    except Exception:
+        # Never a 500 for an empty menu or unknown showtime
+        return success_response(data={"items": []}, message="F&B menu fetched")
+
+
+@router.put("/bookings/{booking_id}/fnb", status_code=status.HTTP_200_OK)
+async def replace_booking_fnb(
+    booking_id: UUID,
+    payload: FnbReplaceRequest,
+    current_user: AuthUserDomain = Depends(get_current_user),
+    booking_service: BookingService = Depends(get_booking_service),
+):
+    try:
+        items = [(line.item_id, line.quantity) for line in payload.items]
+        booking = await booking_service.replace_fnb_for_booking(
+            booking_id=booking_id,
+            user_id=current_user.id,
+            items=items,
+        )
+        detail = await booking_service.get_booking_detail(
+            user_id=current_user.id, booking_id=booking_id
+        )
+        return detail
+    except BookingNotFoundError:
+        return error_response(
+            "BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND
+        )
+    except FnbItemWrongVenueError as exc:
+        return error_response(
+            "VALIDATION_ERROR", str(exc), status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
+    except FnbItemNotFoundError as exc:
+        return error_response(
+            "VALIDATION_ERROR", str(exc), status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
+    except IllegalBookingTransition:
+        return error_response(
+            "HOLD_EXPIRED",
+            "Hold has expired or is no longer editable",
+            status.HTTP_409_CONFLICT,
+        )
+    except ValidationError as exc:
+        return error_response(
+            "VALIDATION_ERROR", str(exc), status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
 @router.patch("/bookings/{booking_id}/cancel")
 async def cancel_legacy_booking(
     booking_id: UUID,

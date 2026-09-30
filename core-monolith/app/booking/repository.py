@@ -81,6 +81,11 @@ class BookingRepository(IBookingRepository):
             seat_codes_json=seat_codes_str,
             contact_email=b.contact_email,          
             contact_phone=b.contact_phone, 
+            ticket_paise=b.ticket_paise,
+            fnb_paise=b.fnb_paise or 0,
+            convenience_fee_paise=b.convenience_fee_paise or 0,
+            terms_accepted_at=b.terms_accepted_at,
+            hold_token_hash=b.hold_token_hash,
         )
         self.session.add(model)
         await self.session.flush()
@@ -156,6 +161,11 @@ class BookingRepository(IBookingRepository):
                 ref_code=b.ref_code,
                 total_paise=b.total_paise,
                 seat_refs_json=seat_refs_str,
+                ticket_paise=b.ticket_paise,
+                fnb_paise=b.fnb_paise or 0,
+                convenience_fee_paise=b.convenience_fee_paise or 0,
+                terms_accepted_at=b.terms_accepted_at,
+                hold_token_hash=b.hold_token_hash
             )
         )
         await self.session.flush()
@@ -210,6 +220,11 @@ class BookingRepository(IBookingRepository):
             seat_codes=seat_codes,
             contact_email=m.contact_email,      
             contact_phone=m.contact_phone,
+            ticket_paise=m.ticket_paise,
+            fnb_paise=m.fnb_paise or 0,
+            convenience_fee_paise=m.convenience_fee_paise or 0,
+            terms_accepted_at=m.terms_accepted_at,
+            hold_token_hash=m.hold_token_hash,
         )
 
 

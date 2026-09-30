@@ -38,6 +38,11 @@ class BookingModel(Base):
     seat_codes_json = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+    ticket_paise = Column(Integer, nullable=True)
+    fnb_paise = Column(Integer, nullable=False, server_default="0")
+    convenience_fee_paise = Column(Integer, nullable=False, server_default="0")
+    terms_accepted_at = Column(DateTime(timezone=True), nullable=True)
+    hold_token_hash = Column(Text, nullable=True, index=True)
 
     __table_args__ = (
         UniqueConstraint("user_id", "idempotency_key", name="ux_user_idempotency"),

@@ -12,6 +12,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.movie.models import Showtime
+from app.booking.models import BookingModel
 
 from app.booking.interfaces import (
     MAX_SEATS_PER_BOOKING,
@@ -229,7 +230,10 @@ class BookingService:
 
         kind = context.get("kind")
         if kind == "MOVIE":
-            return MovieBookingDetail.from_context(booking, context)
+            from app.fnb.repository import SQLAlchemyFnbRepository
+            fnb_repo = SQLAlchemyFnbRepository(session=self.session)
+            context["fnb_lines"] = await fnb_repo.list_for_booking(booking_id)
+            return MovieBookingDetail.from_context(booking, context)    
         if kind == "EVENT":
             return EventBookingDetail.from_context(booking, context)
 
@@ -620,6 +624,7 @@ class BookingService:
             provider_hold_id=remote_hold.hold_id,
             held_until=remote_hold.expires_at,
             currency=remote_hold.currency,
+            ticket_paise=remote_hold.total_paise,  
             total_paise=remote_hold.total_paise,
             idempotency_key=idem_key,
             created_at=now,
@@ -733,6 +738,9 @@ class BookingService:
                 seat_codes=booking.seat_codes,  
                 contact_email=booking.contact_email,     
                 contact_phone=booking.contact_phone,  
+                ticket_paise=booking.ticket_paise,      # ← add
+                fnb_paise=booking.fnb_paise,            # ← add
+                convenience_fee_paise=booking.convenience_fee_paise, 
             )
             await self.booking_repo.update_booking(updated_booking)
             if self.session:
@@ -845,7 +853,130 @@ class BookingService:
         if not booking or booking.user_id != user_id:
             raise BookingNotFoundError()
         return booking
+    def _recompute_total(self, booking) -> None:
+        """The ONLY writer of total_paise for F&B-enabled movie bookings.
+        Must be called inside the caller's transaction, after SELECT ... FOR UPDATE
+        on the booking row."""
+        booking.total_paise = (
+            (booking.ticket_paise or 0)
+            + (booking.fnb_paise or 0)
+            + (booking.convenience_fee_paise or 0)
+        )
 
+    async def replace_fnb_for_booking(
+        self,
+        booking_id: UUID,
+        user_id: UUID,
+        items: list[tuple[UUID, int]],
+    ) -> Booking:
+        """Replace all F&B lines for a HELD booking. Returns the updated booking row.
+        Fails with HoldExpiredError if the booking is not HELD or held_until has passed.
+        Fails with BookingNotFoundError if the booking does not belong to user_id."""
+        if not self.session:
+            raise ValidationError("Repository session is required")
+
+        # Lock the booking row first — two parallel /fnb calls must serialize.
+        stmt = (
+            select(BookingModel)
+            .where(BookingModel.id == booking_id)
+            .with_for_update()
+        )
+        row = (await self.session.execute(stmt)).scalar_one_or_none()
+        if not row or (row.user_id is not None and row.user_id != user_id):
+            raise BookingNotFoundError()
+
+        now = utcnow()
+        if row.status != "HELD":
+            raise IllegalBookingTransition(row.status, "HELD")
+        if not row.held_until or row.held_until <= now:
+            raise IllegalBookingTransition("EXPIRED", "HELD")
+
+        # Resolve the venue via the showtime for validation
+        from app.movie.models import Showtime, Screen
+        stmt = (
+            select(Screen.venue_id)
+            .join(Showtime, Showtime.screen_id == Screen.id)
+            .where(Showtime.id == row.showtime_id)
+        )
+        venue_id = (await self.session.execute(stmt)).scalar_one_or_none()
+        if venue_id is None:
+            raise BookingNotFoundError()
+
+        # Delegate the actual replace to FnbService
+        from app.fnb.services import FnbService
+        from app.fnb.repository import SQLAlchemyFnbRepository
+        fnb_service = FnbService(
+            session=self.session,
+            repo=SQLAlchemyFnbRepository(session=self.session),
+        )
+        lines = await fnb_service.replace_for_booking(booking_id, venue_id, items)
+
+        # Recompute the total
+        row.fnb_paise = FnbService.fnb_total_paise(lines)
+        self._recompute_total(row)
+
+        await self.session.commit()
+        await self.session.refresh(row)
+        return row
+
+    async def update_contact(
+        self,
+        booking_id: UUID,
+        user_id: UUID,
+        contact_email: str | None,
+        contact_phone: str | None,
+    ) -> Booking:
+        if not self.session:
+            raise ValidationError("Repository session is required")
+
+        stmt = (
+            select(BookingModel)
+            .where(BookingModel.id == booking_id)
+            .with_for_update()
+        )
+        row = (await self.session.execute(stmt)).scalar_one_or_none()
+        if not row or (row.user_id is not None and row.user_id != user_id):
+            raise BookingNotFoundError()
+
+        if row.status != "HELD":
+            raise IllegalBookingTransition(row.status, "HELD")
+        if not row.held_until or row.held_until <= utcnow():
+            raise IllegalBookingTransition("EXPIRED", "HELD")
+
+        if contact_email is not None:
+            row.contact_email = contact_email
+        if contact_phone is not None:
+            row.contact_phone = contact_phone
+
+        await self.session.commit()
+        await self.session.refresh(row)
+        return row
+
+    async def get_booking_detail_with_fnb(self, user_id: UUID, booking_id: UUID):
+        """Wrap get_booking_detail but attach fnb_lines to the movie context."""
+        result = await self.booking_repo.get_booking_with_context(booking_id)
+        if not result:
+            raise BookingNotFoundError()
+        booking, context = result
+
+        if booking.user_id != user_id:
+            raise BookingNotFoundError()
+
+        if context is None or context.get("kind") != "MOVIE":
+            if context is None:
+                return BaseBookingDetail.from_domain(booking)
+            from app.booking.schemas import MovieBookingDetail, EventBookingDetail
+            kind = context.get("kind")
+            if kind == "EVENT":
+                return EventBookingDetail.from_context(booking, context)
+            return BaseBookingDetail.from_domain(booking)
+
+        # MOVIE — attach fnb lines
+        from app.fnb.repository import SQLAlchemyFnbRepository
+        fnb_repo = SQLAlchemyFnbRepository(session=self.session)
+        context["fnb_lines"] = await fnb_repo.list_for_booking(booking_id)
+        from app.booking.schemas import MovieBookingDetail
+        return MovieBookingDetail.from_context(booking, context)
     async def release_expired_holds(self) -> list[UUID]:  
         expired_bookings = await self.booking_repo.get_expired_held_bookings()
         swept_ids: list[UUID] = []

@@ -72,6 +72,11 @@ class Booking:
     seat_codes: Optional[list[str]] = None
     contact_email: Optional[str] = None      
     contact_phone: Optional[str] = None 
+    ticket_paise: Optional[int] = None
+    fnb_paise: int = 0
+    convenience_fee_paise: int = 0
+    terms_accepted_at: Optional[datetime] = None
+    hold_token_hash: Optional[str] = None
 class ValidationError(ValueError, DomainError):
     pass
 class SoldOutError(DomainError):

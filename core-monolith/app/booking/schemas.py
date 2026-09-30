@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, Field, model_validator
+from app.fnb.schemas import FnbLineOut
 
 
 class BookingCreateRequest(BaseModel):
@@ -116,6 +117,10 @@ class MovieBookingDetail(BaseBookingDetail):
     seat_codes: list[str] | None = None
     quantity: int
     unit_price_paise: int | None = None
+    ticket_paise: int | None = None
+    fnb_paise: int = 0
+    convenience_fee_paise: int = 0
+    fnb_lines: list[FnbLineOut] = Field(default_factory=list)
 
     @classmethod
     def from_context(cls, b, ctx) -> "MovieBookingDetail":
@@ -139,6 +144,10 @@ class MovieBookingDetail(BaseBookingDetail):
             seat_codes=seats or None,
             quantity=b.quantity or len(seats) or 1,
             unit_price_paise=b.unit_price_paise,
+            ticket_paise=getattr(b, "ticket_paise", None),
+            fnb_paise=getattr(b, "fnb_paise", 0) or 0,
+            convenience_fee_paise=getattr(b, "convenience_fee_paise", 0) or 0,
+            fnb_lines=ctx.get("fnb_lines", []),
         )
 
 
