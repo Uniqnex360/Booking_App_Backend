@@ -43,7 +43,7 @@ class BookingModel(Base):
     convenience_fee_paise = Column(Integer, nullable=False, server_default="0")
     terms_accepted_at = Column(DateTime(timezone=True), nullable=True)
     hold_token_hash = Column(Text, nullable=True, index=True)
-
+    hold_token_expires_at = Column(DateTime(timezone=True), nullable=True)
     __table_args__ = (
         UniqueConstraint("user_id", "idempotency_key", name="ux_user_idempotency"),
     )

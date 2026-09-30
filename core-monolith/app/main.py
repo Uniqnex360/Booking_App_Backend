@@ -17,6 +17,7 @@ from app.movie.routes import movie_router
 from app.booking.routes import router as booking_router
 from app.payment.routes import router as payment_router
 from app.review.routes import router as review_router
+from app.booking.interfaces import BookingNotFoundError
 
 from slowapi.errors import RateLimitExceeded
 from app.auth.exceptions import (
@@ -53,7 +54,9 @@ async def duplicate_email_exception_handler(request: Request, exc: DuplicateEmai
 @app.exception_handler(InvalidCredentialsError)
 async def invalid_creds_exception_handler(request: Request, exc: InvalidCredentialsError):
     return JSONResponse(status_code=401, content={"detail": str(exc.detail)})
-
+@app.exception_handler(BookingNotFoundError)
+async def booking_not_found_exception_handler(request: Request, exc: BookingNotFoundError):
+    return JSONResponse(status_code=404, content={"error": "BOOKING_NOT_FOUND", "message": "Booking not found"})
 @app.exception_handler(InvalidTokenError)
 async def invalid_token_exception_handler(request: Request, exc: InvalidTokenError):
     return JSONResponse(status_code=401, content={"detail": str(exc.detail)})

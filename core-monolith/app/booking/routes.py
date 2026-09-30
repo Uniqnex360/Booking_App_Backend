@@ -1,13 +1,14 @@
 from __future__ import annotations
 import logging
 logger = logging.getLogger(__name__)
-
 from pydantic import BaseModel, Field
-
+from app.booking.dependencies import get_booking_service, get_movie_booking_service, get_booking_actor
 from app.movie.dependencies import get_movie_service
 from app.movie.services import MovieService
 from datetime import date
 from uuid import UUID
+from app.booking.interfaces import Booking
+
 from app.booking.schemas import BookingDetailResponse 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import JSONResponse
@@ -18,7 +19,6 @@ from app.fnb.interfaces import FnbItemNotFoundError, FnbItemWrongVenueError
 from app.fnb.schemas import FnbReplaceRequest
 from app.fnb.services import FnbService
 from app.fnb.dependencies import get_fnb_service
-
 from app.booking.dependencies import get_booking_service, get_movie_booking_service
 from app.booking.interfaces import (
     BookingNotCancellableError,
@@ -52,22 +52,17 @@ from app.providers.base import (
 )
 from app.shared.response import error_response, success_response
 router = APIRouter(tags=["bookings"])
-
-
-
 @router.post("/bookings/hold", status_code=status.HTTP_201_CREATED)
 async def create_provider_hold(
     payload: ProviderHoldCreateRequest,
     idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    x_hold_token: str | None = Header(default=None, alias="X-Hold-Token"),
     current_user: AuthUserDomain | None = Depends(get_current_user_optional),
     booking_service: BookingService = Depends(get_booking_service),
 ):
     if not idempotency_key:
-        return error_response(
-            error_type="VALIDATION_ERROR",
-            message="Idempotency-Key header is required",
-            code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        )
+        return error_response("VALIDATION_ERROR", "Idempotency-Key header is required",
+                              status.HTTP_422_UNPROCESSABLE_ENTITY)
     try:
         booking = await booking_service.create_hold(
             user_id=current_user.id if current_user else None,
@@ -77,12 +72,17 @@ async def create_provider_hold(
             seat_ids=payload.seat_ids,
             idem_key=idempotency_key,
             seat_codes=payload.seat_codes,
+            hold_token=x_hold_token,
         )
         return success_response(
             data={
                 "id": str(booking.id),
                 "status": booking.status.value,
                 "held_until": booking.held_until.isoformat() if booking.held_until else None,
+                "hold_token_expires_at": (
+                    booking.hold_token_expires_at.isoformat()
+                    if booking.hold_token_expires_at else None
+                ),
                 "total_paise": booking.total_paise,
                 "currency": booking.currency,
                 "seats": booking.seat_refs or payload.seat_ids,
@@ -111,18 +111,59 @@ async def create_provider_hold(
         return error_response("PROVIDER_CONTRACT_ERROR", str(exc), status.HTTP_502_BAD_GATEWAY)
     except ProviderError as exc:
         return error_response("PROVIDER_ERROR", str(exc), status.HTTP_502_BAD_GATEWAY)
+@router.post("/bookings/{booking_id}/claim", status_code=status.HTTP_200_OK)
+async def claim_guest_booking(
+    booking_id: UUID,
+    x_hold_token: str | None = Header(default=None, alias="X-Hold-Token"),
+    current_user: AuthUserDomain = Depends(get_current_user),
+    booking_service: BookingService = Depends(get_booking_service),
+):
+    """Attach a guest booking to the currently logged-in user.
+
+    Requires both a valid session AND the guest hold token. Once claimed,
+    the token is burned and the booking is user-owned. Wrong token, wrong
+    state, or already claimed all return the same 404 body.
+    """
+    from app.booking.hold_token import verify as verify_hold_token
+    from app.shared.timeutil import utcnow
+
+    booking = await booking_service.get_booking_for_actor(booking_id)
+    if booking is None:
+        raise BookingNotFoundError()
+    if booking.user_id is not None:
+        raise BookingNotFoundError()
+    if booking.status != "HELD":
+        raise BookingNotFoundError()
+    if not x_hold_token or not booking.hold_token_hash:
+        raise BookingNotFoundError()
+    if booking.hold_token_expires_at and booking.hold_token_expires_at <= utcnow():
+        raise BookingNotFoundError()
+    if not verify_hold_token(x_hold_token, booking.hold_token_hash):
+        raise BookingNotFoundError()
+
+    claimed = await booking_service.booking_repo.claim_guest_booking(
+        booking_id, current_user.id
+    )
+    if not claimed:
+        raise BookingNotFoundError()
+
+    if booking_service.session:
+        await booking_service.session.commit()
+
+    return await booking_service.get_booking_detail(
+        user_id=current_user.id, booking_id=booking_id
+    )
 @router.post("/bookings/{booking_id}/commit", status_code=status.HTTP_200_OK)
 async def commit_booking(
-    booking_id: UUID,
     payload: CommitBookingRequest | None = None,
-    current_user: AuthUserDomain | None = Depends(get_current_user_optional),
+    booking = Depends(get_booking_actor),
     booking_service: BookingService = Depends(get_booking_service),
 ):
     payment_ref = payload.payment_ref if payload else None
     try:
         booking = await booking_service.commit_booking(
-            user_id=current_user.id if current_user else None,
-            booking_id=booking_id,
+            user_id=booking.user_id,
+            booking_id=booking.id,
             payment_ref=payment_ref,
         )
         return success_response(
@@ -155,13 +196,12 @@ async def commit_booking(
         return error_response("PROVIDER_ERROR", str(exc), status.HTTP_502_BAD_GATEWAY)
 @router.delete("/bookings/hold/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_provider_hold(
-    booking_id: UUID,
-    current_user: AuthUserDomain | None = Depends(get_current_user_optional),
+    booking = Depends(get_booking_actor),
     booking_service: BookingService = Depends(get_booking_service),
 ):
     try:
         await booking_service.cancel_hold(
-            user_id=current_user.id if current_user else None, booking_id=booking_id
+            user_id=booking.user_id, booking_id=booking.id
         )
         return JSONResponse(status_code=status.HTTP_204_NO_CONTENT, content=None)
     except BookingNotFoundError:
@@ -169,51 +209,21 @@ async def delete_provider_hold(
     except IllegalBookingTransition as exc:
         return error_response("ILLEGAL_BOOKING_TRANSITION", str(exc), status.HTTP_409_CONFLICT)
     
-# @router.get("/bookings/{booking_id}", status_code=status.HTTP_200_OK)
-# async def get_booking_details(
-#     booking_id: UUID,
-#     current_user: AuthUserDomain = Depends(get_current_user),
-#     booking_service: BookingService = Depends(get_booking_service),
-# ):
-#     try:
-#         booking = await booking_service.get_booking_for_user(
-#             user_id=current_user.id, booking_id=booking_id
-#         )
-#         return success_response(
-#             data={
-#                 "id": str(booking.id),
-#                 "status": booking.status.value,
-#                 "total_paise": booking.total_paise,
-#                 "currency": booking.currency,
-#                 "ref_code": booking.ref_code,
-#                 "barcode": booking.barcode,
-#                 "held_until": booking.held_until.isoformat() if booking.held_until else None,
-#                 "created_at": booking.created_at.isoformat() if booking.created_at else None,
-#             },
-#             message="Booking fetched successfully",
-#         )
-#     except BookingNotFoundError:
-#         return error_response("BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
-
 @router.get(
     "/bookings/{booking_id}",
     response_model=BookingDetailResponse,
     status_code=status.HTTP_200_OK,
 )
-async def get_booking_details(
-    booking_id: UUID,
-    current_user: AuthUserDomain = Depends(get_current_user),
+async def get_booking_by_id(
+    booking = Depends(get_booking_actor),
     booking_service: BookingService = Depends(get_booking_service),
 ):
     try:
-        detail = await booking_service.get_booking_detail(
-            user_id=current_user.id,
-            booking_id=booking_id,
+        return await booking_service.get_booking_detail(
+            user_id=booking.user_id, booking_id=booking.id
         )
-        return detail
     except BookingNotFoundError:
         return error_response("BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
-
 @router.get("/showtimes/{showtime_id}/seat-map", status_code=status.HTTP_200_OK)
 async def get_showtime_seat_map(
     showtime_id: UUID,
@@ -221,11 +231,9 @@ async def get_showtime_seat_map(
     movie_service: MovieService = Depends(get_movie_service),
 ):
     try:
-        # Check if the showtime is provider-backed
         try:
             st, _, _ = await booking_service._resolve_provider_and_showtime(showtime_id)
         except ShowtimeNotProviderError:
-            # Fall back directly to the legacy self-hosted Movie router handler logic
             dto = await movie_service.get_seat_map(showtime_id)
             from app.movie.schemas import SeatMapResponse as MovieSeatMapResponse, RowProjectionResponse, SeatProjectionResponse
             return MovieSeatMapResponse(
@@ -259,7 +267,6 @@ async def get_showtime_seat_map(
                     for r in dto.rows
                 ],
             )
-
         seat_map, is_available = await booking_service.get_provider_seat_map(showtime_id)
         if not is_available or seat_map is None:
             return {
@@ -306,9 +313,6 @@ async def get_showtime_seat_map(
             },
             "message": f"Provider upstream error: {exc}",
         }
-
-
-
 @router.get("/partner/reconcile", status_code=status.HTTP_200_OK)
 async def reconcile(
     date_param: date = Query(..., alias="date"),
@@ -317,9 +321,6 @@ async def reconcile(
 ):
     result = await booking_service.reconcile_bookings(date_param)
     return success_response(data=result, message="Reconciliation report generated")
-
-
-
 @router.post("/bookings", status_code=status.HTTP_201_CREATED)
 async def create_or_confirm_booking(
     payload: BookingCreateRequest,
@@ -330,17 +331,13 @@ async def create_or_confirm_booking(
     from sqlalchemy import select
     from app.payment.models import PaymentModel
     from app.booking.models import BookingModel
-
-    # 1. Check if this is the post-payment confirmation alias: { lock_id, payment_id }
     if payload.lock_id and payload.payment_id:
         session = booking_service.session
         b = await booking_service.booking_repo.get_by_id(payload.lock_id)
         if not b or b.user_id != current_user.id:
             return error_response("PAYMENT_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
-            
         if b.status != "HELD":
             return error_response("BOOKING_NOT_PAYABLE", "Booking is not in payable state", status.HTTP_409_CONFLICT)
-
         pay_stmt = select(PaymentModel).where(
             PaymentModel.booking_id == payload.lock_id,
             PaymentModel.payment_id == payload.payment_id,
@@ -349,10 +346,8 @@ async def create_or_confirm_booking(
         p_row = (await session.execute(pay_stmt)).scalar_one_or_none()
         if not p_row:
             return error_response("PAYMENT_VERIFICATION_FAILED", "Payment not captured for this booking", status.HTTP_402_PAYMENT_REQUIRED)
-
         confirmed_booking = await booking_service.mark_paid(payload.lock_id, payload.payment_id)
         await session.commit()
-
         return success_response(
             data={
                 "id": str(confirmed_booking.id),
@@ -364,8 +359,6 @@ async def create_or_confirm_booking(
             message="Booking confirmed successfully",
             code=status.HTTP_201_CREATED,
         )
-
-    # 2. Otherwise standard booking creation
     try:
         if payload.showtime_id and payload.seat_ids:
             booking = await movie_booking_service.create_booking(
@@ -391,7 +384,6 @@ async def create_or_confirm_booking(
         raise HTTPException(status_code=400, detail=str(exc))
     except (ShowtimeNotFoundError, SeatNotFoundError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-
     return {"booking": {
     "id": str(booking.id),
     "status": getattr(booking.status, "value", booking.status),
@@ -424,28 +416,24 @@ async def get_fnb_menu(
             message="F&B menu fetched",
         )
     except Exception:
-        # Never a 500 for an empty menu or unknown showtime
         return success_response(data={"items": []}, message="F&B menu fetched")
-
-
 @router.put("/bookings/{booking_id}/fnb", status_code=status.HTTP_200_OK)
 async def replace_booking_fnb(
     booking_id: UUID,
     payload: FnbReplaceRequest,
-    current_user: AuthUserDomain = Depends(get_current_user),
+    booking = Depends(get_booking_actor),
     booking_service: BookingService = Depends(get_booking_service),
 ):
     try:
         items = [(line.item_id, line.quantity) for line in payload.items]
-        booking = await booking_service.replace_fnb_for_booking(
+        await booking_service.replace_fnb_for_booking(
             booking_id=booking_id,
-            user_id=current_user.id,
+            user_id=booking.user_id,
             items=items,
         )
-        detail = await booking_service.get_booking_detail(
-            user_id=current_user.id, booking_id=booking_id
+        return await booking_service.get_booking_detail(
+            user_id=booking.user_id, booking_id=booking_id
         )
-        return detail
     except BookingNotFoundError:
         return error_response(
             "BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND
@@ -487,8 +475,6 @@ async def cancel_legacy_booking(
             raise HTTPException(status_code=409, detail=str(exc))
     except BookingNotCancellableError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
-
-   
     contact_email = getattr(booking, "contact_email", None)
     if contact_email:
         try:
@@ -500,9 +486,7 @@ async def cancel_legacy_booking(
             )
         except Exception as exc:
             logger.warning("Cancellation email failed for booking %s: %s", booking.id, exc)
-
     return {"booking": {"id": str(booking.id), "status": "CANCELLED"}}
-
 @router.get("/bookings", status_code=status.HTTP_200_OK)
 async def list_my_bookings(
     current_user: AuthUserDomain = Depends(get_current_user),
@@ -513,7 +497,6 @@ async def list_my_bookings(
     from app.movie.models import Showtime, Movie, Screen, Venue
     from app.event.models import EventORM, TicketCategoryORM
     import json
-
     session = booking_service.session
     stmt = (
         select(
@@ -534,10 +517,8 @@ async def list_my_bookings(
         .where(BookingModel.user_id == current_user.id)
         .order_by(BookingModel.created_at.desc())
     )
-
     res = await session.execute(stmt)
     rows = res.all()
-
     enriched_bookings = []
     for b, st, movie, screen, venue, event, tier in rows:
         if movie:
@@ -546,8 +527,6 @@ async def list_my_bookings(
             location = venue.city if venue else "Kochi"
             image_url = movie.poster_url or "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80"
             booking_date = st.starts_at.isoformat() if st else b.created_at.isoformat()
-
-            # Seat refs → codes list
             seat_codes: list[str] = []
             raw = b.seat_codes_json or b.seat_refs_json
             if raw:
@@ -558,7 +537,6 @@ async def list_my_bookings(
                 except (json.JSONDecodeError, TypeError):
                     seat_codes = []
             guests = len(seat_codes) if seat_codes else 1
-
             extra = {
                 "movie_title": movie.title,
                 "poster_url": movie.poster_url,
@@ -587,7 +565,6 @@ async def list_my_bookings(
             image_url = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80"
             booking_date = b.created_at.isoformat()
             guests = 1
-
         total_rupees = b.total_paise // 100
         row = {
             "id": str(b.id),
@@ -605,51 +582,36 @@ async def list_my_bookings(
             "barcode": b.barcode,
             "created_at": b.created_at.isoformat() if b.created_at else None,
         }
-
         if movie:
             row.update(extra)
-
         enriched_bookings.append(row)
-        # enriched_bookings.append({
-        #     "id": str(b.id),
-        #     "user_id": str(b.user_id),
-        #     "type": b.booking_type or ("MOVIE" if b.showtime_id else "EVENT"),
-        #     "title": title,
-        #     "venue": venue_name,
-        #     "location": location,
-        #     "booking_date": booking_date,
-        #     "guests": guests,
-        #     "total_price": total_rupees,
-        #     "status": b.status,
-        #     "image_url": image_url,
-        #     "ref_code": b.ref_code,
-        #     "barcode": b.barcode,
-        #     "created_at": b.created_at.isoformat() if b.created_at else None,
-        # })
-
     return success_response(
         data=enriched_bookings,
         message="User bookings fetched successfully",
     )
-
-
 class SelfHostedSeatHoldRequest(BaseModel):
     showtime_id: UUID
     seat_ids: list[UUID] = Field(min_length=1, max_length=10)
+    contact_email: str | None = None
+    contact_phone: str | None = None
 
 @router.post("/bookings/seat-hold", status_code=status.HTTP_201_CREATED)
 async def create_self_hosted_seat_hold(
     payload: SelfHostedSeatHoldRequest,
     idempotency_key: str = Header(..., alias="Idempotency-Key"),
-    current_user: AuthUserDomain = Depends(get_current_user),
+    x_hold_token: str | None = Header(default=None, alias="X-Hold-Token"),
+    current_user: AuthUserDomain | None = Depends(get_current_user_optional),
     booking_service: BookingService = Depends(get_booking_service),
 ):
     try:
         booking = await booking_service.create_seat_hold(
-            user_id=current_user.id,
+            user_id=current_user.id if current_user else None,
             showtime_id=payload.showtime_id,
             seat_ids=payload.seat_ids,
             idempotency_key=idempotency_key,
+            hold_token=x_hold_token,
+            contact_email=payload.contact_email,
+            contact_phone=payload.contact_phone,
         )
         return success_response(
             data={
@@ -667,15 +629,13 @@ async def create_self_hosted_seat_hold(
         return error_response("SEAT_UNAVAILABLE", str(exc), status.HTTP_409_CONFLICT)
     except ShowtimeNotFoundError as exc:
         return error_response("SHOWTIME_NOT_FOUND", str(exc), status.HTTP_404_NOT_FOUND)
-
 @router.delete("/bookings/seat-hold/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_self_hosted_seat_hold(
-    booking_id: UUID,
-    current_user: AuthUserDomain = Depends(get_current_user),
+    booking = Depends(get_booking_actor),
     booking_service: BookingService = Depends(get_booking_service),
 ):
     try:
-        await booking_service.release_seat_hold(current_user.id, booking_id)
+        await booking_service.release_seat_hold(booking.user_id, booking.id)
         return JSONResponse(status_code=status.HTTP_204_NO_CONTENT, content=None)
     except BookingNotFoundError:
         return error_response("BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)

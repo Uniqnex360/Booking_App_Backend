@@ -86,6 +86,7 @@ class BookingRepository(IBookingRepository):
             convenience_fee_paise=b.convenience_fee_paise or 0,
             terms_accepted_at=b.terms_accepted_at,
             hold_token_hash=b.hold_token_hash,
+            hold_token_expires_at=b.hold_token_expires_at,
         )
         self.session.add(model)
         await self.session.flush()
@@ -165,7 +166,8 @@ class BookingRepository(IBookingRepository):
                 fnb_paise=b.fnb_paise or 0,
                 convenience_fee_paise=b.convenience_fee_paise or 0,
                 terms_accepted_at=b.terms_accepted_at,
-                hold_token_hash=b.hold_token_hash
+                hold_token_hash=b.hold_token_hash,
+                hold_token_expires_at=b.hold_token_expires_at,
             )
         )
         await self.session.flush()
@@ -225,9 +227,31 @@ class BookingRepository(IBookingRepository):
             convenience_fee_paise=m.convenience_fee_paise or 0,
             terms_accepted_at=m.terms_accepted_at,
             hold_token_hash=m.hold_token_hash,
+            hold_token_expires_at=m.hold_token_expires_at,
         )
 
+    async def claim_guest_booking(self, booking_id: UUID, user_id: UUID) -> bool:
+        """Atomically assign a guest booking to a user and burn the hold token.
 
+        Returns True if the row was claimed, False if it was already owned
+        by someone, not HELD, or did not exist.
+        """
+        from sqlalchemy import update
+        res = await self.session.execute(
+            update(BookingModel)
+            .where(
+                BookingModel.id == booking_id,
+                BookingModel.user_id.is_(None),
+                BookingModel.status == "HELD",
+            )
+            .values(
+                user_id=user_id,
+                hold_token_hash=None,
+                hold_token_expires_at=None,
+            )
+        )
+        await self.session.flush()
+        return res.rowcount > 0
 class TierCounterRepository(ITierCounterRepository):
     def __init__(self, session: AsyncSession):
         self.session = session

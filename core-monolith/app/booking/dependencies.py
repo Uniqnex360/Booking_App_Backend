@@ -1,15 +1,20 @@
-
-
 from __future__ import annotations
 
-from fastapi import Depends
+from uuid import UUID
+
+from fastapi import Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.dependencies import get_current_user_optional
+from app.auth.interfaces import User as AuthUserDomain
+from app.auth.otp_service import NotificationService
+from app.booking.hold_token import verify as verify_hold_token
+from app.booking.interfaces import Booking, BookingNotFoundError
 from app.booking.movie_service import MovieBookingService
 from app.booking.repository import BookingRepository, TierCounterRepository
 from app.booking.services import BookingService
 from app.core.database import get_db
-from app.auth.otp_service import NotificationService
+from app.shared.timeutil import utcnow
 
 
 async def get_booking_service(
@@ -29,3 +34,28 @@ async def get_movie_booking_service(
     session: AsyncSession = Depends(get_db),
 ) -> MovieBookingService:
     return MovieBookingService(session)
+
+
+async def get_booking_actor(
+    booking_id: UUID,
+    x_hold_token: str | None = Header(default=None, alias="X-Hold-Token"),
+    current_user: AuthUserDomain | None = Depends(get_current_user_optional),
+    booking_service: BookingService = Depends(get_booking_service),
+) -> Booking:
+    booking = await booking_service.get_booking_for_actor(booking_id)
+    if booking is None:
+        raise BookingNotFoundError()
+
+    if booking.user_id is not None:
+        if current_user is not None and current_user.id == booking.user_id:
+            return booking
+        raise BookingNotFoundError()
+
+    if not x_hold_token or not booking.hold_token_hash:
+        raise BookingNotFoundError()
+    if booking.hold_token_expires_at and booking.hold_token_expires_at <= utcnow():
+        raise BookingNotFoundError()
+    if not verify_hold_token(x_hold_token, booking.hold_token_hash):
+        raise BookingNotFoundError()
+
+    return booking

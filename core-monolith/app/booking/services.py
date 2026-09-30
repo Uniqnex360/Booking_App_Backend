@@ -221,7 +221,8 @@ class BookingService:
 
         booking, context = result
 
-        
+        if user_id is not None and booking.user_id is not None and booking.user_id != user_id:
+            raise BookingNotFoundError()
         if booking.user_id != user_id:
             raise BookingNotFoundError()
 
@@ -277,7 +278,9 @@ class BookingService:
                 .values(status="BOOKED")
             )
         return await self.booking_repo.get_by_id(booking_id)
-
+    async def get_booking_for_actor(self, booking_id: UUID) -> Booking | None:
+        
+        return await self.booking_repo.get_by_id(booking_id)
     async def force_cancel_after_refund(self, booking_id: UUID, payment_id: str) -> Booking:
         
         b = await self.booking_repo.get_by_id(booking_id)
@@ -307,13 +310,16 @@ class BookingService:
 
     async def create_seat_hold(
         self,
-        user_id: UUID,
+        user_id: UUID | None,
         showtime_id: UUID,
         seat_ids: list[UUID],
         idempotency_key: str,
         hold_seconds: int = 600,
+        hold_token: str | None = None,
+        contact_email: str | None = None,
+        contact_phone: str | None = None,
     ) -> Booking:
-        if idempotency_key:
+        if idempotency_key and user_id is not None:
             existing = await self.booking_repo.get_by_idempotency(user_id, idempotency_key)
             if existing:
                 return existing
@@ -383,17 +389,27 @@ class BookingService:
         booking_id = uuid.uuid4()
         ref_code = f"BK{uuid.uuid4().hex[:8].upper()}"
 
+        from app.booking.hold_token import hash_token
+        hold_token_hash = hash_token(hold_token) if hold_token else None
+        hold_token_expires_at = (
+            held_until + timedelta(hours=24) if hold_token else None
+        )
         booking = Booking(
             id=booking_id,
             user_id=user_id,
             status=BookingStatus.HELD,
             showtime_id=showtime_id,
             total_paise=total_paise,
-            held_until=held_until,  
+            ticket_paise=total_paise,
+            held_until=held_until,
             idempotency_key=idempotency_key,
             ref_code=ref_code,
             created_at=now,
             seat_refs=[str(s) for s in seat_ids],
+            contact_email=contact_email,
+            contact_phone=contact_phone,
+            hold_token_hash=hold_token_hash,
+            hold_token_expires_at=hold_token_expires_at,
         )
 
         try:
@@ -580,6 +596,7 @@ class BookingService:
         seat_codes: list[str] | None = None,
         contact_email: str | None = None,
         contact_phone: str | None = None,
+        hold_token: str | None = None, 
     ) -> Booking:
         if user_id is None and not (contact_email or contact_phone):
             raise ValidationError(
@@ -599,7 +616,8 @@ class BookingService:
             raise ValidationError("Duplicate seats in request")
         if len(seat_ids) > MAX_SEATS_PER_BOOKING:
             raise ValidationError(f"Cannot hold more than {MAX_SEATS_PER_BOOKING} seats")
-
+        if user_id is None and not hold_token:
+            raise ValidationError("Guest holds require X-Hold-Token")
         provider_showtime_ref = st.provider_showtime_ref or str(st.id)
         try:
             remote_hold: ProviderHold = await provider.hold(
@@ -615,6 +633,11 @@ class BookingService:
 
         booking_id = uuid.uuid4()
         now = utcnow()
+        from app.booking.hold_token import hash_token
+        from datetime import timedelta, timezone
+        base_expiry = remote_hold.expires_at or (now + timedelta(hours=24))
+        if base_expiry.tzinfo is None:
+            base_expiry = base_expiry.replace(tzinfo=timezone.utc)
         local_booking = Booking(
             id=booking_id,
             user_id=user_id,
@@ -624,7 +647,7 @@ class BookingService:
             provider_hold_id=remote_hold.hold_id,
             held_until=remote_hold.expires_at,
             currency=remote_hold.currency,
-            ticket_paise=remote_hold.total_paise,  
+            ticket_paise=remote_hold.total_paise,
             total_paise=remote_hold.total_paise,
             idempotency_key=idem_key,
             created_at=now,
@@ -632,8 +655,10 @@ class BookingService:
             seat_codes=seat_codes,
             contact_email=contact_email,
             contact_phone=contact_phone,
+            hold_token_hash=hash_token(hold_token) if hold_token else None,
+            hold_token_expires_at=(base_expiry + timedelta(hours=24)) if hold_token else None,
         )
-
+        
         try:
             created = await self.booking_repo.create(local_booking)
             if self.session:
@@ -700,15 +725,25 @@ class BookingService:
             raise BookingNotFoundError()
         if booking.user_id is not None and booking.user_id != user_id:
             raise BookingNotFoundError()
-        if booking.provider_id is None and booking.showtime_id is not None:
-            raise ValidationError(
-                "Self-hosted bookings must be confirmed via /payments/verify"
-            )
+        
         if booking.tier_id and not booking.provider_id:
             return await self._commit_event_booking(booking, payment_ref)
 
         if booking.status != BookingStatus.HELD:
             raise IllegalBookingTransition(booking.status.value, BookingStatus.CONFIRMED.value)
+        if booking.provider_id is None and booking.showtime_id is not None:
+            from app.payment.models import PaymentModel
+            from sqlalchemy import select as _sel
+            if not self.session:
+                raise ValidationError("Session required")
+            stmt = _sel(PaymentModel).where(
+                PaymentModel.booking_id == booking.id,
+                PaymentModel.status == "CAPTURED",
+                PaymentModel.signature_verified.is_(True),
+            )
+            paid = (await self.session.execute(stmt)).scalar_one_or_none()
+            if not paid:
+                raise ValidationError("Payment not verified for this booking")
         if not booking.showtime_id or not booking.provider_id or not booking.provider_hold_id:
             raise ValidationError("Booking is missing provider hold details")
 
@@ -885,7 +920,7 @@ class BookingService:
             .with_for_update()
         )
         row = (await self.session.execute(stmt)).scalar_one_or_none()
-        if not row or (row.user_id is not None and row.user_id != user_id):
+        if not row or (user_id is not None and row.user_id is not None and row.user_id != user_id):
             raise BookingNotFoundError()
 
         now = utcnow()
@@ -925,7 +960,7 @@ class BookingService:
     async def update_contact(
         self,
         booking_id: UUID,
-        user_id: UUID,
+        user_id: UUID | None,
         contact_email: str | None,
         contact_phone: str | None,
     ) -> Booking:
@@ -938,7 +973,7 @@ class BookingService:
             .with_for_update()
         )
         row = (await self.session.execute(stmt)).scalar_one_or_none()
-        if not row or (row.user_id is not None and row.user_id != user_id):
+        if not row or (user_id is not None and row.user_id is not None and row.user_id != user_id):
             raise BookingNotFoundError()
 
         if row.status != "HELD":
