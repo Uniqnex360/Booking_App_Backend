@@ -598,10 +598,10 @@ class BookingService:
         contact_phone: str | None = None,
         hold_token: str | None = None, 
     ) -> Booking:
-        if user_id is None and not (contact_email or contact_phone):
-            raise ValidationError(
-                "Guest bookings require contact_email or contact_phone"
-            )
+        # if user_id is None and not (contact_email or contact_phone):
+        #     raise ValidationError(
+        #         "Guest bookings require contact_email or contact_phone"
+        #     )
 
         if user_id is not None and idem_key:
             existing = await self.booking_repo.get_by_idempotency(user_id, idem_key)
