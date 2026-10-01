@@ -186,7 +186,6 @@ class PaymentService:
             payment_gateway_id=razorpay_payment_id,
             signature_verified=True,
         )
-        await self.booking_service.mark_paid(booking_id, razorpay_payment_id)
         await self.session.commit()
         await self.booking_service.commit_booking(
             user_id=user_id,
