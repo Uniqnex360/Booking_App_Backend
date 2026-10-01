@@ -263,6 +263,7 @@ async def get_booking_by_id(
         )
     except BookingNotFoundError:
         return error_response("BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
+    
 @router.get("/showtimes/{showtime_id}/seat-map", status_code=status.HTTP_200_OK)
 async def get_showtime_seat_map(
     showtime_id: UUID,
@@ -318,6 +319,36 @@ async def get_showtime_seat_map(
                 },
                 "message": "Provider upstream is currently unavailable",
             }
+        unique_rows = sorted({s.row_label for s in seat_map.seats})
+        n_rows = len(unique_rows)
+
+        if n_rows >= 6:
+            row_start = (n_rows * 30) // 100
+            row_end = (n_rows * 70) // 100
+            bestseller_rows = set(unique_rows[row_start:row_end])
+        else:
+            bestseller_rows = set(unique_rows)  # small hall → all rows qualify
+
+        # Group seat numbers per row so we can pick the middle columns.
+        row_seat_numbers: dict[str, list[int]] = {}
+        for s in seat_map.seats:
+            row_seat_numbers.setdefault(s.row_label, []).append(s.seat_number)
+
+        col_bounds: dict[str, tuple[int, int]] = {}
+        for row, nums in row_seat_numbers.items():
+            nums_sorted = sorted(nums)
+            if len(nums_sorted) < 6:
+                col_bounds[row] = (nums_sorted[0], nums_sorted[-1])
+            else:
+                lo = len(nums_sorted) * 20 // 100
+                hi = len(nums_sorted) * 80 // 100
+                col_bounds[row] = (nums_sorted[lo], nums_sorted[hi - 1])
+
+        def _is_bestseller(row: str, num: int) -> bool:
+            if row not in bestseller_rows:
+                return False
+            lo, hi = col_bounds.get(row, (num, num))
+            return lo <= num <= hi
         return success_response(
             data={
                 "showtime_id": seat_map.showtime_ref,
@@ -334,6 +365,7 @@ async def get_showtime_seat_map(
                         "code": s.seat_code,
                         "price_paise": s.price_paise,
                         "is_available": s.is_available,
+                        "is_bestseller": _is_bestseller(s.row_label, s.seat_number),
                     }
                     for s in seat_map.seats
                 ],
