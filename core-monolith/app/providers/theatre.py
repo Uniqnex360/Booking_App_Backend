@@ -183,6 +183,8 @@ class PVRProvider(ITheatreProvider):
                             seat_code=s.get("code", ""),
                             price_paise=price_paise,
                             is_available=is_avail,
+                            is_couple=bool(row.get("is_couple", False)),
+
                         )
                     )
             starts_at = datetime.fromisoformat(data["starts_at"].replace("Z", "+00:00"))

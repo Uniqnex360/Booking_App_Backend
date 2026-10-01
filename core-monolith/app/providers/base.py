@@ -28,6 +28,7 @@ class ProviderSeat:
     seat_code: str
     price_paise: int
     is_available: bool
+    is_couple: bool = False
 @dataclass(frozen=True, slots=True)
 class ProviderSeatMap:
     showtime_ref: str

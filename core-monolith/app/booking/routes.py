@@ -349,6 +349,10 @@ async def get_showtime_seat_map(
                 return False
             lo, hi = col_bounds.get(row, (num, num))
             return lo <= num <= hi
+        COUPLE_ROWS_TEST = {
+            "40ccc205-49bc-43b8-baf7-6e817c852fa9": {"E", "F"},
+        }
+        test_couple_rows = COUPLE_ROWS_TEST.get(str(showtime_id), set())
         return success_response(
             data={
                 "showtime_id": seat_map.showtime_ref,
@@ -366,6 +370,7 @@ async def get_showtime_seat_map(
                         "price_paise": s.price_paise,
                         "is_available": s.is_available,
                         "is_bestseller": _is_bestseller(s.row_label, s.seat_number),
+                         "is_couple": s.is_couple,
                     }
                     for s in seat_map.seats
                 ],
