@@ -31,7 +31,8 @@ class Settings(BaseSettings):
     RAZORPAY_KEY_SECRET: str = "test_secret_placeholder"
     RAZORPAY_WEBHOOK_SECRET: str = "whsec_test_placeholder" 
     FRONTEND_URL:str
-    
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_MODEL: str = "gpt-4o-mini"
 
     class Config:
         env_file = '.env'
