@@ -39,6 +39,7 @@ from app.auth.schemas import (
     UserMeResponse,
     EmailOTPRequest,
     EmailOTPVerifyRequest,
+    CheckEmailRequest,
 )
 from app.auth.exceptions import DuplicateEmailError, UserNotFoundError
 
@@ -226,6 +227,23 @@ async def get_me(current_user: UserDomain = Depends(get_current_user)):
 #         ],
 #         message="Users list fetched.",
 #     )
+@router.post("/check-email")
+@limiter.limit("20/minute")
+async def check_email(
+    request: Request,
+    payload: CheckEmailRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    email = payload.email.lower().strip()
+    user = await auth_service.user_repo.get_by_email(email)
+    exists = user is not None
+    has_password = bool(user and user.password_hash and user.password_hash.startswith("$"))
+    return success_response(
+        data={"exists": exists, "has_password": has_password},
+        message="Email status checked.",
+    )
+
+
 @router.post("/email-otp/send")
 @limiter.limit("5/minute")
 async def send_email_otp(

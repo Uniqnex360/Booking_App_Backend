@@ -118,3 +118,8 @@ class EmailOTPVerifyRequest(BaseModel):
     user_id: Optional[uuid.UUID] = None
     email: Optional[NormalizedEmail] = None
     otp_code: str = Field(..., min_length=6, max_length=6)
+
+
+class CheckEmailRequest(BaseModel):
+    email: NormalizedEmail
+
