@@ -581,6 +581,8 @@ class BookingService:
             raise ValidationError("Repository session is required for provider operations")
 
         import importlib
+        from app.movie.models import Showtime as ShowtimeModel
+        
         movie_models = importlib.import_module("app.movie.models")
         MovieModel = getattr(movie_models, "Movie")
         MovieStatusEnum = getattr(movie_models, "MovieStatus")
