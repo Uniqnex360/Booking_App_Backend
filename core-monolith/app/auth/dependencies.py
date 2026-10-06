@@ -101,8 +101,10 @@ async def get_current_user_optional(
     except Exception:
         return None
     user = await user_repo.get_by_id(user_id)
-    if user is None or not user.is_active:
+    if user is None:
         return None
+    if not user.is_active:
+        raise InvalidTokenError("Account is inactive or blocked")
     return user
 
 async def get_current_user(

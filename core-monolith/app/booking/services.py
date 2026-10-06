@@ -331,11 +331,26 @@ class BookingService:
         SeatModel = getattr(movie_models, "Seat")
         SeatStateModel = getattr(movie_models, "SeatState")
 
-        st_stmt = select(ShowtimeModel).where(ShowtimeModel.id == showtime_id)
+        MovieModel = getattr(movie_models, "Movie")
+        MovieStatusEnum = getattr(movie_models, "MovieStatus")
+        ShowtimeStatusEnum = getattr(movie_models, "ShowtimeStatus")
+
+        st_stmt = (
+            select(ShowtimeModel, MovieModel)
+            .join(MovieModel, ShowtimeModel.movie_id == MovieModel.id)
+            .where(ShowtimeModel.id == showtime_id)
+        )
         st_res = await self.session.execute(st_stmt)
-        showtime = st_res.scalar_one_or_none()
-        if not showtime:
+        st_row = st_res.first()
+        if not st_row:
             raise ShowtimeNotFoundError(f"Showtime '{showtime_id}' not found")
+        showtime, movie = st_row
+
+        if movie.status != MovieStatusEnum.PUBLISHED.value:
+            raise ValidationError(f"Movie is not available for booking (status: {movie.status})")
+
+        if showtime.status != ShowtimeStatusEnum.ACTIVE.value:
+            raise ValidationError(f"Showtime is not ACTIVE (status: {showtime.status})")
 
         if showtime.provider_id is not None:
             raise ValidationError("Showtime is provider-backed. Use provider hold instead.")
@@ -567,13 +582,26 @@ class BookingService:
 
         import importlib
         movie_models = importlib.import_module("app.movie.models")
-        ShowtimeModel = getattr(movie_models, "Showtime")
+        MovieModel = getattr(movie_models, "Movie")
+        MovieStatusEnum = getattr(movie_models, "MovieStatus")
+        ShowtimeStatusEnum = getattr(movie_models, "ShowtimeStatus")
 
-        stmt = select(ShowtimeModel).where(ShowtimeModel.id == showtime_id)
+        stmt = (
+            select(ShowtimeModel, MovieModel)
+            .join(MovieModel, ShowtimeModel.movie_id == MovieModel.id)
+            .where(ShowtimeModel.id == showtime_id)
+        )
         res = await self.session.execute(stmt)
-        st = res.scalar_one_or_none()
-        if not st:
+        row = res.first()
+        if not row:
             raise ShowtimeNotFoundError(f"Showtime '{showtime_id}' not found")
+        st, movie = row
+
+        if movie.status != MovieStatusEnum.PUBLISHED.value:
+            raise ValidationError(f"Movie is not available for booking (status: {movie.status})")
+
+        if st.status != ShowtimeStatusEnum.ACTIVE.value:
+            raise ValidationError(f"Showtime is not ACTIVE (status: {st.status})")
 
         if not st.provider_id:
             raise ShowtimeNotProviderError("Showtime is not provider-backed")

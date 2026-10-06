@@ -73,7 +73,9 @@ class MovieBookingService:
         if showtime.provider_id is not None:
             raise ValidationError("Showtime is provider-backed. Use /v1/bookings/hold instead.")
 
-        
+        if movie.status != MovieStatus.PUBLISHED.value:
+            raise ValidationError(f"Movie is not available for booking (status: {movie.status})")
+
         if showtime.status != ShowtimeStatus.ACTIVE.value:
             raise ValidationError("Showtime is not ACTIVE")
 

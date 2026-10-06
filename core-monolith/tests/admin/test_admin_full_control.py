@@ -255,3 +255,88 @@ async def test_admin_users_list_and_block_unblock(session: AsyncSession):
         assert self_block_res.status_code == 400
 
     app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_booking_rejected_when_movie_restricted_or_user_blocked(session: AsyncSession):
+    app.dependency_overrides[get_db] = lambda: session
+
+    # 1. Setup Admin, User, Partner, Movie, Venue, Screen, Showtime, Seat
+    from app.partner.models import PartnerORM
+    admin = UserORM(id=uuid.uuid4(), full_name="Admin", email=f"adm_{uuid.uuid4().hex[:6]}@t.com", password_hash="h", role="ADMIN")
+    user = UserORM(id=uuid.uuid4(), full_name="Customer", email=f"c_{uuid.uuid4().hex[:6]}@t.com", password_hash="h", role="USER", is_active=True)
+    partner = PartnerORM(
+        id=uuid.uuid4(), user_id=admin.id, business_name="Cinema Co",
+        partner_type="event_organiser", contact_name="Admin",
+        contact_phone="9999999999", city="Kochi", status="APPROVED",
+    )
+    session.add_all([admin, user, partner])
+    await session.commit()
+
+    from app.movie.models import Movie, Venue, Screen, ScreenRow, Seat, Showtime
+    movie = Movie(
+        id=uuid.uuid4(),
+        title="Restricted Movie",
+        partner_id=partner.id,
+        status="DRAFT", # Admin restricted / not published
+        language="English",
+        certificate="UA",
+        duration_min=120,
+    )
+    venue = Venue(id=uuid.uuid4(), name="Central Cinema", city="Kochi", partner_id=partner.id)
+    screen = Screen(id=uuid.uuid4(), venue_id=venue.id, name="Screen 1", total_seats=1)
+    row = ScreenRow(id=uuid.uuid4(), screen_id=screen.id, label="A", section="STALLS", seat_count=1, price_paise=20000)
+    seat = Seat(id=uuid.uuid4(), row_id=row.id, number=1, code="A1", x=1)
+    showtime = Showtime(
+        id=uuid.uuid4(),
+        movie_id=movie.id,
+        screen_id=screen.id,
+        partner_id=partner.id,
+        starts_at=datetime.utcnow() + timedelta(days=2),
+        status="ACTIVE",
+    )
+    session.add_all([movie, venue, screen, row, seat, showtime])
+    await session.commit()
+
+    user_token = _token_for(user.id, role="USER")
+    admin_token = _token_for(admin.id, role="ADMIN")
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # A. Attempting to hold seats on a DRAFT/restricted movie is rejected with 409/400
+        hold_res = await client.post(
+            "/v1/bookings/seat-hold",
+            json={"showtime_id": str(showtime.id), "seat_ids": [str(seat.id)]},
+            headers={"Authorization": f"Bearer {user_token}", "Idempotency-Key": str(uuid.uuid4())},
+        )
+        assert hold_res.status_code in (400, 409)
+        assert "Movie is not available for booking" in hold_res.text
+
+        # B. Admin publishes movie -> Hold now succeeds
+        await client.patch(
+            f"/v1/admin/movies/{movie.id}/status",
+            json={"status": "PUBLISHED"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        hold_res2 = await client.post(
+            "/v1/bookings/seat-hold",
+            json={"showtime_id": str(showtime.id), "seat_ids": [str(seat.id)]},
+            headers={"Authorization": f"Bearer {user_token}", "Idempotency-Key": str(uuid.uuid4())},
+        )
+        assert hold_res2.status_code == 201
+
+        # C. Admin blocks the user -> Any subsequent booking API call is rejected 401
+        await client.patch(
+            f"/v1/admin/users/{user.id}/status",
+            json={"is_active": False},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+
+        blocked_res = await client.post(
+            "/v1/bookings/seat-hold",
+            json={"showtime_id": str(showtime.id), "seat_ids": [str(seat.id)]},
+            headers={"Authorization": f"Bearer {user_token}", "Idempotency-Key": str(uuid.uuid4())},
+        )
+        assert blocked_res.status_code == 401
+
+    app.dependency_overrides.clear()
+

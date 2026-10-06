@@ -432,6 +432,7 @@ class MovieRepository:
             banner_url=movie.banner_url,
             genre=movie.genre,
             status=movie.status,
+            trailer_url=movie.trailer_url,
         )
     
     async def update_movie(
@@ -460,6 +461,7 @@ class MovieRepository:
             banner_url=movie.banner_url,
             genre=movie.genre,
             status=movie.status,
+            trailer_url=movie.trailer_url,
         )
     async def update_movie_status(
         self, movie_id: UUID, new_status: str

@@ -86,6 +86,9 @@ class SoldOutError(DomainError):
 class EventNotBookableError(DomainError):
     def __init__(self) -> None:
         super().__init__("Event is not in a bookable state (must be PUBLISHED)")
+class MovieNotBookableError(DomainError):
+    def __init__(self, message: str = "Movie is not in a bookable state (must be PUBLISHED)") -> None:
+        super().__init__(message)
 class EventConcludedError(DomainError):
     def __init__(self, message: str = "This event has already ended") -> None:
         super().__init__(message)
