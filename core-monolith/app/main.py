@@ -58,6 +58,8 @@ async def invalid_creds_exception_handler(request: Request, exc: InvalidCredenti
 @app.exception_handler(BookingNotFoundError)
 async def booking_not_found_exception_handler(request: Request, exc: BookingNotFoundError):
     return JSONResponse(status_code=404, content={"error": "BOOKING_NOT_FOUND", "message": "Booking not found"})
+from app.shared.exceptions import ForbiddenError, UnauthorizedError, EntityNotFoundError
+
 @app.exception_handler(InvalidTokenError)
 async def invalid_token_exception_handler(request: Request, exc: InvalidTokenError):
     return JSONResponse(status_code=401, content={"detail": str(exc.detail)})
@@ -65,6 +67,19 @@ async def invalid_token_exception_handler(request: Request, exc: InvalidTokenErr
 @app.exception_handler(TokenReuseError)
 async def token_reuse_exception_handler(request: Request, exc: TokenReuseError):
     return JSONResponse(status_code=401, content={"detail": str(exc.detail)})
+
+@app.exception_handler(ForbiddenError)
+async def forbidden_exception_handler(request: Request, exc: ForbiddenError):
+    return JSONResponse(status_code=403, content={"detail": exc.message})
+
+@app.exception_handler(UnauthorizedError)
+async def unauthorized_exception_handler(request: Request, exc: UnauthorizedError):
+    return JSONResponse(status_code=401, content={"detail": exc.message})
+
+@app.exception_handler(EntityNotFoundError)
+async def not_found_exception_handler(request: Request, exc: EntityNotFoundError):
+    return JSONResponse(status_code=404, content={"detail": exc.message})
+
 
 app.include_router(auth_router, prefix="/v1")
 app.include_router(user_router, prefix="/v1")

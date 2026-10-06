@@ -5,7 +5,7 @@ from app.shared.timeutil import utcnow
 from uuid import UUID
 from zoneinfo import ZoneInfo
 from app.movie.tmdb_client import search_and_get_rating
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 import logging
 logger = logging.getLogger(__name__)
@@ -126,6 +126,62 @@ class MovieRepository:
                 rating_count=m.rating_count,
                 trailer_url=m.trailer_url,  
                 synopsis=m.synopsis, 
+                status=m.status,
+            )
+            for m in movies
+        ]
+        return dtos, total
+
+    async def list_movies_admin(
+        self,
+        *,
+        status: str | None = None,
+        search: str | None = None,
+        page: int = 1,
+        limit: int = 20,
+    ) -> tuple[list[MovieSummaryDTO], int]:
+        filters = []
+        if status:
+            filters.append(Movie.status == status)
+        if search:
+            term = f"%{search.strip()}%"
+            filters.append(
+                or_(
+                    Movie.title.ilike(term),
+                    Movie.original_title.ilike(term),
+                    Movie.genre.ilike(term),
+                    Movie.language.ilike(term),
+                )
+            )
+
+        base_stmt = select(Movie)
+        if filters:
+            base_stmt = base_stmt.where(and_(*filters))
+
+        count_stmt = select(func.count()).select_from(base_stmt.subquery())
+        total = (await self._session.execute(count_stmt)).scalar() or 0
+
+        offset = (page - 1) * limit
+        stmt = base_stmt.order_by(Movie.created_at.desc()).offset(offset).limit(limit)
+        result = await self._session.execute(stmt)
+        movies = result.scalars().all()
+        dtos = [
+            MovieSummaryDTO(
+                id=m.id,
+                title=m.title,
+                genre=m.genre,
+                original_title=m.original_title,
+                language=m.language,
+                duration_min=m.duration_min,
+                certificate=m.certificate,
+                release_date=m.release_date,
+                poster_url=m.poster_url,
+                banner_url=m.banner_url,
+                rating=float(m.rating) if m.rating is not None else None,
+                external_rating=float(m.external_rating) if m.external_rating is not None else None,
+                rating_count=m.rating_count,
+                trailer_url=m.trailer_url,
+                synopsis=m.synopsis,
                 status=m.status,
             )
             for m in movies
@@ -426,6 +482,7 @@ class MovieRepository:
             release_date=movie.release_date,
             poster_url=movie.poster_url,
             banner_url=movie.banner_url,
+            trailer_url=movie.trailer_url,
             status=movie.status,
         )
     async def create_screen(

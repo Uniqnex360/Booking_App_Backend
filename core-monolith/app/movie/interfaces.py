@@ -157,7 +157,16 @@ class IMovieRepository(Protocol):
         page: int = 1,
         limit: int = 20,
     ) -> tuple[list[MovieSummaryDTO], int]: ...
+    async def list_movies_admin(
+        self,
+        *,
+        status: str | None = None,
+        search: str | None = None,
+        page: int = 1,
+        limit: int = 20,
+    ) -> tuple[list[MovieSummaryDTO], int]: ...
     async def get_movie_details(self, movie_id: UUID) -> MovieDetailsDTO | None: ...
+
     async def get_seat_map(self, showtime_id: UUID) -> SeatMapDTO | None: ...
     async def get_showtime_availability(
         self, showtime_id: UUID

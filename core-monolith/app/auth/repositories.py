@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 import uuid
 
-from sqlalchemy import select, and_, update, func, delete
+from sqlalchemy import select, and_, or_, update, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
@@ -186,6 +186,82 @@ class SQLAlchemyUserRepository(IUserRepository):
             await self.db.rollback()
             import logging
             logging.warning(f"Failed to update last_login for {user_id}: {e}")
+
+    async def list_users(
+        self,
+        search: Optional[str] = None,
+        role: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        page: int = 1,
+        limit: int = 20,
+    ) -> tuple[List[UserDomain], int]:
+        try:
+            filters = []
+            if search:
+                term = f"%{search.strip()}%"
+                filters.append(
+                    or_(
+                        UserORM.full_name.ilike(term),
+                        UserORM.email.ilike(term),
+                        UserORM.phone.ilike(term),
+                    )
+                )
+            if role:
+                filters.append(UserORM.role == role)
+            if is_active is not None:
+                filters.append(UserORM.is_active == is_active)
+
+            base_stmt = select(UserORM)
+            if filters:
+                base_stmt = base_stmt.where(and_(*filters))
+
+            count_stmt = select(func.count()).select_from(base_stmt.subquery())
+            total = (await self.db.execute(count_stmt)).scalar() or 0
+
+            offset = (page - 1) * limit
+            query = base_stmt.order_by(UserORM.created_at.desc()).offset(offset).limit(limit)
+            result = await self.db.execute(query)
+            users = [self._to_domain(u) for u in result.scalars().all()]
+            return [u for u in users if u is not None], total
+        except SQLAlchemyError as e:
+            raise RepositoryError(f"Database error listing users: {e}")
+
+    async def set_user_active_status(
+        self, user_id: uuid.UUID, is_active: bool
+    ) -> UserDomain:
+        try:
+            result = await self.db.execute(
+                select(UserORM).where(UserORM.id == user_id)
+            )
+            orm_user = result.scalar_one_or_none()
+            if not orm_user:
+                raise NotFoundError(f"User {user_id} not found")
+            orm_user.is_active = is_active
+            await self.db.commit()
+            await self.db.refresh(orm_user)
+            return self._to_domain(orm_user)
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            raise RepositoryError(f"Database error setting user active status: {e}")
+
+    async def set_user_role(
+        self, user_id: uuid.UUID, role: str
+    ) -> UserDomain:
+        try:
+            result = await self.db.execute(
+                select(UserORM).where(UserORM.id == user_id)
+            )
+            orm_user = result.scalar_one_or_none()
+            if not orm_user:
+                raise NotFoundError(f"User {user_id} not found")
+            orm_user.role = role
+            await self.db.commit()
+            await self.db.refresh(orm_user)
+            return self._to_domain(orm_user)
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            raise RepositoryError(f"Database error setting user role: {e}")
+
 
 
 class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):

@@ -42,6 +42,20 @@ class MovieService:
             page=page,
             limit=limit,
         )
+    async def list_movies_admin(
+        self,
+        *,
+        status: str | None = None,
+        search: str | None = None,
+        page: int = 1,
+        limit: int = 20,
+    ) -> tuple[list[MovieSummaryDTO], int]:
+        return await self._repo.list_movies_admin(
+            status=status,
+            search=search,
+            page=page,
+            limit=limit,
+        )
     async def get_movie_details(self, movie_id: UUID) -> MovieDetailsDTO:
         movie = await self._repo.get_movie_details(movie_id)
         if movie is None:

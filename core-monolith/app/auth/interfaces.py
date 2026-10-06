@@ -71,6 +71,21 @@ class IUserRepository(Protocol):
     async def create(self, user: User) -> User: ...
     async def update(self, user: User) -> User: ...
     async def update_last_login(self, user_id: uuid.UUID) -> None: ...
+    async def list_users(
+        self,
+        search: Optional[str] = None,
+        role: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        page: int = 1,
+        limit: int = 20,
+    ) -> tuple[List[User], int]: ...
+    async def set_user_active_status(
+        self, user_id: uuid.UUID, is_active: bool
+    ) -> User: ...
+    async def set_user_role(
+        self, user_id: uuid.UUID, role: str
+    ) -> User: ...
+
 
 
 class IRefreshTokenRepository(Protocol):

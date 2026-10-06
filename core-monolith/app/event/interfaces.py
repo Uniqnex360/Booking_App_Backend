@@ -112,6 +112,14 @@ class IEventRepository(Protocol):
         page: int, 
         limit: int
     ) -> Tuple[List[Event], int]: ...
+    async def list_all_admin(
+        self,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        page: int = 1,
+        limit: int = 20,
+    ) -> Tuple[List[Event], int]: ...
+
 class ITicketCategoryRepository(Protocol):
     async def create(self, category: TicketCategory) -> TicketCategory: ...
     async def get_by_id(self, category_id: uuid.UUID) -> Optional[TicketCategory]: ...

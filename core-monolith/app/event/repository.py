@@ -44,12 +44,18 @@ class SQLAlchemyEventRepository(IEventRepository):
         def _g(name, default):
             return default if name in unloaded else (getattr(orm, name) or default)
 
+        cat_val = orm.category.lower() if orm.category else "other"
+        try:
+            event_cat = EventCategory(cat_val)
+        except Exception:
+            event_cat = EventCategory.OTHER
+
         return Event(
             id=_u(orm.id),
             partner_id=_u(orm.partner_id),
             title=orm.title,
             slug=orm.slug,
-            category=EventCategory(orm.category),
+            category=event_cat,
             venue_name=orm.venue_name,
             venue_address=orm.venue_address,
             latitude=orm.latitude,
@@ -204,12 +210,22 @@ class SQLAlchemyEventRepository(IEventRepository):
         result = await self.db.execute(stmt)
         return [self._to_domain(orm) for orm in result.scalars().all()], total
     async def update(self, event: Event) -> Event:
-        orm = await self.db.get(EventORM, str(event.id))
+        eid = event.id if isinstance(event.id, uuid.UUID) else uuid.UUID(str(event.id))
+        stmt = select(EventORM).where(EventORM.id == eid)
+        res = await self.db.execute(stmt)
+        orm = res.scalar_one_or_none()
+        if not orm:
+            raise RepositoryError(f"Event {event.id} not found for update")
+
         for key, value in event.__dict__.items():
             if key != 'ticket_categories' and hasattr(orm, key):
-                setattr(orm, key, value if not isinstance(value, uuid.UUID) else str(value))
+                if hasattr(value, "value"):
+                    setattr(orm, key, value.value)
+                else:
+                    setattr(orm, key, value)
         await self.db.commit()
         return await self.get_by_id(event.id)
+
     async def list_by_status(
         self, 
         status: EventStatus, 
@@ -226,6 +242,39 @@ class SQLAlchemyEventRepository(IEventRepository):
             .order_by(EventORM.created_at.desc())
         result = await self.db.execute(stmt)
         return [self._to_domain(orm) for orm in result.scalars().all()], total
+
+    async def list_all_admin(
+        self,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        page: int = 1,
+        limit: int = 20,
+    ) -> Tuple[List[Event], int]:
+        filters = []
+        if status:
+            filters.append(EventORM.status == status)
+        if search:
+            term = f"%{search.strip()}%"
+            filters.append(
+                or_(
+                    EventORM.title.ilike(term),
+                    EventORM.city.ilike(term),
+                    EventORM.venue_name.ilike(term),
+                    EventORM.category.ilike(term),
+                )
+            )
+
+        stmt = select(EventORM).options(selectinload(EventORM.ticket_categories))
+        if filters:
+            stmt = stmt.where(and_(*filters))
+
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await self.db.execute(count_stmt)).scalar() or 0
+
+        stmt = stmt.offset((page - 1) * limit).limit(limit).order_by(EventORM.created_at.desc())
+        result = await self.db.execute(stmt)
+        return [self._to_domain(orm) for orm in result.scalars().all()], total
+
     async def delete(self, event_id: uuid.UUID) -> None:
         orm = await self.db.get(EventORM, str(event_id))
         if orm:
