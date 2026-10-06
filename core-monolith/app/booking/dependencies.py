@@ -15,6 +15,7 @@ from app.booking.repository import BookingRepository, TierCounterRepository
 from app.booking.services import BookingService
 from app.core.database import get_db
 from app.shared.timeutil import utcnow
+from app.booking.interfaces import BookingStatus
 
 
 async def get_booking_service(
@@ -50,7 +51,8 @@ async def resolve_actor(
     booking = await booking_service.get_booking_for_actor(booking_id)
     if booking is None:
         raise BookingNotFoundError()
-
+    if booking.status == BookingStatus.CONFIRMED:
+        return booking
     if booking.user_id is not None:
         if current_user is not None and current_user.id == booking.user_id:
             return booking
