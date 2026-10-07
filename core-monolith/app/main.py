@@ -80,6 +80,27 @@ async def unauthorized_exception_handler(request: Request, exc: UnauthorizedErro
 async def not_found_exception_handler(request: Request, exc: EntityNotFoundError):
     return JSONResponse(status_code=404, content={"detail": exc.message})
 
+from app.auth.interfaces import ValidationError as AuthValidationError
+from app.booking.interfaces import ValidationError as BookingValidationError
+from app.event.exceptions import EventLockedError
+from app.partner.interfaces import PartnerNotApprovedError
+
+@app.exception_handler(AuthValidationError)
+async def auth_validation_exception_handler(request: Request, exc: AuthValidationError):
+    return JSONResponse(status_code=400, content={"error": "VALIDATION_ERROR", "detail": str(exc), "message": str(exc)})
+
+@app.exception_handler(BookingValidationError)
+async def booking_validation_exception_handler(request: Request, exc: BookingValidationError):
+    return JSONResponse(status_code=400, content={"error": "VALIDATION_ERROR", "detail": str(exc), "message": str(exc)})
+
+@app.exception_handler(EventLockedError)
+async def event_locked_exception_handler(request: Request, exc: EventLockedError):
+    return JSONResponse(status_code=400, content={"error": "EVENT_LOCKED", "detail": str(exc), "message": str(exc)})
+
+@app.exception_handler(PartnerNotApprovedError)
+async def partner_not_approved_exception_handler(request: Request, exc: PartnerNotApprovedError):
+    return JSONResponse(status_code=403, content={"error": "PARTNER_NOT_APPROVED", "detail": str(exc), "message": str(exc)})
+
 
 app.include_router(auth_router, prefix="/v1")
 app.include_router(user_router, prefix="/v1")
