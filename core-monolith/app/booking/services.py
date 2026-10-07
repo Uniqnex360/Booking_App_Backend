@@ -236,6 +236,7 @@ class BookingService:
             context["fnb_lines"] = await fnb_repo.list_for_booking(booking_id)
             return MovieBookingDetail.from_context(booking, context)    
         if kind == "EVENT":
+            tier = context.get("tier")
             if self.session:
                 from app.coupon.models import CouponRedemptionORM, CouponORM
                 red_stmt = (
@@ -246,15 +247,25 @@ class BookingService:
                 red_row = (await self.session.execute(red_stmt)).first()
                 if red_row:
                     redemption, coupon = red_row
+                    raw_subtotal = (
+                        (tier.price_paise * (booking.quantity or 1))
+                        if (tier and tier.price_paise)
+                        else (booking.total_paise + redemption.discount_paise)
+                    )
                     context["discount_paise"] = redemption.discount_paise
                     context["coupon_code"] = coupon.code
-                    context["paid_paise"] = max(0, booking.total_paise - redemption.discount_paise)
-                    context["subtotal_paise"] = booking.total_paise
+                    context["subtotal_paise"] = raw_subtotal
+                    context["paid_paise"] = max(0, raw_subtotal - redemption.discount_paise)
                 else:
+                    raw_subtotal = (
+                        (tier.price_paise * (booking.quantity or 1))
+                        if (tier and tier.price_paise)
+                        else booking.total_paise
+                    )
                     context["discount_paise"] = 0
                     context["coupon_code"] = None
+                    context["subtotal_paise"] = raw_subtotal
                     context["paid_paise"] = booking.total_paise
-                    context["subtotal_paise"] = booking.total_paise
 
             return EventBookingDetail.from_context(booking, context)
 
