@@ -2,8 +2,7 @@ import uuid
 from typing import Optional, List, Tuple
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-from datetime import date
+from datetime import date, datetime, timezone, timedelta
 from sqlalchemy.orm import selectinload, defer
 from app.event.interfaces import (
     IEventRepository, ITicketCategoryRepository, 
@@ -82,6 +81,10 @@ class SQLAlchemyEventRepository(IEventRepository):
             is_new_year_party=orm.is_new_year_party,
             language=orm.language,
             tags=list(orm.tags or []),
+            cuisine=list(getattr(orm, "cuisine", []) or []),
+            price_range=getattr(orm, "price_range", None),
+            what_included=getattr(orm, "what_included", None),
+            min_price_paise=min([cat.price_paise for cat in categories if cat.price_paise is not None]) if categories else None,
             status=EventStatus(orm.status),
             ticket_categories=categories,
             published_at=orm.published_at,
@@ -96,7 +99,7 @@ class SQLAlchemyEventRepository(IEventRepository):
                 partner_id=str(event.partner_id),
                 title=event.title,
                 slug=event.slug,
-                category=event.category.value,
+                category=event.category.value if hasattr(event.category, "value") else str(event.category),
                 venue_name=event.venue_name,
                 venue_address=event.venue_address,
                 latitude=event.latitude,
@@ -114,7 +117,7 @@ class SQLAlchemyEventRepository(IEventRepository):
                 poster_image_url=event.poster_image_url,  
                 is_online=event.is_online,
                 online_link=event.online_link,
-                status=event.status.value,
+                status=event.status.value if hasattr(event.status, "value") else str(event.status),
                 is_outdoor=event.is_outdoor,
                 is_fast_filling=event.is_fast_filling,
                 is_must_attend=event.is_must_attend,
@@ -122,6 +125,9 @@ class SQLAlchemyEventRepository(IEventRepository):
                 is_kids_allowed=event.is_kids_allowed,
                 language=event.language,
                 tags=event.tags or [],
+                cuisine=getattr(event, "cuisine", []) or [],
+                price_range=getattr(event, "price_range", None),
+                what_included=getattr(event, "what_included", None),
                 is_masterclass=event.is_masterclass,
                 is_new_year_party=event.is_new_year_party,
             )
@@ -173,16 +179,52 @@ class SQLAlchemyEventRepository(IEventRepository):
             }
             for r in rows
         ]
-    async def list_published(self, city: Optional[str], category: Optional[EventCategory], 
-                             date_from: Optional[date], date_to: Optional[date], 
-                             price_max_paise: Optional[int], page: int, limit: int) -> Tuple[List[Event], int]:
+    async def list_published(
+        self,
+        city: Optional[str] = None,
+        category: Optional[str] = None,
+        tags: Optional[str] = None,
+        price: Optional[str] = None,
+        date_filter: Optional[str] = None,
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+        price_max_paise: Optional[int] = None,
+        page: int = 1,
+        limit: int = 10,
+        **kwargs,
+    ) -> Tuple[List[Event], int]:
         filters = [EventORM.status == EventStatus.PUBLISHED.value]
-        if city: filters.append(EventORM.city == city)
-        if category: filters.append(EventORM.category == category.value)
-        
+        if city:
+            filters.append(func.lower(EventORM.city) == city.lower().strip())
+        if category:
+            cat_str = category.value.lower() if hasattr(category, "value") else str(category).lower().strip()
+            filters.append(func.lower(EventORM.category) == cat_str)
+        if tags:
+            tag_list = [t.strip().upper() for t in tags.split(",") if t.strip()]
+            if tag_list:
+                filters.append(EventORM.tags.overlap(tag_list))
+
+        if date_filter:
+            df = date_filter.lower().strip()
+            now_dt = datetime.now(timezone.utc)
+            today_d = now_dt.date()
+            if df == "today":
+                filters.append(func.date(EventORM.starts_at) == today_d)
+            elif df == "tomorrow":
+                filters.append(func.date(EventORM.starts_at) == today_d + timedelta(days=1))
+            elif df in ("this-weekend", "weekend"):
+                days_until_sat = (5 - today_d.weekday()) % 7
+                sat = today_d + timedelta(days=days_until_sat)
+                sun = sat + timedelta(days=1)
+                filters.append(func.date(EventORM.starts_at).in_([sat, sun]))
+
+        if date_from:
+            filters.append(func.date(EventORM.starts_at) >= date_from)
+        if date_to:
+            filters.append(func.date(EventORM.starts_at) <= date_to)
+
         stmt = (
             select(EventORM)
-            .where(and_(*filters))
             .options(
                 selectinload(EventORM.ticket_categories),
                 defer(EventORM.layout_image_url),
@@ -190,10 +232,38 @@ class SQLAlchemyEventRepository(IEventRepository):
                 defer(EventORM.artists),
             )
         )
-        
-        count_stmt = select(func.count()).select_from(stmt.subquery())
+
+        min_price_subq = (
+            select(
+                TicketCategoryORM.event_id,
+                func.min(TicketCategoryORM.price_paise).label("min_price"),
+            )
+            .where(TicketCategoryORM.is_active == True)
+            .group_by(TicketCategoryORM.event_id)
+            .subquery()
+        )
+
+        if price:
+            stmt = stmt.join(min_price_subq, EventORM.id == min_price_subq.c.event_id)
+            pr = price.lower().strip()
+            if pr == "free":
+                filters.append(min_price_subq.c.min_price == 0)
+            elif pr in ("0-500", "under-500"):
+                filters.append(min_price_subq.c.min_price <= 50000)
+            elif pr in ("500-2000", "501-2000"):
+                filters.append(and_(min_price_subq.c.min_price >= 50000, min_price_subq.c.min_price <= 200000))
+            elif pr in ("2000+", "above-2000", "2000-above"):
+                filters.append(min_price_subq.c.min_price >= 200000)
+        elif price_max_paise:
+            stmt = stmt.join(min_price_subq, EventORM.id == min_price_subq.c.event_id)
+            filters.append(min_price_subq.c.min_price <= price_max_paise)
+
+        stmt = stmt.where(and_(*filters))
+
+        subq = stmt.subquery()
+        count_stmt = select(func.count(func.distinct(subq.c.id))).select_from(subq)
         total = (await self.db.execute(count_stmt)).scalar() or 0
-        
+
         stmt = stmt.offset((page - 1) * limit).limit(limit).order_by(EventORM.starts_at.asc())
         result = await self.db.execute(stmt)
         return [self._to_domain(orm) for orm in result.scalars().all()], total

@@ -51,6 +51,9 @@ class EventUpdateRequest(_PosterUrlMixin):
     is_new_year_party: Optional[bool] = None
     language: Optional[str] = None
     tags: List[str] = []
+    cuisine: Optional[List[str]] = None
+    price_range: Optional[int] = None
+    what_included: Optional[str] = None
 
 
 class EventCreateRequest(_PosterUrlMixin):
@@ -83,6 +86,9 @@ class EventCreateRequest(_PosterUrlMixin):
     is_new_year_party: bool = False
     language: Optional[str] = None
     tags: List[str] = []
+    cuisine: Optional[List[str]] = Field(default_factory=list)
+    price_range: Optional[int] = Field(None, ge=1, le=4)
+    what_included: Optional[str] = None
 
 class EventStatusUpdateRequest(BaseModel):
     status: EventStatus
@@ -116,6 +122,10 @@ class EventResponse(BaseModel):
     language: Optional[str] = None
     tags: List[str] = []
     is_new_year_party: bool = False
+    cuisine: Optional[List[str]] = None
+    price_range: Optional[int] = None
+    what_included: Optional[str] = None
+    min_price_paise: Optional[int] = None
 
     class Config:
         from_attributes = True

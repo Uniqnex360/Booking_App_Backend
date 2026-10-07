@@ -26,7 +26,20 @@ class EventCategory(str, enum.Enum):
     WORKSHOP = "workshop"
     THEATRE = "theatre"
     EXHIBITION = "exhibition"
+    DINING = "dining"
     OTHER = "other"
+
+DINING_TAGS = [
+    "FINE_DINING",
+    "SUNDAY_BRUNCH",
+    "STREET_FOOD",
+    "BUFFET",
+    "POOLSIDE",
+    "ROOFTOP",
+    "OUTDOOR_SEATING",
+    "LIVE_MUSIC",
+    "KIDS_ALLOWED",
+]
 
 class CancellationPolicy(str, enum.Enum):
     NONE = "NONE"
@@ -95,6 +108,10 @@ class Event:
     is_new_year_party: bool = False
     language: Optional[str] = None
     tags: List[str] = field(default_factory=list)
+    cuisine: List[str] = field(default_factory=list)
+    price_range: Optional[int] = None
+    what_included: Optional[str] = None
+    min_price_paise: Optional[int] = None
     
     ticket_categories: List[TicketCategory] = field(default_factory=list)
 
@@ -103,7 +120,7 @@ class IEventRepository(Protocol):
     async def get_by_id(self, event_id: uuid.UUID) -> Optional[Event]: ...
     async def get_by_slug(self, slug: str) -> Optional[Event]: ...
     async def list_for_partner(self, partner_id: uuid.UUID, status: Optional[EventStatus], page: int, limit: int) -> Tuple[List[Event], int]: ...
-    async def list_published(self, city: Optional[str], category: Optional[EventCategory], date_from: Optional[date], date_to: Optional[date], price_max_paise: Optional[int], page: int, limit: int) -> Tuple[List[Event], int]: ...
+    async def list_published(self, city: Optional[str] = None, category: Optional[str] = None, date_from: Optional[date] = None, date_to: Optional[date] = None, price_max_paise: Optional[int] = None, page: int = 1, limit: int = 10, **kwargs) -> Tuple[List[Event], int]: ...
     async def update(self, event: Event) -> Event: ...
     async def delete(self, event_id: uuid.UUID) -> None: ...
     async def list_by_status(

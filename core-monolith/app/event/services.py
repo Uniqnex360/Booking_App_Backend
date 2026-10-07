@@ -87,6 +87,10 @@ class EventService:
             faqs=data.get('faqs') or [],
             terms_and_conditions=data.get('terms_and_conditions') or [],
             offline_promoter=data.get('offline_promoter'),
+            tags=list(data.get('tags') or []),
+            cuisine=list(data.get('cuisine') or []),
+            price_range=data.get('price_range'),
+            what_included=data.get('what_included'),
             status=EventStatus.PENDING_APPROVAL
         )
 
@@ -112,11 +116,14 @@ class EventService:
         return await self.event_repo.list_published(
             city=filters.get('city'),
             category=filters.get('category'),
+            tags=filters.get('tags'),
+            price=filters.get('price'),
+            date_filter=filters.get('date'),
             date_from=filters.get('date_from'),
             date_to=filters.get('date_to'),
             price_max_paise=filters.get('price_max_paise'),
             page=filters.get('page', 1),
-            limit=filters.get('limit', 10)
+            limit=filters.get('limit', 10),
         )
 
     async def list_for_partner(self, partner_id: uuid.UUID) -> List[Event]:

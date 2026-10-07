@@ -103,3 +103,18 @@ async def get_partner_revenue(
         raise PartnerNotFoundHTTP()
     except RepositoryError as e:
         raise PartnerRepositoryHTTP(str(e))
+
+
+from app.event.schemas import EventCreateRequest
+from app.event.dependencies import get_event_service
+from app.event.services import EventService
+from app.partner.dependencies import required_approved_partner
+
+@router.post('/events', status_code=201)
+async def create_partner_event(
+    data: EventCreateRequest,
+    partner = Depends(required_approved_partner),
+    service: EventService = Depends(get_event_service),
+):
+    event = await service.create_event(partner.id, data.model_dump())
+    return success_response(data=event, message="Event created as PENDING_APPROVAL", code=201)

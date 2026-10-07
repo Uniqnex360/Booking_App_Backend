@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
 
@@ -25,8 +26,8 @@ async def create_event(
     service: EventService = Depends(get_event_service)
 ):
     p_type = partner.partner_type.value if hasattr(partner.partner_type, "value") else str(partner.partner_type)
-    if p_type.lower() not in ("event_organiser", "event_organizer"):
-        raise ForbiddenError("Only event organisers can create events")
+    if p_type.lower() not in ("event_organiser", "event_organizer", "restaurant"):
+        raise ForbiddenError("Only event organisers and restaurant partners can create events")
     event = await service.create_event(partner.id, data.model_dump())
     return success_response(data=event, message="Event created as PENDING_APPROVAL", code=201)
 @router.get("/venues")
@@ -49,11 +50,26 @@ async def list_venues(
 async def list_events(
     city: Optional[str] = None,
     category: Optional[str] = None,
+    tags: Optional[str] = Query(None, description="Comma-separated tags (e.g. FINE_DINING,SUNDAY_BRUNCH)"),
+    price: Optional[str] = Query(None, description="free, 0-500, 500-2000, 2000+"),
+    date: Optional[str] = Query(None, description="today, tomorrow, this-weekend, range"),
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
     page: int = Query(1, ge=1),
     limit: int = Query(10, le=100),
     service: EventService = Depends(get_event_service)
 ):
-    events, total = await service.list_public(city=city, category=category, page=page, limit=limit)
+    events, total = await service.list_public(
+        city=city,
+        category=category,
+        tags=tags,
+        price=price,
+        date=date,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        limit=limit,
+    )
     return success_response(data={"items": events, "total": total})
 
 
