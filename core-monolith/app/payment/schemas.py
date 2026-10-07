@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 class CreateOrderRequest(BaseModel):
     booking_id: UUID
+    coupon_code: Optional[str] = None
 
 
 class CreateOrderResponse(BaseModel):

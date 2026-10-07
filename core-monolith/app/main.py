@@ -18,6 +18,7 @@ from app.booking.routes import router as booking_router
 from app.payment.routes import router as payment_router
 from app.review.routes import router as review_router
 from app.support.routes import router as support_router
+from app.coupon.routes import partner_coupon_router, checkout_coupon_router
 from app.booking.interfaces import BookingNotFoundError
 
 from slowapi.errors import RateLimitExceeded
@@ -112,6 +113,8 @@ app.include_router(movie_router, prefix="/v1")
 app.include_router(admin_router, prefix="/v1")
 app.include_router(review_router, prefix="/v1")
 app.include_router(support_router, prefix="/v1")
+app.include_router(partner_coupon_router)
+app.include_router(checkout_coupon_router)
 
 @app.get("/")
 async def root():

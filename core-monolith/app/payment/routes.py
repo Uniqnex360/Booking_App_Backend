@@ -46,7 +46,9 @@ async def create_order(
             payload.booking_id, x_hold_token, current_user, booking_service
         )
         data = await payment_service.create_payment_order(
-            user_id=booking.user_id, booking_id=booking.id
+            user_id=booking.user_id,
+            booking_id=booking.id,
+            coupon_code=payload.coupon_code,
         )
         return success_response(data=data, message="Payment order created successfully")
     except BookingNotFoundError:
@@ -61,6 +63,11 @@ async def create_order(
         return error_response("HOLD_TOO_SHORT", str(exc), status.HTTP_409_CONFLICT)
     except GatewayUnavailable as exc:
         return error_response("PAYMENT_GATEWAY_UNAVAILABLE", str(exc), status.HTTP_502_BAD_GATEWAY)
+    except Exception as exc:
+        if "Coupon" in exc.__class__.__name__ or hasattr(exc, "code"):
+            code = getattr(exc, "code", "COUPON_ERROR")
+            return error_response(code, str(exc), status.HTTP_400_BAD_REQUEST)
+        raise exc
 
 @router.post("/payments/verify", status_code=status.HTTP_200_OK)
 async def verify_payment(

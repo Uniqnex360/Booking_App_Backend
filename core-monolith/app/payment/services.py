@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -55,40 +56,71 @@ class PaymentService:
 
 
     async def create_payment_order(
-        self, user_id: UUID, booking_id: UUID
+        self, user_id: UUID, booking_id: UUID, coupon_code: Optional[str] = None
     ) -> dict[str, Any]:
         
         ctx = await self.booking_service.payment_context(booking_id)
         if not ctx:
             raise EntityNotFoundError("Booking not found")
 
-        
         if ctx["user_id"] != user_id:
             raise EntityNotFoundError("Booking not found")
-
-        
-        
 
         if ctx.get("showtime_id"):
             m_svc = self.movie_service
             try:
-                
                 st_dto = await m_svc.get_seat_map(ctx["showtime_id"])
             except Exception:
                 pass
 
-        
         if ctx["status"] != "HELD":
             raise BookingNotPayable(f"Booking in status '{ctx['status']}' is not payable")
 
-        
         if ctx["total_paise"] == 0:
             return {"status": "NOT_REQUIRED"}
 
-        
+        final_paise = ctx["total_paise"]
+        coupon_meta = None
+
+        if coupon_code and coupon_code.strip():
+            # Validate that this is an event/dining booking (not cinema)
+            if not ctx.get("tier_id"):
+                from app.coupon.interfaces import CouponError
+                raise CouponError("Coupons can only be applied to event bookings", code="NOT_APPLICABLE")
+
+            from app.event.models import TicketCategoryORM
+            tier_stmt = select(TicketCategoryORM).where(TicketCategoryORM.id == ctx["tier_id"])
+            tier_res = await self.session.execute(tier_stmt)
+            tier = tier_res.scalar_one_or_none()
+            if not tier:
+                from app.coupon.interfaces import CouponError
+                raise CouponError("Event ticket tier not found", code="NOT_APPLICABLE")
+
+            from app.coupon.repository import SQLAlchemyCouponRepository
+            from app.coupon.services import CouponService
+            c_repo = SQLAlchemyCouponRepository(self.session)
+            c_svc = CouponService(c_repo, self.session)
+
+            calc_res = await c_svc.validate_and_calculate_discount(
+                code=coupon_code,
+                event_id=tier.event_id,
+                cart_paise=ctx["total_paise"],
+                user_id=user_id,
+                for_update=True,
+            )
+            coupon = calc_res["coupon"]
+            discount_paise = calc_res["discount_paise"]
+            final_paise = calc_res["final_paise"]
+            coupon_meta = {
+                "coupon_id": str(coupon.id),
+                "coupon_code": coupon.code,
+                "discount_paise": discount_paise,
+                "user_id": str(user_id),
+            }
+
         existing_payment = await self.payment_repo.get_by_booking_id(booking_id)
         if existing_payment and existing_payment.status == PaymentStatus.CREATED.value:
-            if existing_payment.amount_paise == ctx["total_paise"]:
+            if existing_payment.amount_paise == final_paise:
                 hold_exp_str = ctx["held_until"].isoformat() if ctx.get("held_until") else None
                 return {
                     "order_id": existing_payment.order_id,
@@ -101,7 +133,6 @@ class PaymentService:
                 existing_payment.id, PaymentStatus.EXPIRED
             )
 
-        
         if ctx.get("held_until"):  
             now = utcnow()
             held_until = ctx["held_until"]  
@@ -111,20 +142,19 @@ class PaymentService:
             if rem_seconds < (PAYMENT_WINDOW_SECONDS + 60):
                 raise HoldTooShort("Remaining hold time is too short to initiate payment")
 
-        
         short_id = str(booking_id)[:8]
         order_id = await gateway_create_order(
-            amount_paise=ctx["total_paise"],
+            amount_paise=final_paise,
             currency=ctx.get("currency", "INR"),
             receipt=f"rcpt_{short_id}",
         )
 
-        
         payment = await self.payment_repo.create_payment(
             booking_id=booking_id,
             order_id=order_id,
-            amount_paise=ctx["total_paise"],
+            amount_paise=final_paise,
             currency=ctx.get("currency", "INR"),
+            raw_event=json.dumps(coupon_meta) if coupon_meta else None,
         )
         await self.session.commit()
 
@@ -187,6 +217,26 @@ class PaymentService:
             signature_verified=True,
         )
         await self.session.commit()
+
+        # Record coupon redemption if a coupon was used
+        if payment.raw_event:
+            try:
+                meta = json.loads(payment.raw_event)
+                if isinstance(meta, dict) and "coupon_id" in meta:
+                    from app.coupon.repository import SQLAlchemyCouponRepository
+                    c_repo = SQLAlchemyCouponRepository(self.session)
+                    cid = UUID(str(meta["coupon_id"]))
+                    uid = UUID(str(user_id)) if user_id else UUID(str(meta.get("user_id")))
+                    bid = UUID(str(booking_id))
+                    await c_repo.record_redemption(
+                        coupon_id=cid,
+                        user_id=uid,
+                        booking_id=bid,
+                        discount_paise=int(meta.get("discount_paise", 0)),
+                    )
+            except Exception as e:
+                logger.exception("Failed to record coupon redemption: %s", e)
+
         await self.booking_service.commit_booking(
             user_id=user_id,
             booking_id=booking_id,
@@ -243,6 +293,22 @@ class PaymentService:
                     payment_gateway_id=payment_id,
                     signature_verified=True,
                 )
+                if payment.raw_event:
+                    try:
+                        meta = json.loads(payment.raw_event)
+                        if isinstance(meta, dict) and "coupon_id" in meta:
+                            from app.coupon.repository import SQLAlchemyCouponRepository
+                            c_repo = SQLAlchemyCouponRepository(self.session)
+                            ctx_b = await self.booking_service.payment_context(payment.booking_id)
+                            u_id = ctx_b["user_id"] if ctx_b else uuid.UUID(meta.get("user_id"))
+                            await c_repo.record_redemption(
+                                coupon_id=uuid.UUID(meta["coupon_id"]),
+                                user_id=u_id,
+                                booking_id=payment.booking_id,
+                                discount_paise=meta.get("discount_paise", 0),
+                            )
+                    except Exception as e:
+                        logger.error("Failed to record webhook coupon redemption: %s", e)
                 await self.booking_service.mark_paid(payment.booking_id, payment_id)
                 await self.session.commit()
 

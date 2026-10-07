@@ -34,6 +34,7 @@ class PaymentRepository:
         amount_paise: int,
         currency: str = "INR",
         gateway: str = "RAZORPAY",
+        raw_event: Optional[str] = None,
     ) -> PaymentModel:
         now = utcnow()
         payment = PaymentModel(
@@ -45,6 +46,7 @@ class PaymentRepository:
             currency=currency,
             status=PaymentStatus.CREATED.value,
             signature_verified=False,
+            raw_event=raw_event,
             created_at=now,
             updated_at=now,
         )

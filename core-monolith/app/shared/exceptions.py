@@ -13,6 +13,9 @@ class ForbiddenError(DomainError):
 class UnauthorizedError(DomainError):
     pass
 
+class ValidationError(DomainError):
+    pass
+
 
 class RepositoryError(DomainError):
     pass
