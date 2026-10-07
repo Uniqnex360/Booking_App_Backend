@@ -236,6 +236,26 @@ class BookingService:
             context["fnb_lines"] = await fnb_repo.list_for_booking(booking_id)
             return MovieBookingDetail.from_context(booking, context)    
         if kind == "EVENT":
+            if self.session:
+                from app.coupon.models import CouponRedemptionORM, CouponORM
+                red_stmt = (
+                    select(CouponRedemptionORM, CouponORM)
+                    .join(CouponORM, CouponRedemptionORM.coupon_id == CouponORM.id)
+                    .where(CouponRedemptionORM.booking_id == booking_id)
+                )
+                red_row = (await self.session.execute(red_stmt)).first()
+                if red_row:
+                    redemption, coupon = red_row
+                    context["discount_paise"] = redemption.discount_paise
+                    context["coupon_code"] = coupon.code
+                    context["paid_paise"] = max(0, booking.total_paise - redemption.discount_paise)
+                    context["subtotal_paise"] = booking.total_paise
+                else:
+                    context["discount_paise"] = 0
+                    context["coupon_code"] = None
+                    context["paid_paise"] = booking.total_paise
+                    context["subtotal_paise"] = booking.total_paise
+
             return EventBookingDetail.from_context(booking, context)
 
         return BaseBookingDetail.from_domain(booking)
@@ -729,6 +749,14 @@ class BookingService:
             booking.id, BookingStatus.HELD, BookingStatus.CONFIRMED
         )
         if self.session:
+            if payment_row and payment_row.amount_paise != booking.total_paise:
+                from app.booking.models import BookingModel
+                from sqlalchemy import update as _upd
+                await self.session.execute(
+                    _upd(BookingModel)
+                    .where(BookingModel.id == booking.id)
+                    .values(total_paise=payment_row.amount_paise)
+                )
             await self.session.commit()
         if not ok:
             fresh = await self.booking_repo.get_by_id(booking.id)

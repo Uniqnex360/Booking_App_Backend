@@ -171,11 +171,23 @@ class EventBookingDetail(BaseBookingDetail):
     tier_name: str | None = None
     tier_price_paise: int | None = None
     quantity: int
+    subtotal_paise: int | None = None
+    discount_paise: int = 0
+    coupon_code: str | None = None
+    paid_paise: int | None = None
 
     @classmethod
     def from_context(cls, b, ctx) -> "EventBookingDetail":
         event, tier = ctx["event"], ctx["tier"]
         base = BaseBookingDetail.from_domain(b).model_dump()
+        discount_paise = ctx.get("discount_paise", 0)
+        coupon_code = ctx.get("coupon_code")
+        subtotal_paise = ctx.get("subtotal_paise", b.total_paise)
+        paid_paise = ctx.get("paid_paise", b.total_paise)
+
+        if discount_paise > 0:
+            base["total_paise"] = paid_paise
+
         return cls(
             **base,
             title=event.title,
@@ -190,6 +202,10 @@ class EventBookingDetail(BaseBookingDetail):
             tier_name=tier.name if tier else None,
             tier_price_paise=tier.price_paise if tier else None,
             quantity=b.quantity or 1,
+            subtotal_paise=subtotal_paise,
+            discount_paise=discount_paise,
+            coupon_code=coupon_code,
+            paid_paise=paid_paise,
         )
 
 
