@@ -512,8 +512,7 @@ async def test_10_payment_verified_records_redemption_and_increments_count(sessi
     token = _token_for(user.id, "USER")
 
     with patch("app.payment.services.gateway_verify_signature", return_value=True), \
-         patch("app.payment.services.gateway_fetch_payment", new_callable=AsyncMock) as mock_fetch, \
-         patch("app.booking.services.BookingService._verify_razorpay_payment", new_callable=AsyncMock):
+         patch("app.payment.services.gateway_fetch_payment", new_callable=AsyncMock) as mock_fetch:
         mock_fetch.return_value = {"id": "pay_test_999", "status": "captured"}
 
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:

@@ -710,7 +710,20 @@ class BookingService:
         if not payment_ref:
             raise ValidationError("payment_ref is required")
 
-        await self._verify_razorpay_payment(payment_ref, booking.total_paise)
+        expected_paise = booking.total_paise
+        payment_row = None
+        if self.session:
+            from app.payment.models import PaymentModel
+            from sqlalchemy import select as _sel
+            stmt = _sel(PaymentModel).where(
+                PaymentModel.booking_id == booking.id,
+            ).order_by(PaymentModel.created_at.desc())
+            payment_row = (await self.session.execute(stmt)).scalars().first()
+            if payment_row:
+                expected_paise = payment_row.amount_paise
+
+        if not (payment_row and payment_row.status == "CAPTURED" and payment_row.signature_verified):
+            await self._verify_razorpay_payment(payment_ref, expected_paise)
 
         ok = await self.booking_repo.update_status(
             booking.id, BookingStatus.HELD, BookingStatus.CONFIRMED
