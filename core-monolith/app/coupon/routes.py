@@ -197,3 +197,17 @@ async def remove_coupon(
 ):
     return success_response(data={"status": "ok"}, message="Coupon removed")
 
+
+@checkout_coupon_router.get("/available-coupons", status_code=status.HTTP_200_OK)
+async def list_available_coupons(
+    event_id: UUID,
+    current_user: Optional[AuthUserDomain] = Depends(get_current_user_optional),
+    service: CouponService = Depends(get_coupon_service),
+):
+    user_id = current_user.id if current_user else None
+    coupons = await service.list_available_coupons_for_event(event_id, user_id=user_id)
+    return success_response(
+        data=coupons,
+        message="Available coupons retrieved successfully",
+    )
+

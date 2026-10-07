@@ -545,3 +545,52 @@ async def test_10_payment_verified_records_redemption_and_increments_count(sessi
         )
         updated_coupon = updated_coupon_res.scalar_one()
         assert updated_coupon.used_count == 1
+
+
+@pytest.mark.asyncio
+async def test_11_customer_lists_available_coupons_for_event(session: AsyncSession):
+    app.dependency_overrides[get_db] = lambda: session
+    partner, _, event, _ = await _create_partner_and_event(session)
+
+    now = datetime.now(timezone.utc)
+    # 1. Active valid coupon for this event
+    c1 = CouponORM(
+        id=uuid.uuid4(),
+        code="SHOWME20",
+        partner_id=partner.id,
+        event_id=event.id,
+        discount_type="PERCENT",
+        discount_value=20,
+        min_order_paise=100000,
+        max_discount_paise=50000,
+        valid_from=now - timedelta(days=1),
+        valid_until=now + timedelta(days=10),
+        is_active=True,
+    )
+    # 2. Inactive coupon (should NOT be returned)
+    c2 = CouponORM(
+        id=uuid.uuid4(),
+        code="HIDDEN50",
+        partner_id=partner.id,
+        event_id=event.id,
+        discount_type="PERCENT",
+        discount_value=50,
+        min_order_paise=0,
+        valid_from=now - timedelta(days=1),
+        valid_until=now + timedelta(days=10),
+        is_active=False,
+    )
+    session.add(c1)
+    session.add(c2)
+    await session.commit()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        res = await ac.get(f"/v1/checkout/available-coupons?event_id={event.id}")
+        assert res.status_code == 200
+        coupons = res.json()["data"]
+        codes = [c["code"] for c in coupons]
+        assert "SHOWME20" in codes
+        assert "HIDDEN50" not in codes
+        item = next(c for c in coupons if c["code"] == "SHOWME20")
+        assert "20% OFF up to ₹500" in item["discount_label"]
+        assert "Min order ₹1,000" in item["min_order_label"]

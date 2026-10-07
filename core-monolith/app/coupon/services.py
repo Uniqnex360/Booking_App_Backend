@@ -185,3 +185,72 @@ class CouponService:
             "message": message,
         }
 
+    async def list_available_coupons_for_event(
+        self, event_id: UUID, user_id: Optional[UUID] = None
+    ) -> List[Dict[str, Any]]:
+        event_stmt = select(EventORM).where(EventORM.id == event_id)
+        res = await self.session.execute(event_stmt)
+        event = res.scalar_one_or_none()
+        if not event:
+            return []
+
+        now = datetime.now(timezone.utc)
+        stmt = (
+            select(CouponORM)
+            .where(
+                CouponORM.is_active.is_(True),
+                CouponORM.valid_from <= now,
+                CouponORM.valid_until >= now,
+                (
+                    (CouponORM.event_id == event.id)
+                    | (
+                        CouponORM.event_id.is_(None)
+                        & (CouponORM.partner_id == event.partner_id)
+                    )
+                ),
+            )
+            .order_by(CouponORM.created_at.desc())
+        )
+        coupons_res = await self.session.execute(stmt)
+        coupons = coupons_res.scalars().all()
+
+        available = []
+        for c in coupons:
+            # Check total usage limit
+            if c.total_usage_limit is not None and c.used_count >= c.total_usage_limit:
+                continue
+
+            # Check per-user limit if user_id is provided
+            if user_id:
+                u_count = await self.repo.count_user_redemptions(c.id, user_id)
+                if u_count >= c.per_user_limit:
+                    continue
+
+            # Generate description
+            if c.discount_type == "PERCENT":
+                cap_text = f" up to ₹{c.max_discount_paise // 100:,}" if c.max_discount_paise else ""
+                desc = f"{c.discount_value}% OFF{cap_text}"
+            else:
+                desc = f"Flat ₹{c.discount_value // 100:,} OFF"
+
+            min_order_text = (
+                f"Min order ₹{c.min_order_paise // 100:,}"
+                if c.min_order_paise > 0
+                else "No min order"
+            )
+
+            available.append({
+                "id": str(c.id),
+                "code": c.code,
+                "discount_type": c.discount_type,
+                "discount_value": c.discount_value,
+                "min_order_paise": c.min_order_paise,
+                "max_discount_paise": c.max_discount_paise,
+                "valid_until": c.valid_until.isoformat(),
+                "discount_label": desc,
+                "min_order_label": min_order_text,
+                "terms": f"{desc} · {min_order_text}",
+            })
+
+        return available
+
