@@ -69,6 +69,8 @@ class SeatMapResponse(BaseModel):
     format: str
     language: str
     rows: list[RowProjectionResponse]
+    first_row_distance_m: float | None = 4.0
+    row_pitch_m: float | None = 1.1
 class AvailabilityResponse(BaseModel):
     showtime_id: UUID
     total_seats: int

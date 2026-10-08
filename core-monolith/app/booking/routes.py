@@ -417,6 +417,16 @@ async def get_showtime_seat_map(
                 return False
             lo, hi = col_bounds.get(row, (num, num))
             return lo <= num <= hi
+        screen_obj = None
+        if booking_service.session and getattr(st, "screen_id", None):
+            from app.movie.models import Screen
+            sc_res = await booking_service.session.execute(select(Screen).where(Screen.id == st.screen_id))
+            screen_obj = sc_res.scalar_one_or_none()
+
+        first_row_dist = float(screen_obj.first_row_distance_m) if (screen_obj and screen_obj.first_row_distance_m is not None) else 4.0
+        is_couple = "couple" in (seat_map.screen_name or "").lower()
+        pitch_m = float(screen_obj.row_pitch_m) if (screen_obj and screen_obj.row_pitch_m is not None) else (1.4 if is_couple else 1.1)
+
         COUPLE_ROWS_TEST = {
             "40ccc205-49bc-43b8-baf7-6e817c852fa9": {"E", "F"},
         }
@@ -429,6 +439,8 @@ async def get_showtime_seat_map(
                 "cinema_name": seat_map.cinema_name,
                 "starts_at": seat_map.starts_at.isoformat(),
                 "fetched_at": seat_map.fetched_at.isoformat(),
+                "first_row_distance_m": first_row_dist,
+                "row_pitch_m": pitch_m,
                 "seats": [
                     {
                         "seat_ref": s.seat_ref,
