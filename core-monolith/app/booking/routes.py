@@ -103,12 +103,69 @@ async def create_provider_hold(
         )
     except ShowtimeNotFoundError as exc:
         return error_response("SHOWTIME_NOT_FOUND", str(exc), status.HTTP_404_NOT_FOUND)
-    except ShowtimeNotProviderError as exc:
-        return error_response("SHOWTIME_NOT_PROVIDER", str(exc), status.HTTP_400_BAD_REQUEST)
+    except ShowtimeNotProviderError:
+        try:
+            booking = await booking_service.create_seat_hold(
+                user_id=current_user.id if current_user else None,
+                showtime_id=payload.showtime_id,
+                seat_ids=payload.seat_ids,
+                idempotency_key=idempotency_key,
+                hold_token=x_hold_token,
+                contact_email=payload.contact_email,
+                contact_phone=payload.contact_phone,
+                seat_codes=payload.seat_codes,
+            )
+            return success_response(
+                data={
+                    "id": str(booking.id),
+                    "status": booking.status.value if hasattr(booking.status, "value") else booking.status,
+                    "held_until": booking.held_until.isoformat() if booking.held_until else None,
+                    "hold_token_expires_at": (
+                        booking.hold_token_expires_at.isoformat()
+                        if booking.hold_token_expires_at else None
+                    ),
+                    "total_paise": booking.total_paise,
+                    "currency": booking.currency,
+                    "seats": booking.seat_refs or payload.seat_ids,
+                },
+                message="Hold created successfully",
+                code=status.HTTP_201_CREATED,
+            )
+        except ValidationError as exc:
+            return error_response("SEAT_UNAVAILABLE", str(exc), status.HTTP_409_CONFLICT)
     except ShowtimeDisabledError as exc:
         return error_response("SHOWTIME_DISABLED", str(exc), status.HTTP_400_BAD_REQUEST)
     except ProviderUnavailable as exc:
-        return error_response("PROVIDER_UNAVAILABLE", str(exc), status.HTTP_502_BAD_GATEWAY)
+        # Fallback to local hold if provider is unavailable
+        try:
+            booking = await booking_service.create_seat_hold(
+                user_id=current_user.id if current_user else None,
+                showtime_id=payload.showtime_id,
+                seat_ids=payload.seat_ids,
+                idempotency_key=idempotency_key,
+                hold_token=x_hold_token,
+                contact_email=payload.contact_email,
+                contact_phone=payload.contact_phone,
+                seat_codes=payload.seat_codes,
+            )
+            return success_response(
+                data={
+                    "id": str(booking.id),
+                    "status": booking.status.value if hasattr(booking.status, "value") else booking.status,
+                    "held_until": booking.held_until.isoformat() if booking.held_until else None,
+                    "hold_token_expires_at": (
+                        booking.hold_token_expires_at.isoformat()
+                        if booking.hold_token_expires_at else None
+                    ),
+                    "total_paise": booking.total_paise,
+                    "currency": booking.currency,
+                    "seats": booking.seat_refs or payload.seat_ids,
+                },
+                message="Hold created successfully",
+                code=status.HTTP_201_CREATED,
+            )
+        except Exception:
+            return error_response("PROVIDER_UNAVAILABLE", str(exc), status.HTTP_502_BAD_GATEWAY)
     except ProviderContractError as exc:
         return error_response("PROVIDER_CONTRACT_ERROR", str(exc), status.HTTP_502_BAD_GATEWAY)
     except ProviderError as exc:
@@ -270,55 +327,66 @@ async def get_showtime_seat_map(
     booking_service: BookingService = Depends(get_booking_service),
     movie_service: MovieService = Depends(get_movie_service),
 ):
+    async def _build_local_seat_map(sid: UUID):
+        dto = await movie_service.get_seat_map(sid)
+        from app.movie.schemas import SeatMapResponse as MovieSeatMapResponse, RowProjectionResponse, SeatProjectionResponse
+        return MovieSeatMapResponse(
+            showtime_id=dto.showtime_id,
+            movie_id=dto.movie_id,
+            movie_title=dto.movie_title,
+            venue_name=dto.venue_name,
+            screen_name=dto.screen_name,
+            starts_at=dto.starts_at,
+            format=dto.format,
+            language=dto.language,
+            rows=[
+                RowProjectionResponse(
+                    row_id=r.row_id,
+                    label=r.label,
+                    section=r.section,
+                    price_paise=r.price_paise,
+                    seats=[
+                        SeatProjectionResponse(
+                            seat_id=s.seat_id,
+                            number=s.number,
+                            code=s.code,
+                            x=s.x,
+                            label=s.label,
+                            status=s.status.value,
+                            price_paise=s.price_paise,
+                        )
+                        for s in r.seats
+                    ],
+                )
+                for r in dto.rows
+            ],
+        )
+
     try:
         try:
             st, _, _ = await booking_service._resolve_provider_and_showtime(showtime_id)
         except ShowtimeNotProviderError:
-            dto = await movie_service.get_seat_map(showtime_id)
-            from app.movie.schemas import SeatMapResponse as MovieSeatMapResponse, RowProjectionResponse, SeatProjectionResponse
-            return MovieSeatMapResponse(
-                showtime_id=dto.showtime_id,
-                movie_id=dto.movie_id,
-                movie_title=dto.movie_title,
-                venue_name=dto.venue_name,
-                screen_name=dto.screen_name,
-                starts_at=dto.starts_at,
-                format=dto.format,
-                language=dto.language,
-                rows=[
-                    RowProjectionResponse(
-                        row_id=r.row_id,
-                        label=r.label,
-                        section=r.section,
-                        price_paise=r.price_paise,
-                        seats=[
-                            SeatProjectionResponse(
-                                seat_id=s.seat_id,
-                                number=s.number,
-                                code=s.code,
-                                x=s.x,
-                                label=s.label,
-                                status=s.status.value,
-                                price_paise=s.price_paise,
-                            )
-                            for s in r.seats
-                        ],
-                    )
-                    for r in dto.rows
-                ],
-            )
-        seat_map, is_available = await booking_service.get_provider_seat_map(showtime_id)
-        if not is_available or seat_map is None:
-            return {
-                "status": "success",
-                "code": 200,
-                "data": {
-                    "showtime_id": str(showtime_id),
-                    "seats": [],
-                    "code": "SOURCE_UNAVAILABLE",
-                },
-                "message": "Provider upstream is currently unavailable",
-            }
+            return await _build_local_seat_map(showtime_id)
+
+        try:
+            seat_map, is_available = await booking_service.get_provider_seat_map(showtime_id)
+            if not is_available or seat_map is None:
+                raise ProviderUnavailable("Provider seat map unavailable or empty")
+        except Exception as prov_err:
+            logger.warning("Provider seat map failed for showtime %s: %s; falling back to local seat map", showtime_id, prov_err)
+            try:
+                return await _build_local_seat_map(showtime_id)
+            except Exception:
+                return {
+                    "status": "success",
+                    "code": 200,
+                    "data": {
+                        "showtime_id": str(showtime_id),
+                        "seats": [],
+                        "code": "SOURCE_UNAVAILABLE",
+                    },
+                    "message": f"Provider upstream error: {prov_err}",
+                }
         unique_rows = sorted({s.row_label for s in seat_map.seats})
         n_rows = len(unique_rows)
 

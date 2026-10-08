@@ -343,12 +343,13 @@ class BookingService:
         self,
         user_id: UUID | None,
         showtime_id: UUID,
-        seat_ids: list[UUID],
+        seat_ids: list[UUID] | list[str],
         idempotency_key: str,
         hold_seconds: int = 600,
         hold_token: str | None = None,
         contact_email: str | None = None,
         contact_phone: str | None = None,
+        seat_codes: list[str] | None = None,
     ) -> Booking:
         if idempotency_key and user_id is not None:
             existing = await self.booking_repo.get_by_idempotency(user_id, idempotency_key)
@@ -356,6 +357,7 @@ class BookingService:
                 return existing
 
         import importlib
+        from uuid import UUID as _UUID
         movie_models = importlib.import_module("app.movie.models")
         ShowtimeModel = getattr(movie_models, "Showtime")
         ScreenRowModel = getattr(movie_models, "ScreenRow")
@@ -383,23 +385,28 @@ class BookingService:
         if showtime.status != ShowtimeStatusEnum.ACTIVE.value:
             raise ValidationError(f"Showtime is not ACTIVE (status: {showtime.status})")
 
-        if showtime.provider_id is not None:
-            raise ValidationError("Showtime is provider-backed. Use provider hold instead.")
-
         if not seat_ids:
             raise ValidationError("Must select at least 1 seat")
-        if len(seat_ids) != len(set(seat_ids)):
+
+        parsed_seat_ids: list[_UUID] = []
+        for sid in seat_ids:
+            if isinstance(sid, _UUID):
+                parsed_seat_ids.append(sid)
+            else:
+                parsed_seat_ids.append(_UUID(str(sid)))
+
+        if len(parsed_seat_ids) != len(set(parsed_seat_ids)):
             raise ValidationError("Duplicate seat IDs in selection")
-        if len(seat_ids) > MAX_SEATS_PER_BOOKING:
+        if len(parsed_seat_ids) > MAX_SEATS_PER_BOOKING:
             raise ValidationError(f"Cannot hold more than {MAX_SEATS_PER_BOOKING} seats")
 
         seats_stmt = (
             select(SeatModel, ScreenRowModel)
             .join(ScreenRowModel, SeatModel.row_id == ScreenRowModel.id)
-            .where(SeatModel.id.in_(seat_ids), ScreenRowModel.screen_id == showtime.screen_id)
+            .where(SeatModel.id.in_(parsed_seat_ids), ScreenRowModel.screen_id == showtime.screen_id)
         )
         rows = (await self.session.execute(seats_stmt)).all()
-        if len(rows) != len(seat_ids):
+        if len(rows) != len(parsed_seat_ids):
             raise ValidationError("One or more seats do not belong to this screen")
 
         now = utcnow()
@@ -408,7 +415,7 @@ class BookingService:
 
         active_states_stmt = select(SeatStateModel.seat_id).where(
             SeatStateModel.showtime_id == showtime_id,
-            SeatStateModel.seat_id.in_(seat_ids),
+            SeatStateModel.seat_id.in_(parsed_seat_ids),
         )
         existing_states = (await self.session.execute(active_states_stmt)).scalars().all()
 
@@ -451,7 +458,8 @@ class BookingService:
             idempotency_key=idempotency_key,
             ref_code=ref_code,
             created_at=now,
-            seat_refs=[str(s) for s in seat_ids],
+            seat_refs=[str(s) for s in parsed_seat_ids],
+            seat_codes=seat_codes,
             contact_email=contact_email,
             contact_phone=contact_phone,
             hold_token_hash=hold_token_hash,
@@ -460,7 +468,7 @@ class BookingService:
 
         try:
             await self.booking_repo.create(booking)
-            for sid in seat_ids:
+            for sid in parsed_seat_ids:
                 self.session.add(
                     SeatStateModel(
                         showtime_id=showtime_id,
@@ -796,6 +804,118 @@ class BookingService:
                     raise ValidationError("Payment capture failed")
             elif p["status"] != "captured":
                 raise ValidationError("Payment not captured")
+
+    async def _commit_local_movie_booking(self, booking: Booking, payment_ref: Optional[str]) -> Booking:
+        if booking.status == BookingStatus.CONFIRMED:
+            return booking
+        if booking.status != BookingStatus.HELD:
+            raise IllegalBookingTransition(booking.status.value, BookingStatus.CONFIRMED.value)
+
+        expected_paise = booking.total_paise
+        payment_row = None
+        if self.session:
+            from app.payment.models import PaymentModel
+            from sqlalchemy import select as _sel
+            stmt = _sel(PaymentModel).where(
+                PaymentModel.booking_id == booking.id,
+            ).order_by(PaymentModel.created_at.desc())
+            payment_row = (await self.session.execute(stmt)).scalars().first()
+            if payment_row:
+                expected_paise = payment_row.amount_paise
+
+        if payment_ref:
+            if not (payment_row and payment_row.status == "CAPTURED" and payment_row.signature_verified):
+                await self._verify_razorpay_payment(payment_ref, expected_paise)
+
+        import importlib
+        from uuid import UUID as _UUID
+        movie_models = importlib.import_module("app.movie.models")
+        SeatStateModel = getattr(movie_models, "SeatState")
+        SeatModel = getattr(movie_models, "Seat")
+        MovieSoldCountModel = getattr(movie_models, "MovieSoldCount")
+
+        seat_uuids = []
+        for s in (booking.seat_refs or []):
+            try:
+                seat_uuids.append(_UUID(str(s)))
+            except Exception:
+                pass
+
+        if self.session and seat_uuids:
+            from sqlalchemy import update as _upd
+            await self.session.execute(
+                _upd(SeatStateModel)
+                .where(
+                    SeatStateModel.booking_id == booking.id,
+                    SeatStateModel.seat_id.in_(seat_uuids),
+                )
+                .values(status="BOOKED", held_until=None)
+            )
+            seats_stmt = select(SeatModel).where(SeatModel.id.in_(seat_uuids))
+            seat_objs = (await self.session.execute(seats_stmt)).scalars().all()
+            for seat in seat_objs:
+                sold_row = (await self.session.execute(
+                    select(MovieSoldCountModel).where(
+                        MovieSoldCountModel.showtime_id == booking.showtime_id,
+                        MovieSoldCountModel.row_id == seat.row_id,
+                    )
+                )).scalar_one_or_none()
+                if not sold_row:
+                    self.session.add(MovieSoldCountModel(showtime_id=booking.showtime_id, row_id=seat.row_id, sold_count=1))
+                else:
+                    sold_row.sold_count += 1
+
+        ok = await self.booking_repo.update_status(
+            booking.id, BookingStatus.HELD, BookingStatus.CONFIRMED
+        )
+        if self.session:
+            if payment_row and payment_row.amount_paise != booking.total_paise:
+                from app.booking.models import BookingModel
+                from sqlalchemy import update as _upd
+                await self.session.execute(
+                    _upd(BookingModel)
+                    .where(BookingModel.id == booking.id)
+                    .values(total_paise=payment_row.amount_paise)
+                )
+            await self.session.commit()
+
+        if not ok:
+            fresh = await self.booking_repo.get_by_id(booking.id)
+            if fresh and fresh.status == BookingStatus.CONFIRMED:
+                return fresh
+            raise IllegalBookingTransition(
+                fresh.status.value if fresh else "UNKNOWN", BookingStatus.CONFIRMED.value
+            )
+
+        confirmed = await self.booking_repo.get_by_id(booking.id)
+        if self._notification and confirmed and confirmed.contact_email:
+            try:
+                st_row = (await self.session.execute(
+                    select(Showtime).where(Showtime.id == booking.showtime_id)
+                )).scalar_one_or_none()
+                if st_row:
+                    movie_row = (await self.session.execute(
+                        select(Movie).where(Movie.id == st_row.movie_id)
+                    )).scalar_one_or_none()
+                    movie_title = movie_row.title if movie_row else "Movie"
+                    starts_at = st_row.starts_at.strftime("%a, %d %b %Y %I:%M %p")
+                    html_content = self._build_confirmation_email(
+                        ref_code=confirmed.ref_code,
+                        movie_title=movie_title,
+                        cinema_name="Cinema",
+                        starts_at_ist=starts_at,
+                        booking=confirmed,
+                    )
+                    await self._notification.send_email(
+                        to=confirmed.contact_email,
+                        subject=f"Booking Confirmed: {movie_title} ({confirmed.ref_code})",
+                        body=html_content,
+                    )
+            except Exception as e:
+                logger.warning("Failed to send confirmation email for booking %s: %s", booking.id, e)
+
+        return confirmed
+
     async def commit_booking(
         self,
         user_id: UUID,
@@ -810,6 +930,9 @@ class BookingService:
         
         if booking.tier_id and not booking.provider_id:
             return await self._commit_event_booking(booking, payment_ref)
+
+        if booking.showtime_id and not booking.provider_id:
+            return await self._commit_local_movie_booking(booking, payment_ref)
 
         if booking.status != BookingStatus.HELD:
             raise IllegalBookingTransition(booking.status.value, BookingStatus.CONFIRMED.value)
@@ -949,6 +1072,16 @@ class BookingService:
                 await provider.release(booking.provider_hold_id)
             except Exception as exc:
                 logger.warning("Remote hold release failed for booking %s: %s", booking_id, exc)
+        elif not booking.provider_id and booking.showtime_id and self.session:
+            import importlib
+            movie_models = importlib.import_module("app.movie.models")
+            SeatStateModel = getattr(movie_models, "SeatState")
+            await self.session.execute(
+                delete(SeatStateModel).where(
+                    SeatStateModel.booking_id == booking_id,
+                    SeatStateModel.status == "LOCKED",
+                )
+            )
 
         cancelled_booking = Booking(
             id=booking.id,
