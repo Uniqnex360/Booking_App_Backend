@@ -10,7 +10,7 @@ from uuid import UUID
 from app.booking.interfaces import Booking
 from app.fnb.schemas import ContactUpdateRequest
 from app.booking.interfaces import BookingStatus
-
+from sqlalchemy import select
 from app.booking.schemas import BookingDetailResponse 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import JSONResponse
