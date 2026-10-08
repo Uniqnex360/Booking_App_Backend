@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import uuid
 from datetime import date, datetime, time
 from app.shared.timeutil import utcnow
@@ -99,15 +100,27 @@ class MovieRepository:
         id_stmt = stmt.with_only_columns(Movie.id).distinct()
         count_stmt = select(func.count()).select_from(id_stmt.subquery())
         total = (await self._session.execute(count_stmt)).scalar() or 0
+        if total == 0:
+            return [], 0
+
         offset = (page - 1) * limit
-        stmt = (
-            select(Movie)
-            .where(Movie.id.in_(id_stmt))
+        paged_id_stmt = (
+            stmt.with_only_columns(Movie.id, Movie.created_at)
+            .distinct()
             .order_by(Movie.created_at.desc())
             .offset(offset)
             .limit(limit)
         )
-        result = await self._session.execute(stmt)
+        paged_ids = (await self._session.execute(paged_id_stmt)).scalars().all()
+        if not paged_ids:
+            return [], total
+
+        movies_stmt = (
+            select(Movie)
+            .where(Movie.id.in_(paged_ids))
+            .order_by(Movie.created_at.desc())
+        )
+        result = await self._session.execute(movies_stmt)
         movies = result.scalars().all()
         dtos = [
             MovieSummaryDTO(
@@ -230,16 +243,16 @@ class MovieRepository:
                     status=st.status,
                 )
             )
-        if movie.external_id is None:
+        if movie.external_id is None and movie.external_rating_fetched_at is None:
             try:
                 year = movie.release_date.year if movie.release_date else None
-                match = await search_and_get_rating(movie.title, year)
+                match = await asyncio.wait_for(search_and_get_rating(movie.title, year), timeout=2.0)
                 if match is not None:
                     tmdb_id, rating = match
                     movie.external_id = tmdb_id
                     movie.external_rating = rating
-                    movie.external_rating_fetched_at = utcnow()
-                    await self._session.commit()
+                movie.external_rating_fetched_at = utcnow()
+                await self._session.commit()
             except Exception as e:
                 logger.warning("TMDB enrichment failed for %s: %s", movie.title, e)
 

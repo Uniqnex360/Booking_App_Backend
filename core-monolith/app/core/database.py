@@ -12,10 +12,15 @@ for _suffix in ("?sslmode=require", "&sslmode=require",
     DATABASE_URL = DATABASE_URL.replace(_suffix, "")
 
 _connect_args = {"ssl": True} if _needs_ssl else {}
+_connect_args["statement_cache_size"] = 0
 
 engine = create_async_engine(
     DATABASE_URL,
-    poolclass=NullPool,
+    pool_size=15,
+    max_overflow=25,
+    pool_timeout=30,
+    pool_recycle=300,
+    pool_pre_ping=True,
     connect_args=_connect_args,
     echo=False,
 )

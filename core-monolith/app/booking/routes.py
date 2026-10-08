@@ -645,13 +645,14 @@ async def cancel_legacy_booking(
     return {"booking": {"id": str(booking.id), "status": "CANCELLED"}}
 @router.get("/bookings", status_code=status.HTTP_200_OK)
 async def list_my_bookings(
+    limit: int = Query(50, ge=1, le=100),
     current_user: AuthUserDomain = Depends(get_current_user),
     booking_service: BookingService = Depends(get_booking_service),
 ):
     from sqlalchemy import select
     from app.booking.models import BookingModel
     from app.movie.models import Showtime, Movie, Screen, Venue
-    from app.event.models import EventORM, TicketCategoryORM
+    from app.event.models import EventORM
     import json
     session = booking_service.session
     stmt = (
@@ -662,21 +663,20 @@ async def list_my_bookings(
             Screen,
             Venue,
             EventORM,
-            TicketCategoryORM,
         )
         .outerjoin(Showtime, BookingModel.showtime_id == Showtime.id)
         .outerjoin(Movie, Showtime.movie_id == Movie.id)
         .outerjoin(Screen, Showtime.screen_id == Screen.id)
         .outerjoin(Venue, Screen.venue_id == Venue.id)
         .outerjoin(EventORM, BookingModel.event_id == EventORM.id)
-        .outerjoin(TicketCategoryORM, BookingModel.tier_id == TicketCategoryORM.id)
         .where(BookingModel.user_id == current_user.id)
         .order_by(BookingModel.created_at.desc())
+        .limit(limit)
     )
     res = await session.execute(stmt)
     rows = res.all()
     enriched_bookings = []
-    for b, st, movie, screen, venue, event, tier in rows:
+    for b, st, movie, screen, venue, event in rows:
         if movie:
             title = movie.title
             venue_name = f"{venue.name} • {screen.name}" if (venue and screen) else (venue.name if venue else "Cinema Hall")

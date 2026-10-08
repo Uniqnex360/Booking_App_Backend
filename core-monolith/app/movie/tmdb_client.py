@@ -23,48 +23,37 @@ async def search_and_get_rating(
     if not title or not title.strip():
         return None
 
-    async def _search(params: dict) -> list[dict]:
-        try:
-            async with httpx.AsyncClient(timeout=6.0) as client:
-                r = await client.get(
-                    f"{TMDB_BASE}/search/movie", params=params, headers=_headers()
-                )
-                r.raise_for_status()
-                data = r.json()
-        except Exception as e:
-            logger.warning("TMDB search failed for %r: %s", title, e)
-            return []
-        return data.get("results") or []
-
-    def _release_year(item: dict) -> Optional[int]:
-        rd = item.get("release_date") or ""
-        if len(rd) >= 4 and rd[:4].isdigit():
-            return int(rd[:4])
-        return None
-
-    def _pick(results: list[dict]) -> Optional[dict]:
-        if not year:
-            return results[0] if results else None
-        # Prefer results whose release year is within ±1 of target.
-        for r in results:
-            ry = _release_year(r)
-            if ry is not None and abs(ry - year) <= 1:
-                return r
-        return None
-
     query = {"query": title.strip()}
 
-    if year:
-        for y in (year, year - 1, year + 1):
-            results = await _search({**query, "year": y})
-            best = _pick(results)
-            if best:
-                return _finalize(best)
-        return None
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            headers = _headers()
+            if year:
+                for y in (year, year - 1, year + 1):
+                    try:
+                        r = await client.get(
+                            f"{TMDB_BASE}/search/movie", params={**query, "year": y}, headers=headers
+                        )
+                        if r.status_code == 200:
+                            results = r.json().get("results") or []
+                            best = _pick(results)
+                            if best:
+                                return _finalize(best)
+                    except Exception as e:
+                        logger.debug("TMDB query year %s failed: %s", y, e)
+                return None
 
-    results = await _search(query)
-    best = _pick(results)
-    return _finalize(best) if best else None
+            r = await client.get(
+                f"{TMDB_BASE}/search/movie", params=query, headers=headers
+            )
+            if r.status_code == 200:
+                results = r.json().get("results") or []
+                best = _pick(results)
+                return _finalize(best) if best else None
+            return None
+    except Exception as e:
+        logger.warning("TMDB client error for %r: %s", title, e)
+        return None
 
 
 def _finalize(best: dict) -> Optional[tuple[str, float]]:

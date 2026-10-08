@@ -56,22 +56,37 @@ class AdminService:
         from app.event.models import EventORM
         from app.partner.models import PartnerORM
 
-        total_users = (await db.execute(select(func.count(UserORM.id)))).scalar() or 0
-        active_users = (await db.execute(select(func.count(UserORM.id)).where(UserORM.is_active.is_(True)))).scalar() or 0
+        u_tot = select(func.count(UserORM.id)).scalar_subquery()
+        u_act = select(func.count(UserORM.id)).where(UserORM.is_active.is_(True)).scalar_subquery()
+        m_tot = select(func.count(MovieORM.id)).scalar_subquery()
+        m_pub = select(func.count(MovieORM.id)).where(MovieORM.status == 'PUBLISHED').scalar_subquery()
+        e_tot = select(func.count(EventORM.id)).scalar_subquery()
+        e_pub = select(func.count(EventORM.id)).where(EventORM.status == 'PUBLISHED').scalar_subquery()
+        e_pen = select(func.count(EventORM.id)).where(EventORM.status == 'PENDING_APPROVAL').scalar_subquery()
+        e_rej = select(func.count(EventORM.id)).where(EventORM.status == 'REJECTED').scalar_subquery()
+        p_tot = select(func.count(PartnerORM.id)).scalar_subquery()
+        p_pen = select(func.count(PartnerORM.id)).where(PartnerORM.status == 'PENDING_APPROVAL').scalar_subquery()
+        p_app = select(func.count(PartnerORM.id)).where(PartnerORM.status == 'APPROVED').scalar_subquery()
+
+        stmt = select(u_tot, u_act, m_tot, m_pub, e_tot, e_pub, e_pen, e_rej, p_tot, p_pen, p_app)
+        row = (await db.execute(stmt)).first()
+
+        total_users = row[0] if row else 0
+        active_users = row[1] if row else 0
         blocked_users = total_users - active_users
 
-        total_movies = (await db.execute(select(func.count(MovieORM.id)))).scalar() or 0
-        published_movies = (await db.execute(select(func.count(MovieORM.id)).where(MovieORM.status == 'PUBLISHED'))).scalar() or 0
+        total_movies = row[2] if row else 0
+        published_movies = row[3] if row else 0
         draft_movies = total_movies - published_movies
 
-        total_events = (await db.execute(select(func.count(EventORM.id)))).scalar() or 0
-        published_events = (await db.execute(select(func.count(EventORM.id)).where(EventORM.status == 'PUBLISHED'))).scalar() or 0
-        pending_events = (await db.execute(select(func.count(EventORM.id)).where(EventORM.status == 'PENDING_APPROVAL'))).scalar() or 0
-        rejected_events = (await db.execute(select(func.count(EventORM.id)).where(EventORM.status == 'REJECTED'))).scalar() or 0
+        total_events = row[4] if row else 0
+        published_events = row[5] if row else 0
+        pending_events = row[6] if row else 0
+        rejected_events = row[7] if row else 0
 
-        total_partners = (await db.execute(select(func.count(PartnerORM.id)))).scalar() or 0
-        pending_partners = (await db.execute(select(func.count(PartnerORM.id)).where(PartnerORM.status == 'PENDING_APPROVAL'))).scalar() or 0
-        approved_partners = (await db.execute(select(func.count(PartnerORM.id)).where(PartnerORM.status == 'APPROVED'))).scalar() or 0
+        total_partners = row[8] if row else 0
+        pending_partners = row[9] if row else 0
+        approved_partners = row[10] if row else 0
 
         return {
             "users": {

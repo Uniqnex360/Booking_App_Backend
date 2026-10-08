@@ -262,8 +262,12 @@ class SQLAlchemyEventRepository(IEventRepository):
 
         stmt = stmt.where(and_(*filters))
 
-        subq = stmt.subquery()
-        count_stmt = select(func.count(func.distinct(subq.c.id))).select_from(subq)
+        if price or price_max_paise:
+            count_stmt = select(func.count(func.distinct(EventORM.id))).join(
+                min_price_subq, EventORM.id == min_price_subq.c.event_id
+            ).where(and_(*filters))
+        else:
+            count_stmt = select(func.count(EventORM.id)).where(and_(*filters))
         total = (await self.db.execute(count_stmt)).scalar() or 0
 
         stmt = stmt.offset((page - 1) * limit).limit(limit).order_by(EventORM.starts_at.asc())
@@ -275,7 +279,7 @@ class SQLAlchemyEventRepository(IEventRepository):
             filters.append(EventORM.status == status.value)
             
         stmt = select(EventORM).where(and_(*filters)).options(selectinload(EventORM.ticket_categories))
-        count_stmt = select(func.count()).select_from(stmt.subquery())
+        count_stmt = select(func.count(EventORM.id)).where(and_(*filters))
         total = (await self.db.execute(count_stmt)).scalar() or 0
         
         stmt = stmt.offset((page - 1) * limit).limit(limit).order_by(EventORM.created_at.desc())
@@ -336,11 +340,20 @@ class SQLAlchemyEventRepository(IEventRepository):
                 )
             )
 
-        stmt = select(EventORM).options(selectinload(EventORM.ticket_categories))
+        stmt = select(EventORM).options(
+            selectinload(EventORM.ticket_categories),
+            defer(EventORM.gallery_images),
+            defer(EventORM.artists),
+            defer(EventORM.faqs),
+            defer(EventORM.terms_and_conditions),
+            defer(EventORM.layout_image_url),
+        )
         if filters:
             stmt = stmt.where(and_(*filters))
 
-        count_stmt = select(func.count()).select_from(stmt.subquery())
+        count_stmt = select(func.count(EventORM.id))
+        if filters:
+            count_stmt = count_stmt.where(and_(*filters))
         total = (await self.db.execute(count_stmt)).scalar() or 0
 
         stmt = stmt.offset((page - 1) * limit).limit(limit).order_by(EventORM.created_at.desc())
