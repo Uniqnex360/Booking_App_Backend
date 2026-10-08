@@ -95,11 +95,11 @@ async def create_provider_hold(
     except ValidationError as exc:
         return error_response("VALIDATION_ERROR", str(exc), status.HTTP_422_UNPROCESSABLE_ENTITY)
     except SeatUnavailableRemote as exc:
+        logger.info("Seat conflict on hold attempt: %s", exc.seats)
         return error_response(
             "SEAT_UNAVAILABLE_REMOTE",
-            str(exc),
+            "One or more selected seats were just taken.",
             status.HTTP_409_CONFLICT,
-            details=exc.seats,
         )
     except ShowtimeNotFoundError as exc:
         return error_response("SHOWTIME_NOT_FOUND", str(exc), status.HTTP_404_NOT_FOUND)

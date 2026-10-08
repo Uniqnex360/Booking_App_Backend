@@ -4,9 +4,8 @@ class BookingNotFoundHTTPError(HTTPException):
     def __init__(self, detail: str = "Booking not found"):
         super().__init__(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
         self.code = "BOOKING_NOT_FOUND"
-
 class SeatUnavailableRemoteHTTPError(HTTPException):
-    def __init__(self, detail: str = "Seats unavailable remotely"):
+    def __init__(self, detail: str = "One or more selected seats were just taken"):
         super().__init__(status_code=status.HTTP_409_CONFLICT, detail=detail)
         self.code = "SEAT_UNAVAILABLE_REMOTE"
 

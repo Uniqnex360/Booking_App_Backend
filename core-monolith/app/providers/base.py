@@ -79,10 +79,9 @@ class ProviderError(Exception):
 class ProviderUnavailable(ProviderError):
     """Upstream provider is unreachable, timed out, or returning 5xx."""
 class SeatUnavailableRemote(ProviderError):
-    """One or more requested seats are not available on the upstream provider."""
     def __init__(self, seats: list[str]) -> None:
-        super().__init__(f"Seats unavailable remotely: {', '.join(seats)}")
-        self.seats = seats
+        super().__init__("One or more selected seats were just taken.")
+        self.seats = seats    # kept for logging, never shown to the client
 class HoldExpiredRemote(ProviderError):
     """Hold expired on the upstream provider."""
 class HoldAlreadyCommitted(ProviderError):
