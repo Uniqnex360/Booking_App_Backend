@@ -79,7 +79,7 @@ class MovieRepository:
     ) -> tuple[list[MovieSummaryDTO], int]:
         stmt = select(Movie).where(Movie.status == MovieStatus.PUBLISHED.value)
         if language:
-            stmt = stmt.where(Movie.language == language)
+            stmt = stmt.where(Movie.language.ilike(f"%{language}%"))
         stmt = stmt.join(Showtime, Showtime.movie_id == Movie.id).join(
             Screen, Showtime.screen_id == Screen.id
         )
