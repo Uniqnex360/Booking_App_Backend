@@ -17,6 +17,34 @@ async def test_cors_rejects_arbitrary_vercel_subdomains():
 
 
 @pytest.mark.asyncio
+async def test_cors_rejects_null_origin():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        resp = await ac.options(
+            "/health",
+            headers={
+                "Origin": "null",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        assert resp.headers.get("access-control-allow-origin") != "null"
+
+
+@pytest.mark.asyncio
+async def test_cors_allows_production_web_origin():
+    from app.core.config import settings
+    prod_origin = getattr(settings, "FRONTEND_URL", "https://booking-app-frontend-navy.vercel.app")
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        resp = await ac.options(
+            "/health",
+            headers={
+                "Origin": prod_origin,
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        assert resp.headers.get("access-control-allow-origin") == prod_origin
+
+
+@pytest.mark.asyncio
 async def test_cors_allows_capacitor_and_localhost_origins():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         for origin in ["capacitor://localhost", "https://localhost", "http://localhost:5173"]:
