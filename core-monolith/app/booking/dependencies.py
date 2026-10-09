@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import get_current_user_optional
 from app.auth.interfaces import User as AuthUserDomain
 from app.auth.otp_service import NotificationService
-from app.booking.hold_token import verify as verify_hold_token, verify_booking_token
+from app.booking.hold_token import verify as verify_hold_token
 from app.booking.interfaces import Booking, BookingNotFoundError
 from app.booking.movie_service import MovieBookingService
 from app.booking.repository import BookingRepository, TierCounterRepository
@@ -76,14 +76,9 @@ async def resolve_actor(
                     raise BookingNotFoundError()
             return dataclasses.replace(booking, actor_role="GUEST")
 
-    # Read-only tokens (ref_code and signed booking_token cannot mutate bookings)
+    # Read-only access (ref_code cannot mutate bookings)
     if not is_write:
-        # 3. Signed booking access token (e.g. guest ticket link / X-Booking-Token)
-        token_to_check = booking_token or x_hold_token
-        if token_to_check and verify_booking_token(booking.id, token_to_check):
-            return dataclasses.replace(booking, actor_role="GUEST")
-
-        # 4. Confirmed booking reference code (e.g. confirmation page with ?ref=...)
+        # 3. Confirmed booking reference code (e.g. confirmation page with ?ref=...)
         if ref_code and booking.status == BookingStatus.CONFIRMED and booking.ref_code:
             if hmac.compare_digest(ref_code.strip(), booking.ref_code.strip()):
                 return dataclasses.replace(booking, actor_role="GUEST")
@@ -96,20 +91,16 @@ async def get_booking_actor(
     request: Request,
     booking_id: UUID,
     x_hold_token: str | None = Header(default=None, alias="X-Hold-Token"),
-    x_booking_token: str | None = Header(default=None, alias="X-Booking-Token"),
-    token: str | None = Query(default=None, alias="token"),
     ref: str | None = Query(default=None, alias="ref"),
     current_user: AuthUserDomain | None = Depends(get_current_user_optional),
     booking_service: BookingService = Depends(get_booking_service),
 ) -> Booking:
     is_write = request.method not in ("GET", "HEAD")
-    booking_token = x_booking_token or token
     return await resolve_actor(
         booking_id=booking_id,
         x_hold_token=x_hold_token,
         current_user=current_user,
         booking_service=booking_service,
-        booking_token=booking_token,
         ref_code=ref,
         is_write=is_write,
     )

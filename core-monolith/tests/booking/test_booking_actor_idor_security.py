@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 from httpx import ASGITransport, AsyncClient
 
 from app.booking.interfaces import Booking, BookingStatus, BookingNotFoundError
-from app.booking.hold_token import hash_token, sign_booking_token
+from app.booking.hold_token import hash_token
 from app.booking.dependencies import resolve_actor
 from app.booking.routes import _mask_guest_detail
 from app.booking.schemas import BaseBookingDetail
