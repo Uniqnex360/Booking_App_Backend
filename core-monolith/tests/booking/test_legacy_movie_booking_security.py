@@ -219,3 +219,78 @@ async def test_legacy_movie_booking_succeeds_for_zero_total_without_payment(sess
         assert resp.json()["booking"]["status"] == "CONFIRMED"
 
     app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_legacy_movie_booking_rejects_reused_payment_id(session: AsyncSession):
+    """A captured payment can only be consumed once; using the same payment_id twice must fail."""
+    app.dependency_overrides[get_db] = lambda: session
+    data = await _seed_movie_showtime(session, seat_price_paise=30000)
+    token = _token_for(data["user"].id)
+
+    # Seed a second seat in the same row
+    seat2 = Seat(
+        id=uuid.uuid4(),
+        row_id=data["row"].id,
+        number=2,
+        code="A2",
+        x=1,
+        label="A2",
+    )
+    session.add(seat2)
+
+    from app.booking.models import BookingModel
+    held_booking = BookingModel(
+        id=uuid.uuid4(),
+        user_id=data["user"].id,
+        booking_type="MOVIE",
+        showtime_id=data["showtime"].id,
+        ref_code="BKHELDREUSE",
+        total_paise=30000,
+        status="HELD",
+    )
+    session.add(held_booking)
+    await session.flush()
+
+    captured_payment = PaymentModel(
+        id=uuid.uuid4(),
+        booking_id=held_booking.id,
+        order_id="order_captured_reuse_123",
+        payment_id="pay_captured_reuse_123",
+        amount_paise=30000,
+        currency="INR",
+        status="CAPTURED",
+        signature_verified=True,
+    )
+    session.add(captured_payment)
+    await session.commit()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # First booking succeeds
+        resp1 = await client.post(
+            "/v1/bookings",
+            json={
+                "showtime_id": str(data["showtime"].id),
+                "seat_ids": [str(data["seat"].id)],
+                "payment_id": "pay_captured_reuse_123",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp1.status_code == 201
+        assert resp1.json()["booking"]["status"] == "CONFIRMED"
+
+        # Second booking with the exact same payment_id MUST fail
+        resp2 = await client.post(
+            "/v1/bookings",
+            json={
+                "showtime_id": str(data["showtime"].id),
+                "seat_ids": [str(seat2.id)],
+                "payment_id": "pay_captured_reuse_123",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp2.status_code == 402
+        assert resp2.json()["error"]["type"] == "PAYMENT_VERIFICATION_FAILED"
+
+    app.dependency_overrides.clear()
+

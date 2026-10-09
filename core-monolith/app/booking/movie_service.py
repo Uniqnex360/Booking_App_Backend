@@ -105,19 +105,32 @@ class MovieBookingService:
         booking_id = uuid.uuid4()
         ref_code = f"BK{secrets.token_hex(16).upper()}"
 
+        p_row = None
         if total_paise > 0:
             if not payment_id:
                 raise ValidationError("payment_id is required to book paid seats")
             from app.payment.models import PaymentModel
-            pay_stmt = select(PaymentModel).where(
-                PaymentModel.payment_id == payment_id,
-                PaymentModel.status == "CAPTURED",
+            pay_stmt = (
+                select(PaymentModel)
+                .where(
+                    PaymentModel.payment_id == payment_id,
+                    PaymentModel.status == "CAPTURED",
+                )
+                .with_for_update()
             )
             p_row = (await self.session.execute(pay_stmt)).scalars().first()
             if not p_row:
                 raise ValidationError("Payment not captured for this booking")
             if p_row.amount_paise != total_paise:
                 raise ValidationError(f"Payment amount mismatch: expected {total_paise}, got {p_row.amount_paise}")
+
+            # Check if this payment is already linked to an existing CONFIRMED booking
+            conf_stmt = select(BookingModel.id).where(
+                BookingModel.id == p_row.booking_id,
+                BookingModel.status == "CONFIRMED",
+            )
+            if (await self.session.execute(conf_stmt)).scalar_one_or_none():
+                raise ValidationError("Payment has already been consumed for another booking")
 
         booking = BookingModel(
             id=booking_id,
@@ -142,6 +155,10 @@ class MovieBookingService:
                     )
                 )
             await self.session.flush()
+
+            # Atomically link payment to this confirmed booking in the same transaction
+            if total_paise > 0 and p_row:
+                p_row.booking_id = booking.id
 
             
             for seat, row in rows:
