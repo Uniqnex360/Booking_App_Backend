@@ -1297,10 +1297,31 @@ async def _ensure_partner(session) -> PartnerORM:
     return partner
 
 
-async def _fetch_showtimes(client: httpx.AsyncClient, base_url: str) -> list[dict]:
-    resp = await client.get(f"{base_url.rstrip('/')}/v1/showtimes")
-    resp.raise_for_status()
-    return resp.json()
+async def _fetch_showtimes(client: httpx.AsyncClient, base_url: str, max_retries: int = 5) -> list[dict]:
+    url = f"{base_url.rstrip('/')}/v1/showtimes"
+    for attempt in range(1, max_retries + 1):
+        try:
+            resp = await client.get(url, timeout=40.0)
+            if resp.status_code in (502, 503, 504) and attempt < max_retries:
+                wait_s = 5 * attempt
+                print(
+                    f"     [spin-up retry {attempt}/{max_retries}] HTTP {resp.status_code} from {base_url}, "
+                    f"waiting {wait_s}s for instance to wake up..."
+                )
+                await asyncio.sleep(wait_s)
+                continue
+            resp.raise_for_status()
+            return resp.json()
+        except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout) as err:
+            if attempt < max_retries:
+                wait_s = 5 * attempt
+                print(
+                    f"     [spin-up retry {attempt}/{max_retries}] {type(err).__name__} from {base_url}, "
+                    f"waiting {wait_s}s for instance to wake up..."
+                )
+                await asyncio.sleep(wait_s)
+                continue
+            raise
 async def _sync_one_provider(
     session,
     client: httpx.AsyncClient,
