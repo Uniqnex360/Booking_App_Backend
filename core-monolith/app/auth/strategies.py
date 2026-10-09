@@ -1,6 +1,6 @@
 import uuid
 import httpx
-from jose import jwt, JWTError
+import jwt
 from app.core.config import settings
 from app.auth.interfaces import (
     IAuthenticationStrategy, 
@@ -156,9 +156,24 @@ class FirebaseManualPhoneStrategy(IAuthenticationStrategy):
             raise InvalidCredentialsError("No firebase token provided")
         try:
             public_keys = await self._get_google_public_keys()
+            header = jwt.get_unverified_header(token)
+            kid = header.get("kid")
+            key = None
+            if isinstance(public_keys, dict):
+                if "keys" in public_keys and isinstance(public_keys["keys"], list):
+                    for jwk in public_keys["keys"]:
+                        if jwk.get("kid") == kid:
+                            from jwt.algorithms import RSAAlgorithm
+                            key = RSAAlgorithm.from_jwk(jwk)
+                            break
+                elif kid and kid in public_keys:
+                    key = public_keys[kid]
+            if not key:
+                key = public_keys
+
             decoded_token = jwt.decode(
                 token,
-                public_keys,
+                key,
                 algorithms=["RS256"],
                 audience=self.project_id,
                 issuer=f"https://securetoken.google.com/{self.project_id}"
@@ -178,7 +193,7 @@ class FirebaseManualPhoneStrategy(IAuthenticationStrategy):
                 raise InactiveAccountError()
             await self.user_repo.update_last_login(user.id)
             return user
-        except JWTError as e:
+        except (jwt.PyJWTError, Exception) as e:
             raise InvalidCredentialsError(f"Firebase verification failed: {str(e)}")
     async def _handle_auto_registration(
         self, 

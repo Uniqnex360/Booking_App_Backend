@@ -5,7 +5,7 @@ from unittest.mock import patch, AsyncMock
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from jose import jwt
+import jwt
 
 from app.main import app
 from app.core.config import settings

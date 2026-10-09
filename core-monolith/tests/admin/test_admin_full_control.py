@@ -3,7 +3,7 @@ import pytest
 from datetime import datetime, timedelta
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from jose import jwt
+import jwt
 
 from app.main import app
 from app.core.config import settings

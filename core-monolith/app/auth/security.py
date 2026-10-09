@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 
-from jose import jwt, JWTError
+import jwt
 from passlib.context import CryptContext
 
 from app.core.config import settings
@@ -68,7 +68,7 @@ class JWTTokenService(ITokenService):
                 raise InvalidTokenError(f"Invalid token type. Expected {token_type}")
                 
             return payload
-        except JWTError as e:
+        except jwt.PyJWTError as e:
             print(f"JWT VALIDATION FAILED: {str(e)}")
             raise InvalidTokenError(str(e))
 

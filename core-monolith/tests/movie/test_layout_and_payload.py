@@ -29,7 +29,7 @@ from app.movie.models import (
 
 
 def _token_for(user_id: uuid.UUID, role: str = "USER") -> str:
-    from jose import jwt
+    import jwt
     from datetime import datetime, timedelta
 
     to_encode = {

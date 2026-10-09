@@ -3,7 +3,7 @@ Provider Integration tests C1 through C15 covering mock transports and live inte
 """
 
 from __future__ import annotations
-from jose import jwt
+import jwt
 import json
 import os
 from sqlalchemy.ext.asyncio import AsyncSession

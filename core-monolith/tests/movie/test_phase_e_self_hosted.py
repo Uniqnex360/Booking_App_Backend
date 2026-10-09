@@ -9,7 +9,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 import pytest
 from httpx import ASGITransport, AsyncClient
-from jose import jwt
+import jwt
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
