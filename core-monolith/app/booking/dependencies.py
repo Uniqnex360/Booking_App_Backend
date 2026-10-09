@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user_optional
 from app.auth.interfaces import User as AuthUserDomain
 from app.auth.otp_service import NotificationService
-from app.booking.hold_token import verify as verify_hold_token
+from app.booking.hold_token import verify as verify_hold_token, verify_booking_token
 from app.booking.interfaces import Booking, BookingNotFoundError
 from app.booking.movie_service import MovieBookingService
 from app.booking.repository import BookingRepository, TierCounterRepository
@@ -41,37 +41,62 @@ async def resolve_actor(
     x_hold_token: str | None,
     current_user: AuthUserDomain | None,
     booking_service: BookingService,
+    booking_token: str | None = None,
+    ref_code: str | None = None,
 ) -> Booking:
     """Resolve the acting identity for a booking.
 
     User-owned booking: requires current_user matching booking.user_id.
-    Guest-owned booking: requires matching X-Hold-Token.
+    Guest-owned booking: requires matching X-Hold-Token, signed booking token, or matching ref code.
     Any mismatch or missing credential raises BookingNotFoundError (404).
     """
     booking = await booking_service.get_booking_for_actor(booking_id)
     if booking is None:
         raise BookingNotFoundError()
-    if booking.status == BookingStatus.CONFIRMED:
-        return booking
+
+    # 1. User-owned booking: if user is authenticated and matches booking owner
     if booking.user_id is not None:
         if current_user is not None and current_user.id == booking.user_id:
             return booking
-        raise BookingNotFoundError()
 
-    if not x_hold_token or not booking.hold_token_hash:
-        raise BookingNotFoundError()
-    if booking.hold_token_expires_at and booking.hold_token_expires_at <= utcnow():
-        raise BookingNotFoundError()
-    if not verify_hold_token(x_hold_token, booking.hold_token_hash):
-        raise BookingNotFoundError()
+    # 2. Hold-token authentication (valid for guest bookings or user holding sessions)
+    if x_hold_token and booking.hold_token_hash:
+        if verify_hold_token(x_hold_token, booking.hold_token_hash):
+            if booking.status == BookingStatus.HELD:
+                if booking.hold_token_expires_at and booking.hold_token_expires_at <= utcnow():
+                    raise BookingNotFoundError()
+            return booking
 
-    return booking
+    # 3. Signed booking access token (e.g. guest ticket link / X-Booking-Token)
+    token_to_check = booking_token or x_hold_token
+    if token_to_check and verify_booking_token(booking.id, token_to_check):
+        return booking
+
+    # 4. Confirmed booking reference code (e.g. confirmation page with ?ref=...)
+    if ref_code and booking.status == BookingStatus.CONFIRMED and booking.ref_code:
+        import hmac
+        if hmac.compare_digest(ref_code.strip(), booking.ref_code.strip()):
+            return booking
+
+    # If no identity check succeeded, deny access
+    raise BookingNotFoundError()
 
 
 async def get_booking_actor(
     booking_id: UUID,
     x_hold_token: str | None = Header(default=None, alias="X-Hold-Token"),
+    x_booking_token: str | None = Header(default=None, alias="X-Booking-Token"),
+    token: str | None = Query(default=None, alias="token"),
+    ref: str | None = Query(default=None, alias="ref"),
     current_user: AuthUserDomain | None = Depends(get_current_user_optional),
     booking_service: BookingService = Depends(get_booking_service),
 ) -> Booking:
-    return await resolve_actor(booking_id, x_hold_token, current_user, booking_service)
+    booking_token = x_booking_token or token
+    return await resolve_actor(
+        booking_id=booking_id,
+        x_hold_token=x_hold_token,
+        current_user=current_user,
+        booking_service=booking_service,
+        booking_token=booking_token,
+        ref_code=ref,
+    )
