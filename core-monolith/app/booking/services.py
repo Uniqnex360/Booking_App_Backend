@@ -293,9 +293,26 @@ class BookingService:
         }
 
     async def mark_paid(self, booking_id: UUID, payment_id: str) -> Booking:
-        b = await self.booking_repo.get_by_id(booking_id)
+        b = await self.booking_repo.get_by_id(booking_id, for_update=True)
         if not b:
             raise BookingNotFoundError()
+        if b.status == BookingStatus.CONFIRMED:
+            return b
+
+        if self.session and b.total_paise > 0:
+            from app.payment.models import PaymentModel
+            from sqlalchemy import select as _sel
+            stmt = _sel(PaymentModel).where(
+                PaymentModel.booking_id == booking_id,
+                PaymentModel.status == "CAPTURED",
+            )
+            pay_row = (await self.session.execute(stmt)).scalars().first()
+            if not pay_row:
+                raise ValidationError("Payment not captured for this booking")
+            if pay_row.amount_paise != b.total_paise:
+                raise ValidationError(
+                    f"Payment amount mismatch: expected {b.total_paise}, got {pay_row.amount_paise}"
+                )
 
         await self.booking_repo.update_status(booking_id, b.status, BookingStatus.CONFIRMED)
 
@@ -941,7 +958,7 @@ class BookingService:
         booking_id: UUID,
         payment_ref: Optional[str] = None,
     ) -> Booking:
-        booking = await self.booking_repo.get_by_id(booking_id)
+        booking = await self.booking_repo.get_by_id(booking_id, for_update=True)
         if not booking:
             raise BookingNotFoundError()
         if booking.user_id is not None and booking.user_id != user_id:
@@ -958,7 +975,7 @@ class BookingService:
 
         if booking.status != BookingStatus.HELD:
             raise IllegalBookingTransition(booking.status.value, BookingStatus.CONFIRMED.value)
-        if booking.showtime_id is not None:
+        if booking.total_paise > 0:
             from app.payment.models import PaymentModel
             from sqlalchemy import select as _sel
             if not self.session:

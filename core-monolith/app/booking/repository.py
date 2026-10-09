@@ -36,10 +36,11 @@ class BookingRepository(IBookingRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_by_id(self, booking_id: UUID) -> Optional[Booking]:
-        res = await self.session.execute(
-            select(BookingModel).where(BookingModel.id == booking_id)
-        )
+    async def get_by_id(self, booking_id: UUID, for_update: bool = False) -> Optional[Booking]:
+        stmt = select(BookingModel).where(BookingModel.id == booking_id)
+        if for_update:
+            stmt = stmt.with_for_update()
+        res = await self.session.execute(stmt)
         row = res.scalar_one_or_none()
         return self._to_domain(row) if row else None
 

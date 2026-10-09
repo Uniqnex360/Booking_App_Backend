@@ -502,6 +502,8 @@ async def create_or_confirm_booking(
         p_row = (await session.execute(pay_stmt)).scalar_one_or_none()
         if not p_row:
             return error_response("PAYMENT_VERIFICATION_FAILED", "Payment not captured for this booking", status.HTTP_402_PAYMENT_REQUIRED)
+        if p_row.amount_paise != b.total_paise:
+            return error_response("PAYMENT_VERIFICATION_FAILED", "Payment amount mismatch", status.HTTP_402_PAYMENT_REQUIRED)
         confirmed_booking = await booking_service.mark_paid(payload.lock_id, payload.payment_id)
         await session.commit()
         return success_response(
