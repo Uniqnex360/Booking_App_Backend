@@ -81,7 +81,8 @@ async def resolve_actor(
         # 3. Confirmed booking reference code (e.g. confirmation page with ?ref=... or ?ref_code=...)
         if ref_code and booking.status == BookingStatus.CONFIRMED and booking.ref_code:
             if hmac.compare_digest(ref_code.strip(), booking.ref_code.strip()):
-                assert booking.id == booking_id, "Booking ID mismatch in actor resolution"
+                if booking.id != booking_id:
+                    raise BookingNotFoundError()
                 return dataclasses.replace(booking, actor_role="GUEST")
 
     # If no identity check succeeded, deny access
