@@ -47,7 +47,9 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 limiter = Limiter(key_func=get_remote_address)
 
 @router.post("/register", status_code=201)
+@limiter.limit("5/minute")
 async def register(
+    request: Request,
     user_data: UserRegisterRequest,
     auth_service: AuthService = Depends(get_auth_service) 
 ):
@@ -58,9 +60,10 @@ async def register(
         code=201,
     )
 @router.post("/login/firebase")
+@limiter.limit("5/minute")
 async def login_firebase(
-    payload: dict, 
     request: Request,
+    payload: dict, 
     auth_service: AuthService = Depends(get_auth_service),
     fb_strategy: IAuthenticationStrategy = Depends(get_firebase_manual_strategy)
 ):
@@ -78,9 +81,10 @@ async def login_firebase(
     return success_response(data=data, message="Firebase login successful.")
 
 @router.post("/login/phone-email")
+@limiter.limit("5/minute")
 async def login_phone_email(
-    payload: dict, 
     request: Request,
+    payload: dict, 
     auth_service: AuthService = Depends(get_auth_service),
     user_repo: IUserRepository = Depends(get_user_repo) 
 ):
@@ -99,7 +103,9 @@ async def login_phone_email(
     }
     return success_response(data=data, message="Phone/Email login successful.")
 @router.post("/register/initiate")
+@limiter.limit("5/minute")
 async def register_initiate(
+    request: Request,
     user_data: UserRegisterRequest,
     auth_service: AuthService = Depends(get_auth_service),
     otp_service: IOTPService = Depends(get_otp_service),
@@ -340,7 +346,7 @@ async def forgot_password(
     try:
         await auth_service.request_password_reset(body.email, reset_repo, notification)
     except UserNotFoundError:
-        raise
+        pass
     except Exception as exc:
         logger.error("Forgot-password failed silently for %s: %s", body.email, exc)
 
