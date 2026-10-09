@@ -1,6 +1,9 @@
 import pytest
 import httpx
 from unittest.mock import AsyncMock, patch, MagicMock
+
+import app.auth.models  # ensure models are registered with Base.metadata
+from app.main import app  # ensure all models and routes are imported
 from app.auth.strategies import PhoneEmailStrategy
 from app.auth.exceptions import InvalidCredentialsError
 
@@ -10,6 +13,9 @@ def user_repo():
     repo = AsyncMock()
     repo.get_by_phone.return_value = None
     repo.create.side_effect = lambda u: u
+    repo.update_last_login.return_value = None
+    repo.is_verification_url_used.return_value = False
+    repo.mark_verification_url_used.return_value = None
     return repo
 
 
@@ -119,6 +125,11 @@ async def test_phone_email_valid_payload_for_verified_hosts(user_repo):
 @pytest.mark.asyncio
 async def test_phone_email_replay_guard_rejects_reused_url(user_repo):
     strategy = PhoneEmailStrategy(user_repo)
+    used_hashes = set()
+    user_repo.is_verification_url_used.side_effect = lambda h: h in used_hashes
+    def _mark(h, uid=None):
+        used_hashes.add(h)
+    user_repo.mark_verification_url_used.side_effect = _mark
 
     mock_resp = MagicMock()
     mock_resp.is_redirect = False
@@ -138,3 +149,84 @@ async def test_phone_email_replay_guard_rejects_reused_url(user_repo):
         # Replay attempt fails
         with pytest.raises(InvalidCredentialsError, match="already been used"):
             await strategy.authenticate({"url": url})
+
+
+@pytest.mark.asyncio
+async def test_phone_email_failure_does_not_burn_url(user_repo):
+    strategy = PhoneEmailStrategy(user_repo)
+    url = "https://user.phone.email/user_retryable.json"
+    used_hashes = set()
+    user_repo.is_verification_url_used.side_effect = lambda h: h in used_hashes
+    def _mark(h, uid=None):
+        used_hashes.add(h)
+    user_repo.mark_verification_url_used.side_effect = _mark
+
+    # First attempt fails with network error
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+        mock_get.side_effect = httpx.ConnectError("Transient network failure")
+        with pytest.raises(InvalidCredentialsError, match="network error"):
+            await strategy.authenticate({"url": url})
+
+    # Second attempt succeeds because the URL was not marked used on failure
+    mock_success = MagicMock()
+    mock_success.is_redirect = False
+    mock_success.status_code = 200
+    mock_success.json.return_value = {
+        "user_country_code": "+91",
+        "user_phone_number": "9876543210",
+    }
+    with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_success
+        user = await strategy.authenticate({"url": url})
+        assert user is not None
+        assert user.phone == "+919876543210"
+
+
+@pytest.mark.asyncio
+async def test_phone_email_db_replay_guard_across_two_instances(engine):
+    """Verifies that DB-backed replay guard works across two separate app instances/sessions."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+    from app.auth.repositories import SQLAlchemyUserRepository
+
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    url = "https://user.phone.email/user_multi_instance.json"
+
+    # Instance 1 logs in successfully
+    async with factory() as session1:
+        repo1 = SQLAlchemyUserRepository(session1)
+        strategy1 = PhoneEmailStrategy(repo1)
+
+        mock_resp = MagicMock()
+        mock_resp.is_redirect = False
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "user_country_code": "+91",
+            "user_phone_number": "9123456789",
+        }
+        with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = mock_resp
+            user = await strategy1.authenticate({"url": url})
+            assert user is not None
+            assert user.phone == "+919123456789"
+
+    # Instance 2 (completely separate session/strategy) attempts to replay the same URL
+    async with factory() as session2:
+        repo2 = SQLAlchemyUserRepository(session2)
+        strategy2 = PhoneEmailStrategy(repo2)
+
+        # Clear in-memory cache to prove DB table is the source of truth across instances
+        if hasattr(PhoneEmailStrategy, "_replay_cache"):
+            PhoneEmailStrategy._replay_cache.clear()
+
+        mock_resp2 = MagicMock()
+        mock_resp2.is_redirect = False
+        mock_resp2.status_code = 200
+        mock_resp2.json.return_value = {
+            "user_country_code": "+91",
+            "user_phone_number": "9123456789",
+        }
+        with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = mock_resp2
+            with pytest.raises(InvalidCredentialsError, match="already been used"):
+                await strategy2.authenticate({"url": url})
+

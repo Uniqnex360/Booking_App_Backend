@@ -11,6 +11,7 @@ from app.auth.models import (
     RefreshToken as RefreshTokenORM,
     OTPCode as OTPCodeORM,
     PasswordReset as PasswordResetModel,
+    UsedPhoneEmailVerification,
 )
 
 from app.auth.interfaces import (
@@ -261,6 +262,35 @@ class SQLAlchemyUserRepository(IUserRepository):
         except SQLAlchemyError as e:
             await self.db.rollback()
             raise RepositoryError(f"Database error setting user role: {e}")
+
+    async def is_verification_url_used(self, url_hash: str) -> bool:
+        try:
+            result = await self.db.execute(
+                select(UsedPhoneEmailVerification.id).where(
+                    UsedPhoneEmailVerification.url_hash == url_hash
+                )
+            )
+            return result.scalar_one_or_none() is not None
+        except SQLAlchemyError as e:
+            raise RepositoryError(f"Database error checking verification URL replay: {e}")
+
+    async def mark_verification_url_used(
+        self, url_hash: str, user_id: Optional[uuid.UUID] = None
+    ) -> None:
+        try:
+            record = UsedPhoneEmailVerification(
+                id=uuid.uuid4(),
+                url_hash=url_hash,
+                user_id=user_id,
+            )
+            self.db.add(record)
+            await self.db.commit()
+        except IntegrityError:
+            await self.db.rollback()
+            raise DuplicateError("Phone.Email verification URL has already been used")
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            raise RepositoryError(f"Database error saving verification URL: {e}")
 
 
 
