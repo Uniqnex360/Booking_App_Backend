@@ -150,3 +150,83 @@ async def test_write_fnb_update_rejects_ref_only_access(session: AsyncSession):
         assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
 
     app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_ref_of_booking_a_on_booking_b_url_returns_404(session: AsyncSession):
+    """Using reference code of booking A on URL of booking B must return 404."""
+    app.dependency_overrides[get_db] = lambda: session
+    data = await _seed_test_bookings(session)
+
+    # Seed booking B
+    booking_b = BookingModel(
+        id=uuid.uuid4(),
+        user_id=None,
+        booking_type="EVENT",
+        status="CONFIRMED",
+        ref_code="BKOTHERCONFIRMED12345678901234",
+        total_paise=50000,
+        currency="INR",
+        contact_email="other@example.com",
+        contact_phone="+919111111111",
+        created_at=datetime.now(timezone.utc),
+    )
+    session.add(booking_b)
+    await session.commit()
+
+    ref_a = data["confirmed_ref"]
+    url_b = f"/v1/bookings/{booking_b.id}?ref={ref_a}"
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get(url_b)
+        assert resp.status_code == 404
+
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_ref_code_get_returns_masked_email_and_phone(session: AsyncSession):
+    """Guest lookup with reference code must return masked email and phone."""
+    app.dependency_overrides[get_db] = lambda: session
+    data = await _seed_test_bookings(session)
+    booking_id = data["confirmed"].id
+    ref = data["confirmed_ref"]
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get(f"/v1/bookings/{booking_id}?ref={ref}")
+        assert resp.status_code == 200
+        body = resp.json()
+
+        # Raw values were guest@example.com and +919876543210
+        assert body["contact_email"] != "guest@example.com"
+        assert "@example.com" in body["contact_email"]
+        assert "*" in body["contact_email"]
+
+        assert body["contact_phone"] != "+919876543210"
+        assert "*" in body["contact_phone"]
+        assert body["contact_phone"].endswith("3210")
+
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_guest_confirmation_page_url_e2e_supports_both_ref_and_ref_code(session: AsyncSession):
+    """Frontend confirmation URLs using either ?ref= or ?ref_code= succeed identically."""
+    app.dependency_overrides[get_db] = lambda: session
+    data = await _seed_test_bookings(session)
+    booking_id = data["confirmed"].id
+    ref = data["confirmed_ref"]
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # 1. Frontend OrderSummary / ConfirmationPage standard: ?ref=...
+        resp_ref = await client.get(f"/v1/bookings/{booking_id}?ref={ref}")
+        assert resp_ref.status_code == 200
+        assert resp_ref.json()["id"] == str(booking_id)
+
+        # 2. Alternative parameter name: ?ref_code=...
+        resp_ref_code = await client.get(f"/v1/bookings/{booking_id}?ref_code={ref}")
+        assert resp_ref_code.status_code == 200
+        assert resp_ref_code.json()["id"] == str(booking_id)
+
+    app.dependency_overrides.clear()
+

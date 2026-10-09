@@ -78,9 +78,10 @@ async def resolve_actor(
 
     # Read-only access (ref_code cannot mutate bookings)
     if not is_write:
-        # 3. Confirmed booking reference code (e.g. confirmation page with ?ref=...)
+        # 3. Confirmed booking reference code (e.g. confirmation page with ?ref=... or ?ref_code=...)
         if ref_code and booking.status == BookingStatus.CONFIRMED and booking.ref_code:
             if hmac.compare_digest(ref_code.strip(), booking.ref_code.strip()):
+                assert booking.id == booking_id, "Booking ID mismatch in actor resolution"
                 return dataclasses.replace(booking, actor_role="GUEST")
 
     # If no identity check succeeded, deny access
@@ -92,15 +93,17 @@ async def get_booking_actor(
     booking_id: UUID,
     x_hold_token: str | None = Header(default=None, alias="X-Hold-Token"),
     ref: str | None = Query(default=None, alias="ref"),
+    ref_code: str | None = Query(default=None, alias="ref_code"),
     current_user: AuthUserDomain | None = Depends(get_current_user_optional),
     booking_service: BookingService = Depends(get_booking_service),
 ) -> Booking:
     is_write = request.method not in ("GET", "HEAD")
+    effective_ref = ref or ref_code
     return await resolve_actor(
         booking_id=booking_id,
         x_hold_token=x_hold_token,
         current_user=current_user,
         booking_service=booking_service,
-        ref_code=ref,
+        ref_code=effective_ref,
         is_write=is_write,
     )
