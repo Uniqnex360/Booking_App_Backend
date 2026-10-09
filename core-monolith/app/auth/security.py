@@ -1,9 +1,12 @@
+import logging
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 
 import jwt
 from passlib.context import CryptContext
+
+logger = logging.getLogger(__name__)
 
 from app.core.config import settings
 from app.auth.exceptions import InvalidTokenError
@@ -69,7 +72,7 @@ class JWTTokenService(ITokenService):
                 
             return payload
         except jwt.PyJWTError as e:
-            print(f"JWT VALIDATION FAILED: {str(e)}")
+            logger.debug("JWT validation failed: %s", e)
             raise InvalidTokenError(str(e))
 
     def hash_token(self, token: str) -> str:
