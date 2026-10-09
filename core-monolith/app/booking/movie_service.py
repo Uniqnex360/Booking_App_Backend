@@ -50,6 +50,7 @@ class MovieBookingService:
         showtime_id: UUID,
         seat_ids: list[UUID],
         idempotency_key: Optional[str] = None,
+        payment_id: Optional[str] = None,
     ) -> BookingModel:
         
         if idempotency_key:
@@ -103,6 +104,20 @@ class MovieBookingService:
         total_paise = sum(row.price_paise for _, row in rows)
         booking_id = uuid.uuid4()
         ref_code = f"BK{secrets.token_hex(16).upper()}"
+
+        if total_paise > 0:
+            if not payment_id:
+                raise ValidationError("payment_id is required to book paid seats")
+            from app.payment.models import PaymentModel
+            pay_stmt = select(PaymentModel).where(
+                PaymentModel.payment_id == payment_id,
+                PaymentModel.status == "CAPTURED",
+            )
+            p_row = (await self.session.execute(pay_stmt)).scalars().first()
+            if not p_row:
+                raise ValidationError("Payment not captured for this booking")
+            if p_row.amount_paise != total_paise:
+                raise ValidationError(f"Payment amount mismatch: expected {total_paise}, got {p_row.amount_paise}")
 
         booking = BookingModel(
             id=booking_id,

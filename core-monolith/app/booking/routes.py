@@ -549,6 +549,7 @@ async def create_or_confirm_booking(
                 showtime_id=payload.showtime_id,
                 seat_ids=payload.seat_ids,
                 idempotency_key=payload.idempotency_key,
+                payment_id=payload.payment_id,
             )
         else:
             booking = await booking_service.create_booking(
@@ -561,7 +562,15 @@ async def create_or_confirm_booking(
         raise HTTPException(status_code=409, detail=str(exc))
     except SoldOutError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
-    except (EventNotBookableError, EventConcludedError, TierInactiveError, SalesClosedError, ValidationError) as exc:
+    except ValidationError as exc:
+        if "payment" in str(exc).lower() or "payment_id" in str(exc).lower():
+            return error_response(
+                "PAYMENT_VERIFICATION_FAILED",
+                str(exc),
+                status.HTTP_402_PAYMENT_REQUIRED,
+            )
+        raise HTTPException(status_code=400, detail=str(exc))
+    except (EventNotBookableError, EventConcludedError, TierInactiveError, SalesClosedError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except QuantityExceedsMaxError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
