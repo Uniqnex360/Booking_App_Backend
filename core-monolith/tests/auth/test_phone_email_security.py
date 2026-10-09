@@ -230,3 +230,73 @@ async def test_phone_email_db_replay_guard_across_two_instances(engine):
             with pytest.raises(InvalidCredentialsError, match="already been used"):
                 await strategy2.authenticate({"url": url})
 
+
+@pytest.mark.asyncio
+async def test_phone_email_parallel_requests_rejected(engine):
+    """Two concurrent requests using the exact same verification URL: exactly one succeeds, the other fails."""
+    import asyncio
+    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+    from app.auth.repositories import SQLAlchemyUserRepository
+
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    url = "https://user.phone.email/user_parallel_race.json"
+
+    mock_resp = MagicMock()
+    mock_resp.is_redirect = False
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "user_country_code": "+91",
+        "user_phone_number": "9123456789",
+    }
+
+    async def attempt_auth():
+        async with factory() as session:
+            repo = SQLAlchemyUserRepository(session)
+            strategy = PhoneEmailStrategy(repo)
+            with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+                mock_get.return_value = mock_resp
+                return await strategy.authenticate({"url": url})
+
+    results = await asyncio.gather(attempt_auth(), attempt_auth(), return_exceptions=True)
+    successes = [r for r in results if not isinstance(r, Exception)]
+    failures = [r for r in results if isinstance(r, InvalidCredentialsError)]
+
+    assert len(successes) == 1
+    assert len(failures) == 1
+    assert "already been used" in str(failures[0])
+
+
+@pytest.mark.asyncio
+async def test_cleanup_old_verification_urls(engine):
+    """Cleanup method purges expired verification URL records older than threshold."""
+    import uuid
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+    from app.auth.repositories import SQLAlchemyUserRepository
+    from app.auth.models import UsedPhoneEmailVerification
+
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session:
+        repo = SQLAlchemyUserRepository(session)
+
+        # Seed one recent record and one old record (25 hours ago)
+        old_record = UsedPhoneEmailVerification(
+            id=uuid.uuid4(),
+            url_hash="old_hash_1234567890",
+            created_at=datetime.now(timezone.utc) - timedelta(hours=25),
+        )
+        recent_record = UsedPhoneEmailVerification(
+            id=uuid.uuid4(),
+            url_hash="recent_hash_1234567890",
+            created_at=datetime.now(timezone.utc),
+        )
+        session.add_all([old_record, recent_record])
+        await session.commit()
+
+        deleted_count = await repo.cleanup_old_verification_urls(max_age_hours=24)
+        assert deleted_count == 1
+
+        assert await repo.is_verification_url_used("old_hash_1234567890") is False
+        assert await repo.is_verification_url_used("recent_hash_1234567890") is True
+
+
