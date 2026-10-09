@@ -2,7 +2,7 @@ import pytest
 import uuid
 import asyncio
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
@@ -297,3 +297,82 @@ async def test_commit_concurrency_lock_and_idempotence():
     assert all(r.status == BookingStatus.CONFIRMED for r in results)
     # The underlying status transition must have happened exactly once
     assert state["updates"] == 1
+
+
+@pytest.mark.asyncio
+async def test_commit_rejects_captured_payment_from_different_booking(session, jwt_service):
+    """Captured payment from booking X with same amount cannot be used to confirm booking Y."""
+    user = User(id=uuid.uuid4(), full_name="Customer", email="buyer2@example.com")
+    session.add(user)
+
+    # Booking X (Confirmed with a captured payment)
+    booking_x_id = uuid.uuid4()
+    booking_x = BookingModel(
+        id=booking_x_id,
+        user_id=user.id,
+        booking_type="EVENT",
+        event_id=uuid.uuid4(),
+        tier_id=uuid.uuid4(),
+        status="CONFIRMED",
+        total_paise=50000,
+        ref_code=f"BK{uuid.uuid4().hex[:8].upper()}",
+    )
+    session.add(booking_x)
+    await session.flush()
+
+    payment_x = PaymentModel(
+        id=uuid.uuid4(),
+        booking_id=booking_x_id,
+        order_id="order_x_12345",
+        payment_id="pay_x_captured_500",
+        amount_paise=50000,
+        currency="INR",
+        status="CAPTURED",
+        signature_verified=True,
+    )
+    session.add(payment_x)
+
+    # Booking Y (Held, needing payment)
+    booking_y_id = uuid.uuid4()
+    booking_y = BookingModel(
+        id=booking_y_id,
+        user_id=user.id,
+        booking_type="EVENT",
+        event_id=uuid.uuid4(),
+        tier_id=uuid.uuid4(),
+        status="HELD",
+        total_paise=50000,
+        ref_code=f"BK{uuid.uuid4().hex[:8].upper()}",
+    )
+    session.add(booking_y)
+    await session.commit()
+
+    token = jwt_service.create_access_token(user)
+
+    # Mock Razorpay gateway API returning valid captured payment for pay_x_captured_500
+    mock_rzp_resp = MagicMock()
+    mock_rzp_resp.status_code = 200
+    mock_rzp_resp.json.return_value = {
+        "id": "pay_x_captured_500",
+        "amount": 50000,
+        "currency": "INR",
+        "status": "captured",
+        "order_id": "order_x_12345",
+        "notes": {"booking_id": str(booking_x_id)},
+    }
+
+    app.dependency_overrides[get_db] = lambda: session
+    try:
+        with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = mock_rzp_resp
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.post(
+                    f"/v1/bookings/{booking_y_id}/commit",
+                    json={"payment_ref": "pay_x_captured_500"},
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+                assert resp.status_code == 402, f"Expected 402, got {resp.status_code}: {resp.text}"
+                assert resp.json()["error"]["type"] == "PAYMENT_VERIFICATION_FAILED"
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+

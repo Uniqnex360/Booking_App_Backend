@@ -779,7 +779,7 @@ class BookingService:
 
         if booking.total_paise > 0:
             if not payment_row and payment_ref:
-                await self._verify_razorpay_payment(payment_ref, expected_paise)
+                payment_row = await self._verify_razorpay_payment(payment_ref, expected_paise, booking.id)
             elif not payment_row:
                 raise ValidationError("Payment not verified for this booking")
 
@@ -813,24 +813,91 @@ class BookingService:
             )
         return await self.booking_repo.get_by_id(booking.id)
 
-    async def _verify_razorpay_payment(self, payment_id: str, expected_paise: int) -> None:
-        import os, httpx
-        auth = (os.environ["RAZORPAY_KEY_ID"], os.environ["RAZORPAY_KEY_SECRET"])
+    async def _verify_razorpay_payment(
+        self,
+        payment_id: str,
+        expected_paise: int,
+        booking_id: Optional[UUID] = None,
+    ) -> Any:
+        import os, httpx, uuid
+        from app.payment.models import PaymentModel
+        from sqlalchemy import select as _sel
+
+        if self.session and booking_id:
+            dup_stmt = _sel(PaymentModel).where(
+                PaymentModel.payment_id == payment_id,
+                PaymentModel.status == "CAPTURED",
+                PaymentModel.booking_id != booking_id,
+            )
+            existing_payment = (await self.session.execute(dup_stmt)).scalars().first()
+            if existing_payment:
+                raise ValidationError("Payment has already been used for another booking")
+
+        auth = (os.environ.get("RAZORPAY_KEY_ID", ""), os.environ.get("RAZORPAY_KEY_SECRET", ""))
         base = f"https://api.razorpay.com/v1/payments/{payment_id}"
         async with httpx.AsyncClient(timeout=10) as c:
             r = await c.get(base, auth=auth)
             if r.status_code != 200:
                 raise ValidationError("Payment not found")
             p = r.json()
-            if p["amount"] != expected_paise or p["currency"] != "INR":
+            if p.get("amount") != expected_paise or p.get("currency") != "INR":
                 raise ValidationError("Payment amount mismatch")
-            if p["status"] == "authorized":
-                cap = await c.post(f"{base}/capture", auth=auth,
-                                json={"amount": expected_paise, "currency": "INR"})
+            if p.get("status") == "authorized":
+                cap = await c.post(
+                    f"{base}/capture",
+                    auth=auth,
+                    json={"amount": expected_paise, "currency": "INR"},
+                )
                 if cap.status_code != 200:
                     raise ValidationError("Payment capture failed")
-            elif p["status"] != "captured":
+            elif p.get("status") != "captured":
                 raise ValidationError("Payment not captured")
+
+            if booking_id:
+                notes = p.get("notes") or {}
+                note_booking_id = notes.get("booking_id") or notes.get("bookingId")
+                if note_booking_id and str(note_booking_id).strip() != str(booking_id):
+                    raise ValidationError("Payment notes do not match this booking")
+
+                order_id = p.get("order_id")
+                if order_id and self.session:
+                    ord_stmt = _sel(PaymentModel).where(
+                        PaymentModel.order_id == order_id,
+                        PaymentModel.booking_id != booking_id,
+                    )
+                    other_ord = (await self.session.execute(ord_stmt)).scalars().first()
+                    if other_ord:
+                        raise ValidationError("Payment order belongs to another booking")
+
+                if self.session:
+                    curr_stmt = _sel(PaymentModel).where(
+                        PaymentModel.booking_id == booking_id
+                    )
+                    curr_payment = (await self.session.execute(curr_stmt)).scalars().first()
+                    if curr_payment:
+                        curr_payment.payment_id = payment_id
+                        curr_payment.status = "CAPTURED"
+                        curr_payment.signature_verified = True
+                        if order_id and not curr_payment.order_id:
+                            curr_payment.order_id = order_id
+                        await self.session.flush()
+                        return curr_payment
+                    else:
+                        new_pay = PaymentModel(
+                            id=uuid.uuid4(),
+                            booking_id=booking_id,
+                            gateway="RAZORPAY",
+                            order_id=order_id or f"fallback_{payment_id}",
+                            payment_id=payment_id,
+                            amount_paise=expected_paise,
+                            currency="INR",
+                            status="CAPTURED",
+                            signature_verified=True,
+                        )
+                        self.session.add(new_pay)
+                        await self.session.flush()
+                        return new_pay
+        return None
 
     async def _commit_local_movie_booking(self, booking: Booking, payment_ref: Optional[str]) -> Booking:
         if booking.status == BookingStatus.CONFIRMED:
@@ -852,7 +919,7 @@ class BookingService:
 
         if booking.total_paise > 0:
             if not payment_row and payment_ref:
-                await self._verify_razorpay_payment(payment_ref, expected_paise)
+                payment_row = await self._verify_razorpay_payment(payment_ref, expected_paise, booking.id)
             elif not payment_row:
                 raise ValidationError("Payment not verified for this booking")
 
