@@ -38,15 +38,31 @@ app = FastAPI(
 cors_origins = [
     o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173,https://localhost,capacitor://localhost").split(",") if o.strip()
 ]
+# Ensure Capacitor origins and localhost are always explicitly allowed
+default_trusted_origins = ["https://localhost", "capacitor://localhost", "http://localhost:5173", "http://localhost:3000"]
+for origin in default_trusted_origins:
+    if origin not in cors_origins:
+        cors_origins.append(origin)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_origin_regex=r"https://.*\.vercel\.app|https?://localhost(:[0-9]+)?|capacitor://localhost",
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$|^capacitor://localhost$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*", "Idempotency-Key", "idempotency-key", "Authorization", "Content-Type"]
 )
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
