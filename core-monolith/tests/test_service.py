@@ -185,6 +185,8 @@ async def test_b9_b10_cancel_lifecycle(booking_service, session, setup_tier):
     await session.flush()
 
     booking = await booking_service.create_booking(user_id, tier_id, 5)
+    from app.booking.interfaces import BookingStatus
+    await booking_service.booking_repo.update_status(booking.id, BookingStatus.HELD, BookingStatus.CONFIRMED)
     await booking_service.cancel_booking(booking.id, user_id=user_id)
 
     res = await session.execute(text("SELECT sold FROM ticket_sold_counts WHERE tier_id=:t"), {"t": tier_id})
@@ -341,6 +343,8 @@ async def test_b11_cancel_restores_capacity(booking_service, session, setup_tier
     await session.flush()
 
     booking = await booking_service.create_booking(user_id, tier_id, 5)
+    from app.booking.interfaces import BookingStatus
+    await booking_service.booking_repo.update_status(booking.id, BookingStatus.HELD, BookingStatus.CONFIRMED)
     await booking_service.cancel_booking(booking.id, user_id=user_id)
 
     user_id_2 = uuid.uuid4()
@@ -371,13 +375,18 @@ async def test_b12_cancel_by_non_owner_fails(booking_service, session, setup_tie
 
 @pytest.mark.asyncio
 async def test_b14_booking_status_transitions(booking_service, session, setup_tier):
-    """After creation status is CONFIRMED; after cancel it is CANCELLED."""
+    """After creation status is HELD; after confirmation CONFIRMED; after cancel CANCELLED."""
     tier_id = await setup_tier(capacity=10)
     user_id = uuid.uuid4()
     await create_test_user(session, user_id, "b14@t.com", "USER")
     await session.flush()
 
     booking = await booking_service.create_booking(user_id, tier_id, 1)
+    assert booking.status == "HELD"
+
+    from app.booking.interfaces import BookingStatus
+    await booking_service.booking_repo.update_status(booking.id, BookingStatus.HELD, BookingStatus.CONFIRMED)
+    booking = await booking_service.booking_repo.get_by_id(booking.id)
     assert booking.status == "CONFIRMED"
 
     await booking_service.cancel_booking(booking.id, user_id=user_id)

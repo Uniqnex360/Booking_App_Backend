@@ -484,42 +484,57 @@ async def test_concurrent_commits_with_same_payment_id_one_wins(engine, jwt_serv
 
     token = jwt_service.create_access_token(user)
 
-    async def attempt_commit(booking_id: uuid.UUID, order_id: str):
-        # Each session receives a custom mock response matching that booking
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {
-            "id": shared_pay_id,
-            "amount": 30000,
-            "currency": "INR",
-            "status": "captured",
-            "order_id": order_id,
-            "notes": {"booking_id": str(booking_id)},
-        }
-        async with factory() as req_session:
-            app.dependency_overrides[get_db] = lambda: req_session
-            try:
-                with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
-                    mock_get.return_value = mock_resp
-                    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                        return await client.post(
-                            f"/v1/bookings/{booking_id}/commit",
-                            json={"payment_ref": shared_pay_id},
-                            headers={"Authorization": f"Bearer {token}"},
-                        )
-            finally:
-                app.dependency_overrides.pop(get_db, None)
+    import contextvars
+    import httpx
+    current_commit_ctx = contextvars.ContextVar("current_commit_ctx")
 
-    # Launch both commits concurrently
-    res1, res2 = await asyncio.gather(
-        attempt_commit(booking1_id, order1_id),
-        attempt_commit(booking2_id, order2_id),
-    )
+    async def attempt_commit(booking_id: uuid.UUID, order_id: str):
+        current_commit_ctx.set((booking_id, order_id))
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            return await client.post(
+                f"/v1/bookings/{booking_id}/commit",
+                json={"payment_ref": shared_pay_id},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+    real_async_get = httpx.AsyncClient.get
+
+    async def mock_razorpay_get(url, *args, **kwargs):
+        if "api.razorpay.com" in str(url):
+            b_id, o_id = current_commit_ctx.get()
+            mock_resp = MagicMock()
+            mock_resp.status_code = 200
+            mock_resp.json.return_value = {
+                "id": shared_pay_id,
+                "amount": 30000,
+                "currency": "INR",
+                "status": "captured",
+                "order_id": o_id,
+                "notes": {"booking_id": str(b_id)},
+            }
+            return mock_resp
+        return await real_async_get(url, *args, **kwargs)
+
+    async def override_get_db():
+        async with factory() as req_session:
+            yield req_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with patch("httpx.AsyncClient.get", side_effect=mock_razorpay_get):
+            # Launch both commits concurrently
+            res1, res2 = await asyncio.gather(
+                attempt_commit(booking1_id, order1_id),
+                attempt_commit(booking2_id, order2_id),
+            )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
     statuses = [res1.status_code, res2.status_code]
     # Exactly one must succeed (200) and the other must fail (not 200)
     assert statuses.count(200) == 1, f"Expected exactly one 200, got {statuses}: {res1.text} vs {res2.text}"
     assert all(st in (200, 400, 402, 409) for st in statuses)
+
 
 
 

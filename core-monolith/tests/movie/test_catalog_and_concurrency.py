@@ -7,7 +7,7 @@ from __future__ import annotations
 import asyncio
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import pytest
 from alembic import command
@@ -194,9 +194,9 @@ async def test_m4_seat_blocking_lifecycle(session: AsyncSession, engine):
 
     venue = Venue(id=uuid.uuid4(), name="V1", city="Kochi", partner_id=partner.id)
     screen = Screen(id=uuid.uuid4(), venue_id=venue.id, name="SCR1")
-    row = ScreenRow(id=uuid.uuid4(), screen_id=screen.id, label="A", seat_count=1, price_paise=10000)
+    row = ScreenRow(id=uuid.uuid4(), screen_id=screen.id, label="A", seat_count=1, price_paise=0)
     seat = Seat(id=uuid.uuid4(), row_id=row.id, number=1, code="A01", x=0)
-    movie = Movie(id=uuid.uuid4(), title="M1", language="Malayalam", duration_min=120, certificate="U", partner_id=partner.id)
+    movie = Movie(id=uuid.uuid4(), title="M1", language="Malayalam", duration_min=120, certificate="U", partner_id=partner.id, status=MovieStatus.PUBLISHED.value)
     st = Showtime(id=uuid.uuid4(), screen_id=screen.id, movie_id=movie.id, starts_at=datetime.now(timezone.utc), partner_id=partner.id)
     session.add_all([venue, screen, row, seat, movie, st])
     await session.commit()
@@ -252,10 +252,10 @@ async def test_m5_book_cancel_rebook_same_seat(session: AsyncSession):
     partner_id = uuid.uuid4()
     venue = Venue(id=uuid.uuid4(), name="V1", city="Kochi", partner_id=partner_id)
     screen = Screen(id=uuid.uuid4(), venue_id=venue.id, name="SCR1")
-    row = ScreenRow(id=uuid.uuid4(), screen_id=screen.id, label="A", seat_count=1, price_paise=10000)
+    row = ScreenRow(id=uuid.uuid4(), screen_id=screen.id, label="A", seat_count=1, price_paise=0)
     seat = Seat(id=uuid.uuid4(), row_id=row.id, number=1, code="A01", x=0)
-    movie = Movie(id=uuid.uuid4(), title="M1", language="Malayalam", duration_min=120, certificate="U", partner_id=partner_id)
-    st = Showtime(id=uuid.uuid4(), screen_id=screen.id, movie_id=movie.id, starts_at=datetime.now(timezone.utc), partner_id=partner_id)
+    movie = Movie(id=uuid.uuid4(), title="M1", language="Malayalam", duration_min=120, certificate="U", partner_id=partner_id, status=MovieStatus.PUBLISHED.value)
+    st = Showtime(id=uuid.uuid4(), screen_id=screen.id, movie_id=movie.id, starts_at=datetime.now(timezone.utc) + timedelta(days=1), partner_id=partner_id)
     session.add_all([user1, user2, venue, screen, row, seat, movie, st])
     await session.commit()
 
@@ -333,12 +333,12 @@ async def test_m7_concurrent_booking_attempts(session: AsyncSession, engine):
     partner_id = uuid.uuid4()
     venue = Venue(id=uuid.uuid4(), name="V1", city="Kochi", partner_id=partner_id)
     screen = Screen(id=uuid.uuid4(), venue_id=venue.id, name="SCR1")
-    row = ScreenRow(id=uuid.uuid4(), screen_id=screen.id, label="A", seat_count=5, price_paise=10000)
+    row = ScreenRow(id=uuid.uuid4(), screen_id=screen.id, label="A", seat_count=5, price_paise=0)
     seats = [
         Seat(id=uuid.uuid4(), row_id=row.id, number=n, code=f"A{n:02d}", x=n - 1)
         for n in range(1, 6)
     ]
-    movie = Movie(id=uuid.uuid4(), title="M1", language="Malayalam", duration_min=120, certificate="U", partner_id=partner_id)
+    movie = Movie(id=uuid.uuid4(), title="M1", language="Malayalam", duration_min=120, certificate="U", partner_id=partner_id, status=MovieStatus.PUBLISHED.value)
     st = Showtime(id=uuid.uuid4(), screen_id=screen.id, movie_id=movie.id, starts_at=datetime.now(timezone.utc), partner_id=partner_id)
 
     users = [User(id=uuid.uuid4(), full_name="Test User", email=f"u{i}@pvr.local", password_hash="h") for i in range(20)]

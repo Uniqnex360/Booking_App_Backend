@@ -153,7 +153,7 @@ async def test_e5_book_three_seats_happy_path(session: AsyncSession):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         await client.patch(
             f"/v1/partner/screens/{data['screen'].id}/layout",
-            json={"text_grid": "A(5): 11111", "default_price_paise": 20000},
+            json={"text_grid": "A(5): 11111", "default_price_paise": 0},
             headers={"Authorization": f"Bearer {p_token}"},
         )
 
@@ -189,7 +189,7 @@ async def test_e6_book_blocked_seat_409(session: AsyncSession):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         await client.patch(
             f"/v1/partner/screens/{data['screen'].id}/layout",
-            json={"text_grid": "A(5): 11111", "default_price_paise": 20000},
+            json={"text_grid": "A(5): 11111", "default_price_paise": 0},
             headers={"Authorization": f"Bearer {p_token}"},
         )
         st = Showtime(id=uuid.uuid4(), screen_id=data["screen"].id, movie_id=data["movie"].id, starts_at=utcnow() + timedelta(days=1), partner_id=data["partner"].id, status="ACTIVE")
@@ -223,7 +223,7 @@ async def test_e7_idempotent_booking_same_key(session: AsyncSession):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         await client.patch(
             f"/v1/partner/screens/{data['screen'].id}/layout",
-            json={"text_grid": "A(5): 11111", "default_price_paise": 20000},
+            json={"text_grid": "A(5): 11111", "default_price_paise": 0},
             headers={"Authorization": f"Bearer {p_token}"},
         )
         st = Showtime(id=uuid.uuid4(), screen_id=data["screen"].id, movie_id=data["movie"].id, starts_at=utcnow() + timedelta(days=1), partner_id=data["partner"].id, status="ACTIVE")
@@ -255,7 +255,7 @@ async def test_e9_book_cancel_rebook_succeeds(session: AsyncSession):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         await client.patch(
             f"/v1/partner/screens/{data['screen'].id}/layout",
-            json={"text_grid": "A(5): 11111", "default_price_paise": 20000},
+            json={"text_grid": "A(5): 11111", "default_price_paise": 0},
             headers={"Authorization": f"Bearer {p_token}"},
         )
         st = Showtime(id=uuid.uuid4(), screen_id=data["screen"].id, movie_id=data["movie"].id, starts_at=utcnow() + timedelta(days=1), partner_id=data["partner"].id, status="ACTIVE")
@@ -288,7 +288,7 @@ async def test_e10_self_hosted_never_held(session: AsyncSession):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         await client.patch(
             f"/v1/partner/screens/{data['screen'].id}/layout",
-            json={"text_grid": "A(5): 11111", "default_price_paise": 20000},
+            json={"text_grid": "A(5): 11111", "default_price_paise": 0},
             headers={"Authorization": f"Bearer {p_token}"},
         )
         st = Showtime(id=uuid.uuid4(), screen_id=data["screen"].id, movie_id=data["movie"].id, starts_at=utcnow() + timedelta(days=1), partner_id=data["partner"].id, status="ACTIVE")

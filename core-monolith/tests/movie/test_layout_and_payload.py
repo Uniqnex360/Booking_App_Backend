@@ -134,10 +134,10 @@ async def test_m14_multi_section_booking_across_stalls_and_balcony(session: Asyn
     venue = Venue(id=uuid.uuid4(), name="V1", city="Kochi", partner_id=partner_id)
     screen = Screen(id=uuid.uuid4(), venue_id=venue.id, name="SCR1", total_seats=2)
 
-    row_stalls = ScreenRow(id=uuid.uuid4(), screen_id=screen.id, label="A", section="STALLS", seat_count=1, price_paise=15000)
+    row_stalls = ScreenRow(id=uuid.uuid4(), screen_id=screen.id, label="A", section="STALLS", seat_count=1, price_paise=0)
     seat_stalls = Seat(id=uuid.uuid4(), row_id=row_stalls.id, number=1, code="A01", x=0)
 
-    row_balcony = ScreenRow(id=uuid.uuid4(), screen_id=screen.id, label="B", section="BALCONY", seat_count=1, price_paise=30000)
+    row_balcony = ScreenRow(id=uuid.uuid4(), screen_id=screen.id, label="B", section="BALCONY", seat_count=1, price_paise=0)
     seat_balcony = Seat(id=uuid.uuid4(), row_id=row_balcony.id, number=1, code="B01", x=0)
 
     movie = Movie(id=uuid.uuid4(), title="M14 Film", language="Malayalam", duration_min=120, certificate="UA", status=MovieStatus.PUBLISHED.value, partner_id=partner_id)

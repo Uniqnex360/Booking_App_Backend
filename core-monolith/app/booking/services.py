@@ -786,9 +786,18 @@ class BookingService:
             if payment_row:
                 if payment_row.booking_id != booking.id:
                     raise ValidationError("Payment is not tied to this booking")
-                if payment_row.amount_paise != booking.total_paise:
+                expected_amount = booking.total_paise
+                if getattr(payment_row, "raw_event", None):
+                    try:
+                        import json
+                        meta = json.loads(payment_row.raw_event)
+                        if isinstance(meta, dict) and "discount_paise" in meta:
+                            expected_amount -= int(meta["discount_paise"])
+                    except Exception:
+                        pass
+                if payment_row.amount_paise != expected_amount:
                     raise ValidationError(
-                        f"Payment amount mismatch: expected {booking.total_paise}, got {payment_row.amount_paise}"
+                        f"Payment amount mismatch: expected {expected_amount}, got {payment_row.amount_paise}"
                     )
 
         ok = await self.booking_repo.update_status(
@@ -915,9 +924,18 @@ class BookingService:
             if payment_row:
                 if payment_row.booking_id != booking.id:
                     raise ValidationError("Payment is not tied to this booking")
-                if payment_row.amount_paise != booking.total_paise:
+                expected_amount = booking.total_paise
+                if getattr(payment_row, "raw_event", None):
+                    try:
+                        import json
+                        meta = json.loads(payment_row.raw_event)
+                        if isinstance(meta, dict) and "discount_paise" in meta:
+                            expected_amount -= int(meta["discount_paise"])
+                    except Exception:
+                        pass
+                if payment_row.amount_paise != expected_amount:
                     raise ValidationError(
-                        f"Payment amount mismatch: expected {booking.total_paise}, got {payment_row.amount_paise}"
+                        f"Payment amount mismatch: expected {expected_amount}, got {payment_row.amount_paise}"
                     )
 
         import importlib

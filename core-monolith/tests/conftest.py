@@ -69,3 +69,12 @@ async def session(engine):
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as sess:
         yield sess
+
+
+@pytest.fixture(autouse=True)
+def clean_app_dependency_overrides():
+    yield
+    from unittest.mock import patch
+    patch.stopall()
+    from app.main import app
+    app.dependency_overrides.clear()

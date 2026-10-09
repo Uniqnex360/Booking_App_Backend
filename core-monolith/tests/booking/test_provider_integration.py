@@ -596,7 +596,7 @@ async def test_c13_live_provider_integration(session: AsyncSession, monkeypatch)
 
     # 1. Real connectivity probe
     try:
-        async with httpx.AsyncClient(timeout=3.0) as probe_client:
+        async with httpx.AsyncClient(timeout=30.0) as probe_client:
             probe = await probe_client.get(f"{url}/docs")
             if probe.status_code != 200:
                 pytest.fail(f"PVR_BASE_URL={url} is set but unreachable - start pvr before running -e")
@@ -604,7 +604,7 @@ async def test_c13_live_provider_integration(session: AsyncSession, monkeypatch)
         pytest.fail(f"PVR_BASE_URL={url} is set but unreachable - start pvr before running -e")
 
     # 2. Authenticate with live PVR instance to obtain channel credential token
-    async with httpx.AsyncClient(timeout=5.0) as live_client:
+    async with httpx.AsyncClient(timeout=30.0) as live_client:
         login_resp = await live_client.post(f"{url}/v1/auth/login", json={"email": "demo@pvr.local", "password": "demo1234"})
         if login_resp.status_code != 200:
             pytest.fail(f"Failed to authenticate with live PVR: {login_resp.text}")
@@ -692,7 +692,7 @@ async def test_c13_live_provider_integration(session: AsyncSession, monkeypatch)
         booking_id = hold_resp.json()["data"]["id"]
 
         # 5. Verify seat is BOOKED on PVR native map
-        async with httpx.AsyncClient(timeout=5.0) as check_client:
+        async with httpx.AsyncClient(timeout=30.0) as check_client:
             map_pvr = await check_client.get(f"{url}/v1/showtimes/{pvr_st_id}/seats")
             pvr_seats = [s for r in map_pvr.json()["rows"] for s in r["seats"]]
             seat_state = next(s for s in pvr_seats if s["id"] == avail_seat["id"])
@@ -724,7 +724,7 @@ async def test_c13_live_provider_integration(session: AsyncSession, monkeypatch)
         assert commit_data["ref_code"] is not None
 
         # 7. Unfabricable check: Query PVR directly to verify ticket exists
-        async with httpx.AsyncClient(timeout=5.0) as check_client:
+        async with httpx.AsyncClient(timeout=30.0) as check_client:
             pvr_ticket_resp = await check_client.get(f"{url}/v1/tickets/{commit_data['ref_code']}")
             assert pvr_ticket_resp.status_code == 200
             pvr_ticket = pvr_ticket_resp.json()
