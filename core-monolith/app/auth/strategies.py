@@ -38,20 +38,92 @@ class PasswordAuthStrategy(IAuthenticationStrategy):
             raise InactiveAccountError()
         await self.user_repo.update_last_login(user.id)
         return user
+import ipaddress
+import socket
+import urllib.parse
+
+
 class PhoneEmailStrategy(IAuthenticationStrategy):
+    ALLOWED_HOSTS = {"auth.phone.email"}
+    REQUEST_TIMEOUT = 5.0
+
     def __init__(self, user_repo: IUserRepository):
         self.user_repo = user_repo
+
+    def _validate_url(self, raw_url: str) -> urllib.parse.ParseResult:
+        if not raw_url or not isinstance(raw_url, str):
+            raise InvalidCredentialsError("Missing Phone.Email verification URL")
+
+        parsed = urllib.parse.urlparse(raw_url)
+        if parsed.scheme != "https":
+            raise InvalidCredentialsError("Invalid Phone.Email verification URL: HTTPS required")
+
+        hostname = (parsed.hostname or "").lower().strip()
+        if hostname not in self.ALLOWED_HOSTS:
+            raise InvalidCredentialsError("Invalid Phone.Email verification URL: untrusted domain")
+
+        if parsed.port and parsed.port != 443:
+            raise InvalidCredentialsError("Invalid Phone.Email verification URL: invalid port")
+
+        # SSRF Defense: verify resolved IP addresses are not private/loopback/link-local
+        try:
+            addr_info = socket.getaddrinfo(hostname, 443, proto=socket.IPPROTO_TCP)
+            for _, _, _, _, sockaddr in addr_info:
+                ip_str = sockaddr[0]
+                ip_obj = ipaddress.ip_address(ip_str)
+                if (
+                    ip_obj.is_private
+                    or ip_obj.is_loopback
+                    or ip_obj.is_reserved
+                    or ip_obj.is_link_local
+                    or ip_obj.is_multicast
+                ):
+                    raise InvalidCredentialsError("Invalid Phone.Email verification URL: restricted IP")
+        except socket.gaierror:
+            raise InvalidCredentialsError("Invalid Phone.Email verification URL: resolution failed")
+
+        return parsed
+
     async def authenticate(self, credentials: dict) -> UserDomain:
         user_json_url = credentials.get("url")
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(user_json_url)
+        self._validate_url(user_json_url)
+
+        try:
+            async with httpx.AsyncClient(timeout=self.REQUEST_TIMEOUT, follow_redirects=False) as client:
+                resp = await client.get(user_json_url)
+        except httpx.HTTPError:
+            raise InvalidCredentialsError("Phone.Email verification failed: network error")
+
+        if resp.is_redirect or resp.status_code in (301, 302, 303, 307, 308):
+            raise InvalidCredentialsError("Phone.Email verification failed: redirects not allowed")
+
+        if resp.status_code != 200:
+            raise InvalidCredentialsError(f"Phone.Email verification failed: HTTP {resp.status_code}")
+
+        try:
             data = resp.json()
+        except Exception:
+            raise InvalidCredentialsError("Phone.Email verification failed: malformed JSON")
+
+        if not isinstance(data, dict):
+            raise InvalidCredentialsError("Phone.Email verification failed: invalid payload")
+
+        phone_num = data.get("user_phone_number")
+        country_code = data.get("user_country_code")
+        if not phone_num or not country_code:
+            raise InvalidCredentialsError("Phone.Email verification failed: missing phone details")
+
+        clean_country = str(country_code).strip()
+        clean_phone = str(phone_num).strip().replace(" ", "").replace("-", "")
+        if not clean_country.startswith("+") or not clean_phone.isdigit():
+            raise InvalidCredentialsError("Phone.Email verification failed: invalid phone format")
+
         first_name = data.get("user_first_name") or ""
         last_name = data.get("user_last_name") or ""
         full_name = f"{first_name} {last_name}".strip()
         if not full_name:
             full_name = "Phone User"
-        phone = f"{data.get('user_country_code')}{data.get('user_phone_number')}"
+        phone = f"{clean_country}{clean_phone}"
         user = await self.user_repo.get_by_phone(phone)
         if not user:
             user = await self._handle_auto_registration(phone, full_name)
