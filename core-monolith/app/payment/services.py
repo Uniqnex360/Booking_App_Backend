@@ -66,12 +66,8 @@ class PaymentService:
         if ctx["user_id"] != user_id:
             raise EntityNotFoundError("Booking not found")
 
-        if ctx.get("showtime_id"):
-            m_svc = self.movie_service
-            try:
-                st_dto = await m_svc.get_seat_map(ctx["showtime_id"])
-            except Exception:
-                pass
+        if ctx.get("is_provider"):
+            raise PaymentNotAvailableHere("Payment not available for provider showtimes")
 
         if ctx["status"] != "HELD":
             raise BookingNotPayable(f"Booking in status '{ctx['status']}' is not payable")

@@ -934,6 +934,12 @@ class BookingService:
             except Exception:
                 pass
 
+        if not seat_uuids and self.session:
+            locked_seats = (await self.session.execute(
+                select(SeatStateModel.seat_id).where(SeatStateModel.booking_id == booking.id)
+            )).scalars().all()
+            seat_uuids = list(locked_seats)
+
         if self.session and seat_uuids:
             from sqlalchemy import update as _upd
             await self.session.execute(
