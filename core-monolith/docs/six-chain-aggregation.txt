@@ -1,0 +1,70 @@
+{
+  "venue_name": "AGS Cinemas",
+  "city": "Chennai",
+  "showtimes": 3
+}
+{
+  "venue_name": "AGS Maduravoyal",
+  "city": "Chennai",
+  "showtimes": 4
+}
+{
+  "venue_name": "AGS T. Nagar",
+  "city": "Chennai",
+  "showtimes": 4
+}
+{
+  "venue_name": "AGS Villivakkam",
+  "city": "Chennai",
+  "showtimes": 4
+}
+{
+  "venue_name": "Cinepolis Centre Square",
+  "city": "Kochi",
+  "showtimes": 2
+}
+{
+  "venue_name": "Cinepolis Nexus",
+  "city": "Bangalore",
+  "showtimes": 4
+}
+{
+  "venue_name": "INOX Garuda Mall",
+  "city": "Bangalore",
+  "showtimes": 4
+}
+{
+  "venue_name": "PVR Forum Mall",
+  "city": "Bangalore",
+  "showtimes": 4
+}
+{
+  "venue_name": "PVR Grand Mall",
+  "city": "Chennai",
+  "showtimes": 3
+}
+{
+  "venue_name": "PVR Lulu Mall",
+  "city": "Kochi",
+  "showtimes": 4
+}
+{
+  "venue_name": "Rakki Ambattur",
+  "city": "Chennai",
+  "showtimes": 2
+}
+{
+  "venue_name": "Rakki OMR",
+  "city": "Chennai",
+  "showtimes": 2
+}
+{
+  "venue_name": "Sathyam Cinemas",
+  "city": "Chennai",
+  "showtimes": 3
+}
+{
+  "venue_name": "Vanitha Vineetha",
+  "city": "Kochi",
+  "showtimes": 2
+}

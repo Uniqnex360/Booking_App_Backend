@@ -1,0 +1,109 @@
+======================================================================
+ §1  HTTP: each chain responds independently
+======================================================================
+PVR      http://localhost:8000/v1/showtimes -> 159 showtimes
+AGS      http://localhost:8001/v1/showtimes -> 51 showtimes
+Rakki    http://localhost:8002/v1/showtimes -> 22 showtimes
+Kochi1   http://localhost:8003/v1/showtimes -> 11 showtimes
+Kochi2   http://localhost:8004/v1/showtimes -> 11 showtimes
+Kochi3   http://localhost:8005/v1/showtimes -> 6 showtimes
+
+======================================================================
+ §2  DB: cinema and showtime counts per chain's own database
+======================================================================
+PVR      cinemas=9 showtimes=1272
+AGS      cinemas=3 showtimes=408
+Rakki    cinemas=2 showtimes=176
+Kochi1   cinemas=1 showtimes=88
+Kochi2   cinemas=1 showtimes=88
+Kochi3   cinemas=1 showtimes=48
+
+======================================================================
+ §3  Cross-DB negative: unique cinema must not appear in OTHER chains
+======================================================================
+
+--- PVR's unique cinema: 'PVR Lulu Mall' ---
+  PVR Lulu Mall        in AGS      DB -> 0 (isolated)
+  PVR Lulu Mall        in Rakki    DB -> 0 (isolated)
+  PVR Lulu Mall        in Kochi1   DB -> 0 (isolated)
+  PVR Lulu Mall        in Kochi2   DB -> 0 (isolated)
+  PVR Lulu Mall        in Kochi3   DB -> 0 (isolated)
+
+--- AGS's unique cinema: 'AGS T. Nagar' ---
+  AGS T. Nagar         in PVR      DB -> 0 (isolated)
+  AGS T. Nagar         in Rakki    DB -> 0 (isolated)
+  AGS T. Nagar         in Kochi1   DB -> 0 (isolated)
+  AGS T. Nagar         in Kochi2   DB -> 0 (isolated)
+  AGS T. Nagar         in Kochi3   DB -> 0 (isolated)
+
+--- Rakki's unique cinema: 'Rakki Ambattur' ---
+  Rakki Ambattur       in PVR      DB -> 0 (isolated)
+  Rakki Ambattur       in AGS      DB -> 0 (isolated)
+  Rakki Ambattur       in Kochi1   DB -> 0 (isolated)
+  Rakki Ambattur       in Kochi2   DB -> 0 (isolated)
+  Rakki Ambattur       in Kochi3   DB -> 0 (isolated)
+
+--- Kochi1's unique cinema: 'Cinepolis Centre Square' ---
+  Cinepolis Centre Square in PVR      DB -> 0 (isolated)
+  Cinepolis Centre Square in AGS      DB -> 0 (isolated)
+  Cinepolis Centre Square in Rakki    DB -> 0 (isolated)
+  Cinepolis Centre Square in Kochi2   DB -> 0 (isolated)
+  Cinepolis Centre Square in Kochi3   DB -> 0 (isolated)
+
+--- Kochi2's unique cinema: 'Vanitha Vineetha' ---
+  Vanitha Vineetha     in PVR      DB -> 0 (isolated)
+  Vanitha Vineetha     in AGS      DB -> 0 (isolated)
+  Vanitha Vineetha     in Rakki    DB -> 0 (isolated)
+  Vanitha Vineetha     in Kochi1   DB -> 0 (isolated)
+  Vanitha Vineetha     in Kochi3   DB -> 0 (isolated)
+
+--- Kochi3's unique cinema: 'Shenoys' ---
+  Shenoys              in PVR      DB -> 0 (isolated)
+  Shenoys              in AGS      DB -> 0 (isolated)
+  Shenoys              in Rakki    DB -> 0 (isolated)
+  Shenoys              in Kochi1   DB -> 0 (isolated)
+  Shenoys              in Kochi2   DB -> 0 (isolated)
+
+======================================================================
+ §4  Vyhbz: provider-scoped showtime counts
+======================================================================
+ provider | showtimes 
+----------+-----------
+ AGS      |        51
+ Kochi1   |        11
+ Kochi2   |        11
+ Kochi3   |         6
+ PVR      |       159
+ Rakki    |        22
+(6 rows)
+
+
+======================================================================
+ §5  Vyhbz: Chennai venues by provider
+======================================================================
+ provider |      venue       | showtimes 
+----------+------------------+-----------
+ AGS      | AGS Maduravoyal  |        17
+ AGS      | AGS T. Nagar     |        17
+ AGS      | AGS Villivakkam  |        17
+ PVR      | PVR Ampa Skywalk |        17
+ PVR      | PVR Grand Mall   |        17
+ PVR      | PVR Marina Mall  |        17
+ Rakki    | Rakki Ambattur   |        11
+ Rakki    | Rakki OMR        |        11
+(8 rows)
+
+
+======================================================================
+ §6  Vyhbz: Kochi venues by provider
+======================================================================
+ provider |          venue          | showtimes 
+----------+-------------------------+-----------
+ Kochi1   | Cinepolis Centre Square |        11
+ Kochi2   | Vanitha Vineetha        |        11
+ Kochi3   | Shenoys                 |         6
+ PVR      | PVR Centre Square       |        18
+ PVR      | PVR Lulu Mall           |        18
+ PVR      | PVR Oberon Mall         |        18
+(6 rows)
+

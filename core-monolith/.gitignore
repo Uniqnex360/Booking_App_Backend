@@ -3,3 +3,18 @@
 __pycache__/
 *.pyc
 *.pyo
+
+# Env / secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Virtualenvs
+venv/
+.venv/
+env/
+
+# Tools
+.pytest_cache/
+.mypy_cache/
