@@ -59,7 +59,7 @@ class PhoneEmailStrategy(IAuthenticationStrategy):
             raise InvalidCredentialsError("Missing Phone.Email verification URL")
 
         parsed = urllib.parse.urlparse(raw_url)
-        if parsed.scheme != "https":
+        if (parsed.scheme or "").lower() != "https":
             raise InvalidCredentialsError("Invalid Phone.Email verification URL: HTTPS required")
 
         hostname = (parsed.hostname or "").lower().strip()
@@ -89,11 +89,21 @@ class PhoneEmailStrategy(IAuthenticationStrategy):
 
         return parsed
 
+    @staticmethod
+    def _normalize_url(parsed: urllib.parse.ParseResult) -> str:
+        scheme = parsed.scheme.lower()
+        netloc = parsed.netloc.lower()
+        path = parsed.path or "/"
+        query_items = sorted(urllib.parse.parse_qsl(parsed.query, keep_blank_values=True))
+        normalized_query = urllib.parse.urlencode(query_items)
+        return urllib.parse.urlunparse((scheme, netloc, path, "", normalized_query, ""))
+
     async def authenticate(self, credentials: dict) -> UserDomain:
         user_json_url = credentials.get("url")
-        await self._validate_url(user_json_url)
+        parsed = await self._validate_url(user_json_url)
 
-        url_hash = hashlib.sha256(user_json_url.strip().encode("utf-8")).hexdigest()
+        normalized_url = self._normalize_url(parsed)
+        url_hash = hashlib.sha256(normalized_url.encode("utf-8")).hexdigest()
         if await self.user_repo.is_verification_url_used(url_hash):
             raise InvalidCredentialsError("Phone.Email verification URL has already been used")
 

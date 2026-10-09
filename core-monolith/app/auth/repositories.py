@@ -292,20 +292,6 @@ class SQLAlchemyUserRepository(IUserRepository):
             await self.db.rollback()
             raise RepositoryError(f"Database error saving verification URL: {e}")
 
-    async def cleanup_old_verification_urls(self, max_age_hours: int = 24) -> int:
-        try:
-            cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
-            result = await self.db.execute(
-                delete(UsedPhoneEmailVerification).where(
-                    UsedPhoneEmailVerification.created_at < cutoff
-                )
-            )
-            await self.db.commit()
-            return result.rowcount or 0
-        except SQLAlchemyError as e:
-            await self.db.rollback()
-            raise RepositoryError(f"Database error cleaning up old verification URLs: {e}")
-
 
 
 class SQLAlchemyRefreshTokenRepository(IRefreshTokenRepository):
