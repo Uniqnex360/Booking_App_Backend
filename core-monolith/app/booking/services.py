@@ -854,49 +854,38 @@ class BookingService:
                 raise ValidationError("Payment not captured")
 
             if booking_id:
-                notes = p.get("notes") or {}
+                # 1. Reject if notes are missing or mismatch
+                notes = p.get("notes")
+                if not notes or not isinstance(notes, dict):
+                    raise ValidationError("Payment notes are missing")
                 note_booking_id = notes.get("booking_id") or notes.get("bookingId")
-                if note_booking_id and str(note_booking_id).strip() != str(booking_id):
-                    raise ValidationError("Payment notes do not match this booking")
+                if not note_booking_id or str(note_booking_id).strip() != str(booking_id):
+                    raise ValidationError("Payment notes missing or do not match this booking")
 
+                # 2. Require order_id present
                 order_id = p.get("order_id")
-                if order_id and self.session:
-                    ord_stmt = _sel(PaymentModel).where(
-                        PaymentModel.order_id == order_id,
-                        PaymentModel.booking_id != booking_id,
-                    )
-                    other_ord = (await self.session.execute(ord_stmt)).scalars().first()
-                    if other_ord:
-                        raise ValidationError("Payment order belongs to another booking")
+                if not order_id:
+                    raise ValidationError("Payment is missing order_id")
 
+                # 3. Found in payments, linked to this booking
                 if self.session:
-                    curr_stmt = _sel(PaymentModel).where(
-                        PaymentModel.booking_id == booking_id
+                    ord_stmt = _sel(PaymentModel).where(
+                        PaymentModel.order_id == order_id
                     )
-                    curr_payment = (await self.session.execute(curr_stmt)).scalars().first()
-                    if curr_payment:
-                        curr_payment.payment_id = payment_id
-                        curr_payment.status = "CAPTURED"
-                        curr_payment.signature_verified = True
-                        if order_id and not curr_payment.order_id:
-                            curr_payment.order_id = order_id
+                    order_payment = (await self.session.execute(ord_stmt)).scalars().first()
+                    if not order_payment:
+                        raise ValidationError("Payment order not found in payments")
+                    if order_payment.booking_id != booking_id:
+                        raise ValidationError("Payment order is not linked to this booking")
+
+                    order_payment.payment_id = payment_id
+                    order_payment.status = "CAPTURED"
+                    order_payment.signature_verified = True
+                    try:
                         await self.session.flush()
-                        return curr_payment
-                    else:
-                        new_pay = PaymentModel(
-                            id=uuid.uuid4(),
-                            booking_id=booking_id,
-                            gateway="RAZORPAY",
-                            order_id=order_id or f"fallback_{payment_id}",
-                            payment_id=payment_id,
-                            amount_paise=expected_paise,
-                            currency="INR",
-                            status="CAPTURED",
-                            signature_verified=True,
-                        )
-                        self.session.add(new_pay)
-                        await self.session.flush()
-                        return new_pay
+                    except Exception as e:
+                        raise ValidationError("Payment has already been used for another booking") from e
+                    return order_payment
         return None
 
     async def _commit_local_movie_booking(self, booking: Booking, payment_ref: Optional[str]) -> Booking:

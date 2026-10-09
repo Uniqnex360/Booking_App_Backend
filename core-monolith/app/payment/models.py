@@ -12,7 +12,7 @@ class PaymentModel(Base):
     booking_id = Column(sa.Uuid, ForeignKey("bookings.id"), nullable=False, index=True)
     gateway = Column(Text, nullable=False, default="RAZORPAY")
     order_id = Column(Text, nullable=False, unique=True)
-    payment_id = Column(Text, nullable=True)
+    payment_id = Column(Text, nullable=True, unique=True, index=True)
     refund_id = Column(Text, nullable=True, unique=True)
     amount_paise = Column(Integer, nullable=False)
     currency = Column(Text, nullable=False, default="INR")

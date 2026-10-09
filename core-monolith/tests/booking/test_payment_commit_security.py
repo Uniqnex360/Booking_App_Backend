@@ -376,3 +376,150 @@ async def test_commit_rejects_captured_payment_from_different_booking(session, j
     finally:
         app.dependency_overrides.pop(get_db, None)
 
+
+@pytest.mark.asyncio
+async def test_commit_fails_closed_when_notes_missing(session, jwt_service):
+    """Fallback gateway commit fails closed if notes or order_id missing."""
+    user = User(id=uuid.uuid4(), full_name="Customer", email="buyer3@example.com")
+    session.add(user)
+
+    booking_id = uuid.uuid4()
+    booking = BookingModel(
+        id=booking_id,
+        user_id=user.id,
+        booking_type="EVENT",
+        event_id=uuid.uuid4(),
+        tier_id=uuid.uuid4(),
+        status="HELD",
+        total_paise=50000,
+        ref_code=f"BK{uuid.uuid4().hex[:8].upper()}",
+    )
+    session.add(booking)
+    await session.commit()
+
+    token = jwt_service.create_access_token(user)
+
+    # Missing notes entirely
+    mock_rzp_resp = MagicMock()
+    mock_rzp_resp.status_code = 200
+    mock_rzp_resp.json.return_value = {
+        "id": "pay_missing_notes",
+        "amount": 50000,
+        "currency": "INR",
+        "status": "captured",
+        "order_id": "order_missing_notes",
+        # notes omitted
+    }
+
+    app.dependency_overrides[get_db] = lambda: session
+    try:
+        with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = mock_rzp_resp
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.post(
+                    f"/v1/bookings/{booking_id}/commit",
+                    json={"payment_ref": "pay_missing_notes"},
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+                assert resp.status_code == 402, f"Expected 402, got {resp.status_code}: {resp.text}"
+                assert resp.json()["error"]["type"] == "PAYMENT_VERIFICATION_FAILED"
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_commits_with_same_payment_id_one_wins(engine, jwt_service):
+    """Two concurrent commits on different bookings with one payment id: exactly one wins."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    user_id = uuid.uuid4()
+    booking1_id = uuid.uuid4()
+    booking2_id = uuid.uuid4()
+    order1_id = f"order_{uuid.uuid4().hex[:12]}"
+    order2_id = f"order_{uuid.uuid4().hex[:12]}"
+    shared_pay_id = f"pay_{uuid.uuid4().hex[:14]}"
+
+    async with factory() as s:
+        user = User(id=user_id, full_name="Concurrent Tester", email="concur@example.com")
+        s.add(user)
+        b1 = BookingModel(
+            id=booking1_id,
+            user_id=user_id,
+            booking_type="EVENT",
+            event_id=uuid.uuid4(),
+            tier_id=uuid.uuid4(),
+            status="HELD",
+            total_paise=30000,
+            ref_code=f"BK{uuid.uuid4().hex[:8].upper()}",
+        )
+        b2 = BookingModel(
+            id=booking2_id,
+            user_id=user_id,
+            booking_type="EVENT",
+            event_id=uuid.uuid4(),
+            tier_id=uuid.uuid4(),
+            status="HELD",
+            total_paise=30000,
+            ref_code=f"BK{uuid.uuid4().hex[:8].upper()}",
+        )
+        p1 = PaymentModel(
+            id=uuid.uuid4(),
+            booking_id=booking1_id,
+            order_id=order1_id,
+            amount_paise=30000,
+            currency="INR",
+            status="CREATED",
+        )
+        p2 = PaymentModel(
+            id=uuid.uuid4(),
+            booking_id=booking2_id,
+            order_id=order2_id,
+            amount_paise=30000,
+            currency="INR",
+            status="CREATED",
+        )
+        s.add_all([b1, b2, p1, p2])
+        await s.commit()
+
+    token = jwt_service.create_access_token(user)
+
+    async def attempt_commit(booking_id: uuid.UUID, order_id: str):
+        # Each session receives a custom mock response matching that booking
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "id": shared_pay_id,
+            "amount": 30000,
+            "currency": "INR",
+            "status": "captured",
+            "order_id": order_id,
+            "notes": {"booking_id": str(booking_id)},
+        }
+        async with factory() as req_session:
+            app.dependency_overrides[get_db] = lambda: req_session
+            try:
+                with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+                    mock_get.return_value = mock_resp
+                    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                        return await client.post(
+                            f"/v1/bookings/{booking_id}/commit",
+                            json={"payment_ref": shared_pay_id},
+                            headers={"Authorization": f"Bearer {token}"},
+                        )
+            finally:
+                app.dependency_overrides.pop(get_db, None)
+
+    # Launch both commits concurrently
+    res1, res2 = await asyncio.gather(
+        attempt_commit(booking1_id, order1_id),
+        attempt_commit(booking2_id, order2_id),
+    )
+
+    statuses = [res1.status_code, res2.status_code]
+    # Exactly one must succeed (200) and the other must fail (not 200)
+    assert statuses.count(200) == 1, f"Expected exactly one 200, got {statuses}: {res1.text} vs {res2.text}"
+    assert all(st in (200, 400, 402, 409) for st in statuses)
+
+
+
