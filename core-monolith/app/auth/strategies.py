@@ -1,3 +1,10 @@
+import asyncio
+import hashlib
+import ipaddress
+import json
+import socket
+import time
+import urllib.parse
 import uuid
 import httpx
 import jwt
@@ -38,19 +45,32 @@ class PasswordAuthStrategy(IAuthenticationStrategy):
             raise InactiveAccountError()
         await self.user_repo.update_last_login(user.id)
         return user
-import ipaddress
-import socket
-import urllib.parse
-
-
 class PhoneEmailStrategy(IAuthenticationStrategy):
-    ALLOWED_HOSTS = {"auth.phone.email"}
+    # Verified hosts: user.phone.email hosts user_json_url; auth.phone.email hosts login dialog/redirect
+    ALLOWED_HOSTS = {"user.phone.email", "auth.phone.email"}
     REQUEST_TIMEOUT = 5.0
+    REPLAY_CACHE_TTL_SECONDS = 900  # 15 minutes TTL for single-use URL replay guard
+
+    # Shared class-level replay cache: {url_sha256_hash: timestamp}
+    _replay_cache: dict[str, float] = {}
 
     def __init__(self, user_repo: IUserRepository):
         self.user_repo = user_repo
 
-    def _validate_url(self, raw_url: str) -> urllib.parse.ParseResult:
+    @classmethod
+    def _check_and_mark_replay(cls, url: str) -> None:
+        now = time.time()
+        # Clean expired replay entries older than TTL
+        expired_keys = [k for k, ts in cls._replay_cache.items() if now - ts > cls.REPLAY_CACHE_TTL_SECONDS]
+        for k in expired_keys:
+            cls._replay_cache.pop(k, None)
+
+        url_hash = hashlib.sha256(url.strip().encode("utf-8")).hexdigest()
+        if url_hash in cls._replay_cache:
+            raise InvalidCredentialsError("Phone.Email verification URL has already been used")
+        cls._replay_cache[url_hash] = now
+
+    async def _validate_url(self, raw_url: str) -> urllib.parse.ParseResult:
         if not raw_url or not isinstance(raw_url, str):
             raise InvalidCredentialsError("Missing Phone.Email verification URL")
 
@@ -65,9 +85,10 @@ class PhoneEmailStrategy(IAuthenticationStrategy):
         if parsed.port and parsed.port != 443:
             raise InvalidCredentialsError("Invalid Phone.Email verification URL: invalid port")
 
-        # SSRF Defense: verify resolved IP addresses are not private/loopback/link-local
+        # SSRF Defense: non-blocking DNS resolution check via running event loop
         try:
-            addr_info = socket.getaddrinfo(hostname, 443, proto=socket.IPPROTO_TCP)
+            loop = asyncio.get_running_loop()
+            addr_info = await loop.getaddrinfo(hostname, 443, proto=socket.IPPROTO_TCP)
             for _, _, _, _, sockaddr in addr_info:
                 ip_str = sockaddr[0]
                 ip_obj = ipaddress.ip_address(ip_str)
@@ -86,7 +107,8 @@ class PhoneEmailStrategy(IAuthenticationStrategy):
 
     async def authenticate(self, credentials: dict) -> UserDomain:
         user_json_url = credentials.get("url")
-        self._validate_url(user_json_url)
+        await self._validate_url(user_json_url)
+        self._check_and_mark_replay(user_json_url)
 
         try:
             async with httpx.AsyncClient(timeout=self.REQUEST_TIMEOUT, follow_redirects=False) as client:
@@ -102,7 +124,7 @@ class PhoneEmailStrategy(IAuthenticationStrategy):
 
         try:
             data = resp.json()
-        except Exception:
+        except (ValueError, json.JSONDecodeError, Exception):
             raise InvalidCredentialsError("Phone.Email verification failed: malformed JSON")
 
         if not isinstance(data, dict):
