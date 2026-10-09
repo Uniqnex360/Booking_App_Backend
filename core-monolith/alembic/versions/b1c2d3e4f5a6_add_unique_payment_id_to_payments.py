@@ -30,3 +30,4 @@ def downgrade():
         "payments",
         type_="unique",
     )
+

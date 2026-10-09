@@ -674,6 +674,22 @@ async def test_c13_live_provider_integration(session: AsyncSession, monkeypatch)
             seat_state = next(s for s in pvr_seats if s["id"] == avail_seat["id"])
             assert seat_state["status"] == "BOOKED"
 
+        # Seed verified payment in Vybh DB to satisfy SEC-02 commit requirement
+        from app.payment.models import PaymentModel
+        hold_total = hold_resp.json()["data"]["total_paise"]
+        pay = PaymentModel(
+            id=uuid.uuid4(),
+            booking_id=uuid.UUID(booking_id),
+            order_id=f"order_live_{uuid.uuid4().hex[:10]}",
+            payment_id=f"pay_live_{uuid.uuid4().hex[:10]}",
+            amount_paise=hold_total,
+            currency="INR",
+            status="CAPTURED",
+            signature_verified=True,
+        )
+        session.add(pay)
+        await session.commit()
+
         # 6. Commit hold via Vybh (real HTTP to PVR)
         commit_resp = await client.post(
             f"/v1/bookings/{booking_id}/commit",
