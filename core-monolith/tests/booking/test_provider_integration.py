@@ -24,6 +24,7 @@ from app.auth.models import User
 from app.auth.services import AuthService
 from app.booking.models import BookingModel
 from app.booking.services import BookingService
+from app.payment.models import PaymentModel
 from app.core.config import settings
 from app.main import app
 from app.movie.models import Movie, Screen, Showtime, Venue
@@ -100,6 +101,23 @@ async def _seed_provider_showtime(session: AsyncSession) -> dict:
         "provider": provider_reg,
         "user": user,
     }
+
+
+async def _seed_payment_for_booking(session: AsyncSession, booking_id: uuid.UUID, amount_paise: int):
+    pay = PaymentModel(
+        id=uuid.uuid4(),
+        booking_id=booking_id,
+        gateway="RAZORPAY",
+        order_id=f"order_{uuid.uuid4().hex[:12]}",
+        payment_id=f"pay_{uuid.uuid4().hex[:12]}",
+        amount_paise=amount_paise,
+        currency="INR",
+        status="CAPTURED",
+        signature_verified=True,
+    )
+    session.add(pay)
+    await session.commit()
+    return pay
 
 
 # ---------------------------------------------------------------------------
@@ -317,6 +335,8 @@ async def test_c6_commit_expired_remote(session: AsyncSession, monkeypatch):
             headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "c6-key"},
         )
         booking_id = r.json()["data"]["id"]
+        total_paise = r.json()["data"]["total_paise"]
+        await _seed_payment_for_booking(session, uuid.UUID(booking_id), total_paise)
 
         commit_resp = await client.post(
             f"/v1/bookings/{booking_id}/commit",
@@ -360,6 +380,8 @@ async def test_c7_commit_timeout_pending_confirmation(session: AsyncSession, mon
             headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "c7-key"},
         )
         booking_id = r.json()["data"]["id"]
+        total_paise = r.json()["data"]["total_paise"]
+        await _seed_payment_for_booking(session, uuid.UUID(booking_id), total_paise)
 
         commit_resp = await client.post(
             f"/v1/bookings/{booking_id}/commit",
@@ -407,6 +429,8 @@ async def test_c8_commit_twice_conflict(session: AsyncSession, monkeypatch):
             headers={"Authorization": f"Bearer {token}", "Idempotency-Key": "c8-key"},
         )
         booking_id = r.json()["data"]["id"]
+        total_paise = r.json()["data"]["total_paise"]
+        await _seed_payment_for_booking(session, uuid.UUID(booking_id), total_paise)
 
         c1 = await client.post(f"/v1/bookings/{booking_id}/commit", headers={"Authorization": f"Bearer {token}"})
         assert c1.status_code == 200

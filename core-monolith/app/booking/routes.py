@@ -101,72 +101,16 @@ async def create_provider_hold(
             "SEAT_UNAVAILABLE_REMOTE",
             "One or more selected seats were just taken.",
             status.HTTP_409_CONFLICT,
+            details=exc.seats,
         )
     except ShowtimeNotFoundError as exc:
         return error_response("SHOWTIME_NOT_FOUND", str(exc), status.HTTP_404_NOT_FOUND)
-    except ShowtimeNotProviderError:
-        try:
-            booking = await booking_service.create_seat_hold(
-                user_id=current_user.id if current_user else None,
-                showtime_id=payload.showtime_id,
-                seat_ids=payload.seat_ids,
-                idempotency_key=idempotency_key,
-                hold_token=x_hold_token,
-                contact_email=payload.contact_email,
-                contact_phone=payload.contact_phone,
-                seat_codes=payload.seat_codes,
-            )
-            return success_response(
-                data={
-                    "id": str(booking.id),
-                    "status": booking.status.value if hasattr(booking.status, "value") else booking.status,
-                    "held_until": booking.held_until.isoformat() if booking.held_until else None,
-                    "hold_token_expires_at": (
-                        booking.hold_token_expires_at.isoformat()
-                        if booking.hold_token_expires_at else None
-                    ),
-                    "total_paise": booking.total_paise,
-                    "currency": booking.currency,
-                    "seats": booking.seat_refs or payload.seat_ids,
-                },
-                message="Hold created successfully",
-                code=status.HTTP_201_CREATED,
-            )
-        except ValidationError as exc:
-            return error_response("SEAT_UNAVAILABLE", str(exc), status.HTTP_409_CONFLICT)
+    except ShowtimeNotProviderError as exc:
+        return error_response("SHOWTIME_NOT_PROVIDER", str(exc), status.HTTP_400_BAD_REQUEST)
     except ShowtimeDisabledError as exc:
         return error_response("SHOWTIME_DISABLED", str(exc), status.HTTP_400_BAD_REQUEST)
     except ProviderUnavailable as exc:
-        # Fallback to local hold if provider is unavailable
-        try:
-            booking = await booking_service.create_seat_hold(
-                user_id=current_user.id if current_user else None,
-                showtime_id=payload.showtime_id,
-                seat_ids=payload.seat_ids,
-                idempotency_key=idempotency_key,
-                hold_token=x_hold_token,
-                contact_email=payload.contact_email,
-                contact_phone=payload.contact_phone,
-                seat_codes=payload.seat_codes,
-            )
-            return success_response(
-                data={
-                    "id": str(booking.id),
-                    "status": booking.status.value if hasattr(booking.status, "value") else booking.status,
-                    "held_until": booking.held_until.isoformat() if booking.held_until else None,
-                    "hold_token_expires_at": (
-                        booking.hold_token_expires_at.isoformat()
-                        if booking.hold_token_expires_at else None
-                    ),
-                    "total_paise": booking.total_paise,
-                    "currency": booking.currency,
-                    "seats": booking.seat_refs or payload.seat_ids,
-                },
-                message="Hold created successfully",
-                code=status.HTTP_201_CREATED,
-            )
-        except Exception:
-            return error_response("PROVIDER_UNAVAILABLE", str(exc), status.HTTP_502_BAD_GATEWAY)
+        return error_response("PROVIDER_UNAVAILABLE", str(exc), status.HTTP_502_BAD_GATEWAY)
     except ProviderContractError as exc:
         return error_response("PROVIDER_CONTRACT_ERROR", str(exc), status.HTTP_502_BAD_GATEWAY)
     except ProviderError as exc:
@@ -398,20 +342,17 @@ async def get_showtime_seat_map(
             if not is_available or seat_map is None:
                 raise ProviderUnavailable("Provider seat map unavailable or empty")
         except Exception as prov_err:
-            logger.warning("Provider seat map failed for showtime %s: %s; falling back to local seat map", showtime_id, prov_err)
-            try:
-                return await _build_local_seat_map(showtime_id)
-            except Exception:
-                return {
-                    "status": "success",
-                    "code": 200,
-                    "data": {
-                        "showtime_id": str(showtime_id),
-                        "seats": [],
-                        "code": "SOURCE_UNAVAILABLE",
-                    },
-                    "message": f"Provider upstream error: {prov_err}",
-                }
+            logger.warning("Provider seat map failed for showtime %s: %s", showtime_id, prov_err)
+            return {
+                "status": "success",
+                "code": 200,
+                "data": {
+                    "showtime_id": str(showtime_id),
+                    "seats": [],
+                    "code": "SOURCE_UNAVAILABLE",
+                },
+                "message": f"Provider upstream error: {prov_err}",
+            }
         unique_rows = sorted({s.row_label for s in seat_map.seats})
         n_rows = len(unique_rows)
 

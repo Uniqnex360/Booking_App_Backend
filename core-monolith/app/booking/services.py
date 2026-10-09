@@ -1022,6 +1022,8 @@ class BookingService:
             raise BookingNotFoundError()
 
         if booking.status == BookingStatus.CONFIRMED:
+            if booking.provider_id:
+                raise HoldAlreadyCommitted(booking_id=booking.provider_booking_id, booking_ref=booking.ref_code)
             return booking
 
         if booking.tier_id and not booking.provider_id:

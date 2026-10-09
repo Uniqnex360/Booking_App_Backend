@@ -122,7 +122,7 @@ async def test_commit_booking_is_idempotent():
         user_id=user_id,
         status=BookingStatus.CONFIRMED,
         showtime_id=uuid.uuid4(),
-        provider_id="pvr",  # Test on provider showtime too
+        provider_id=None,
         total_paise=25000,
         currency="INR",
         created_at=datetime.now(timezone.utc),
