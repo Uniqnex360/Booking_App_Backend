@@ -65,3 +65,50 @@ async def test_security_headers_present():
         assert resp.headers.get("X-Content-Type-Options") == "nosniff"
         assert resp.headers.get("X-Frame-Options") == "DENY"
         assert resp.headers.get("Referrer-Policy") == "no-referrer"
+
+
+@pytest.mark.asyncio
+async def test_cors_production_environment_blocks_insecure_localhost_and_allows_capacitor():
+    from app.main import create_app
+    prod_app = create_app(environment="production")
+    async with AsyncClient(transport=ASGITransport(app=prod_app), base_url="http://test") as ac:
+        # http://localhost:5173 must be rejected in production
+        resp_dev = await ac.options(
+            "/health",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        assert resp_dev.headers.get("access-control-allow-origin") != "http://localhost:5173"
+
+        # http://127.0.0.1:8000 must be rejected in production
+        resp_loopback = await ac.options(
+            "/health",
+            headers={
+                "Origin": "http://127.0.0.1:8000",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        assert resp_loopback.headers.get("access-control-allow-origin") != "http://127.0.0.1:8000"
+
+        # capacitor://localhost must be allowed in production
+        resp_cap = await ac.options(
+            "/health",
+            headers={
+                "Origin": "capacitor://localhost",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        assert resp_cap.headers.get("access-control-allow-origin") == "capacitor://localhost"
+
+        # https://localhost must be allowed in production
+        resp_https_local = await ac.options(
+            "/health",
+            headers={
+                "Origin": "https://localhost",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        assert resp_https_local.headers.get("access-control-allow-origin") == "https://localhost"
+
