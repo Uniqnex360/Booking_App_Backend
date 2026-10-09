@@ -78,6 +78,7 @@ class Booking:
     terms_accepted_at: Optional[datetime] = None
     hold_token_hash: Optional[str] = None
     hold_token_expires_at: Optional[datetime] = None
+    actor_role: Optional[str] = None
 class ValidationError(ValueError, DomainError):
     pass
 class SoldOutError(DomainError):

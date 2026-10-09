@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import secrets
 import uuid
 from datetime import date, datetime, timezone
 from typing import Optional, Any
@@ -457,7 +458,7 @@ class BookingService:
 
         total_paise = sum(row.price_paise for _, row in rows)
         booking_id = uuid.uuid4()
-        ref_code = f"BK{uuid.uuid4().hex[:8].upper()}"
+        ref_code = f"BK{secrets.token_hex(16).upper()}"
 
         from app.booking.hold_token import hash_token
         hold_token_hash = hash_token(hold_token) if hold_token else None
@@ -585,7 +586,7 @@ class BookingService:
             total_paise=total_paise,
             status=BookingStatus.CONFIRMED if total_paise == 0 else BookingStatus.HELD,
             held_until=None if total_paise == 0 else now + timedelta(minutes=10),
-            ref_code=f"BK{uuid.uuid4().hex[:8].upper()}",
+            ref_code=f"BK{secrets.token_hex(16).upper()}",
             idempotency_key=idempotency_key,
             created_at=now,
         )

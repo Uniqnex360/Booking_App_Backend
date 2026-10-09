@@ -12,8 +12,9 @@ from app.fnb.schemas import ContactUpdateRequest
 from app.booking.interfaces import BookingStatus
 from sqlalchemy import select
 from app.booking.schemas import BookingDetailResponse 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
+from app.auth.routes import limiter
 from app.auth.dependencies import get_current_user,get_current_user_optional,get_notification_service
 from app.auth.interfaces import User as AuthUserDomain,INotificationService
 from app.providers.base import HoldAlreadyCommitted
@@ -305,19 +306,43 @@ async def delete_provider_hold(
     except IllegalBookingTransition as exc:
         return error_response("ILLEGAL_BOOKING_TRANSITION", str(exc), status.HTTP_409_CONFLICT)
     
+def _mask_guest_detail(detail: Any) -> Any:
+    if hasattr(detail, "contact_email") and detail.contact_email:
+        email = detail.contact_email
+        if "@" in email:
+            local, domain = email.split("@", 1)
+            if len(local) <= 2:
+                masked_local = local[0] + "*"
+            else:
+                masked_local = local[0] + "*" * (len(local) - 2) + local[-1]
+            detail.contact_email = f"{masked_local}@{domain}"
+    if hasattr(detail, "contact_phone") and detail.contact_phone:
+        phone = str(detail.contact_phone)
+        if len(phone) >= 7:
+            detail.contact_phone = phone[:3] + "*" * (len(phone) - 7) + phone[-4:]
+        elif len(phone) > 4:
+            detail.contact_phone = phone[:2] + "****"
+    return detail
+
+
 @router.get(
     "/bookings/{booking_id}",
     response_model=BookingDetailResponse,
     status_code=status.HTTP_200_OK,
 )
+@limiter.limit("30/minute")
 async def get_booking_by_id(
+    request: Request,
     booking = Depends(get_booking_actor),
     booking_service: BookingService = Depends(get_booking_service),
 ):
     try:
-        return await booking_service.get_booking_detail(
+        detail = await booking_service.get_booking_detail(
             user_id=booking.user_id, booking_id=booking.id
         )
+        if getattr(booking, "actor_role", None) == "GUEST":
+            detail = _mask_guest_detail(detail)
+        return detail
     except BookingNotFoundError:
         return error_response("BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
     

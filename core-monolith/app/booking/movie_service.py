@@ -1,6 +1,7 @@
 
 from __future__ import annotations
 
+import secrets
 import uuid
 from typing import Optional
 from uuid import UUID
@@ -101,7 +102,7 @@ class MovieBookingService:
 
         total_paise = sum(row.price_paise for _, row in rows)
         booking_id = uuid.uuid4()
-        ref_code = f"BK{uuid.uuid4().hex[:8].upper()}"
+        ref_code = f"BK{secrets.token_hex(16).upper()}"
 
         booking = BookingModel(
             id=booking_id,

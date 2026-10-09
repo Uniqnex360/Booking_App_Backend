@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import dataclasses
+import hmac
 from uuid import UUID
 
 from fastapi import Depends, Header, Query
@@ -54,10 +56,15 @@ async def resolve_actor(
     if booking is None:
         raise BookingNotFoundError()
 
+    # 0. Admin access: Admins can view any booking with full privileges
+    user_role = getattr(current_user, "role", None)
+    if user_role and (user_role == "ADMIN" or getattr(user_role, "value", None) == "ADMIN"):
+        return dataclasses.replace(booking, actor_role="ADMIN")
+
     # 1. User-owned booking: if user is authenticated and matches booking owner
     if booking.user_id is not None:
         if current_user is not None and current_user.id == booking.user_id:
-            return booking
+            return dataclasses.replace(booking, actor_role="OWNER")
 
     # 2. Hold-token authentication (valid for guest bookings or user holding sessions)
     if x_hold_token and booking.hold_token_hash:
@@ -65,18 +72,17 @@ async def resolve_actor(
             if booking.status == BookingStatus.HELD:
                 if booking.hold_token_expires_at and booking.hold_token_expires_at <= utcnow():
                     raise BookingNotFoundError()
-            return booking
+            return dataclasses.replace(booking, actor_role="GUEST")
 
     # 3. Signed booking access token (e.g. guest ticket link / X-Booking-Token)
     token_to_check = booking_token or x_hold_token
     if token_to_check and verify_booking_token(booking.id, token_to_check):
-        return booking
+        return dataclasses.replace(booking, actor_role="GUEST")
 
     # 4. Confirmed booking reference code (e.g. confirmation page with ?ref=...)
     if ref_code and booking.status == BookingStatus.CONFIRMED and booking.ref_code:
-        import hmac
         if hmac.compare_digest(ref_code.strip(), booking.ref_code.strip()):
-            return booking
+            return dataclasses.replace(booking, actor_role="GUEST")
 
     # If no identity check succeeded, deny access
     raise BookingNotFoundError()

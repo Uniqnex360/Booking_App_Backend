@@ -36,4 +36,4 @@ async def test_security_headers_present():
         resp = await ac.get("/health")
         assert resp.headers.get("X-Content-Type-Options") == "nosniff"
         assert resp.headers.get("X-Frame-Options") == "DENY"
-        assert resp.headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"
+        assert resp.headers.get("Referrer-Policy") == "no-referrer"

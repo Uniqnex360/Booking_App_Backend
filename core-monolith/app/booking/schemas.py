@@ -89,6 +89,8 @@ class BaseBookingDetail(BaseModel):
     ref_code: str | None = None
     barcode: str | None = None
     created_at: datetime | None = None
+    contact_email: str | None = None
+    contact_phone: str | None = None
 
     @classmethod
     def from_domain(cls, b) -> "BaseBookingDetail":
@@ -104,6 +106,8 @@ class BaseBookingDetail(BaseModel):
             ref_code=b.ref_code,
             barcode=b.barcode,
             created_at=b.created_at,
+            contact_email=getattr(b, "contact_email", None),
+            contact_phone=getattr(b, "contact_phone", None),
         )
 
 
