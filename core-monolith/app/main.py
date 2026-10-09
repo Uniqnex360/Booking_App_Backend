@@ -29,10 +29,17 @@ from app.auth.exceptions import (
     TokenReuseError,
 )
 
+from app.core.config import settings
+
+is_production = getattr(settings, "ENVIRONMENT", "development").lower() == "production"
+
 app = FastAPI(
     title="Booking Platform API",
     description="Core Monolith API with SOLID Auth Infrastructure",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url=None if is_production else "/docs",
+    redoc_url=None if is_production else "/redoc",
+    openapi_url=None if is_production else "/openapi.json",
 )
 
 cors_origins = [
