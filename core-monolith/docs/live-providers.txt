@@ -3,9 +3,9 @@ Deployed providers:
   PVR Provider              https://pvr-backend-jioy.onrender.com
   AGS                       https://ags-app-ixgv.onrender.com
   Rakki                     https://rakki-app-i0rw.onrender.com
-  Cinepolis Centre Square   https://kochi-app-1.onrender.com
-  Vanitha Vineetha          https://vanitha-kochi-app-2.onrender.com
-  Shenoys                   https://shenoys.onrender.com
+  Cinepolis Centre Square   https://cinepolis-kochi-app-1.onrender.com
+  Vanitha Vineetha          https://vanitha-kochi-app-2-u5ww.onrender.com
+  Shenoys                   https://shenoys-w13i.onrender.com
 
 Core Backend (Vyhbz):
   Vyhbz Monolith API        https://booking-app-backend-rwim.onrender.com
