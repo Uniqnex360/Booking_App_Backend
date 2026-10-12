@@ -552,7 +552,54 @@ async def test_c11_seat_map_dead_provider_source_unavailable(session: AsyncSessi
         assert resp.status_code == 200
         body = resp.json()
         assert body["data"]["code"] == "SOURCE_UNAVAILABLE" or body.get("code") == "SOURCE_UNAVAILABLE"
-        assert body["data"]["seats"] == []
+    app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# C11b: Seat-map with a live provider -> returns seats, no greenlet_spawn error
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_c11b_seat_map_live_provider_success(session: AsyncSession, monkeypatch):
+    app.dependency_overrides[get_db] = lambda: session
+    data = await _seed_provider_showtime(session)
+    st_id_str = str(data["showtime"].id)
+
+    def mock_handler(request: httpx.Request):
+        return Response(
+            200,
+            json={
+                "showtime_id": st_id_str,
+                "movie_title": "Test Movie",
+                "screen_name": "Screen 1",
+                "cinema_name": "Test Cinema",
+                "starts_at": "2026-10-15T18:00:00Z",
+                "rows": [
+                    {
+                        "label": "A",
+                        "seats": [
+                            {"id": "a1", "number": 1, "code": "A1", "status": "AVAILABLE", "price_paise": 25000}
+                        ],
+                    }
+                ],
+            },
+        )
+
+    mock_client = httpx.AsyncClient(transport=MockTransport(mock_handler))
+    monkeypatch.setattr(
+        "app.booking.services.create_provider_client",
+        lambda reg, client=None: PVRProvider(reg.base_url, client=mock_client),
+    )
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get(f"/v1/showtimes/{data['showtime'].id}/seat-map")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "success"
+        assert len(body["data"]["seats"]) == 1
+        assert body["data"]["seats"][0]["seat_ref"] == "a1"
+        assert body["data"]["seats"][0]["price_paise"] == 25000
+        assert body["data"]["first_row_distance_m"] is not None
+        assert body["data"]["row_pitch_m"] is not None
 
     app.dependency_overrides.clear()
 

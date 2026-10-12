@@ -333,22 +333,35 @@ async def get_showtime_seat_map(
 
     try:
         try:
-            st, _, _ = await booking_service._resolve_provider_and_showtime(showtime_id)
+            st, _, provider = await booking_service._resolve_provider_and_showtime(showtime_id)
         except ShowtimeNotProviderError:
             return await _build_local_seat_map(showtime_id)
 
-        screen_obj = None
-        if booking_service.session and getattr(st, "screen_id", None):
+        first_row_dist = 4.0
+        row_pitch_m = None
+        screen_id = getattr(st, "screen_id", None)
+        if booking_service.session and screen_id:
             from app.movie.models import Screen
-            sc_res = await booking_service.session.execute(select(Screen).where(Screen.id == st.screen_id))
+            sc_res = await booking_service.session.execute(select(Screen).where(Screen.id == screen_id))
             screen_obj = sc_res.scalar_one_or_none()
+            if screen_obj:
+                if screen_obj.first_row_distance_m is not None:
+                    first_row_dist = float(screen_obj.first_row_distance_m)
+                if screen_obj.row_pitch_m is not None:
+                    row_pitch_m = float(screen_obj.row_pitch_m)
+
+        provider_showtime_ref = str(st.provider_showtime_ref or st.id)
 
         # Release DB connection back to QueuePool before making outbound HTTP calls
         if booking_service.session:
             await booking_service.session.rollback()
 
         try:
-            seat_map, is_available = await booking_service.get_provider_seat_map(showtime_id)
+            seat_map, is_available = await booking_service.get_provider_seat_map(
+                showtime_id,
+                provider_showtime_ref=provider_showtime_ref,
+                provider=provider,
+            )
             if not is_available or seat_map is None:
                 raise ProviderUnavailable("Provider seat map unavailable or empty")
         except Exception as prov_err:
@@ -394,9 +407,8 @@ async def get_showtime_seat_map(
             lo, hi = col_bounds.get(row, (num, num))
             return lo <= num <= hi
 
-        first_row_dist = float(screen_obj.first_row_distance_m) if (screen_obj and screen_obj.first_row_distance_m is not None) else 4.0
         is_couple = "couple" in (seat_map.screen_name or "").lower()
-        pitch_m = float(screen_obj.row_pitch_m) if (screen_obj and screen_obj.row_pitch_m is not None) else (1.4 if is_couple else 1.1)
+        pitch_m = row_pitch_m if row_pitch_m is not None else (1.4 if is_couple else 1.1)
 
         COUPLE_ROWS_TEST = {
             "40ccc205-49bc-43b8-baf7-6e817c852fa9": {"E", "F"},

@@ -1384,17 +1384,22 @@ class BookingService:
         return swept_ids
 
     async def get_provider_seat_map(
-        self, showtime_id: UUID
+        self,
+        showtime_id: UUID,
+        provider_showtime_ref: Optional[str] = None,
+        provider: Optional[Any] = None,
     ) -> tuple[Optional[ProviderSeatMap], bool]:
         now = time.time()
         cached = _SEAT_MAP_CACHE.get(showtime_id)
         if cached and (now - cached[0]) < 15.0:
             return cached[1], cached[2]
 
-        st, registry, provider = await self._resolve_provider_and_showtime(showtime_id)
-        if self.session:
-            await self.session.rollback()
-        provider_showtime_ref = st.provider_showtime_ref or str(st.id)
+        if provider is None or provider_showtime_ref is None:
+            st, registry, provider = await self._resolve_provider_and_showtime(showtime_id)
+            provider_showtime_ref = str(st.provider_showtime_ref or st.id)
+            if self.session:
+                await self.session.rollback()
+
         try:
             seat_map = await provider.seat_map(provider_showtime_ref)
             _SEAT_MAP_CACHE[showtime_id] = (now, seat_map, True)
