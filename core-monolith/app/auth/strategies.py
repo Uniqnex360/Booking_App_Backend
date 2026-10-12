@@ -199,9 +199,15 @@ class FirebaseManualPhoneStrategy(IAuthenticationStrategy):
                             key = RSAAlgorithm.from_jwk(jwk)
                             break
                 elif kid and kid in public_keys:
-                    key = public_keys[kid]
+                    raw_key = public_keys[kid]
+                    if isinstance(raw_key, str) and "-----BEGIN CERTIFICATE-----" in raw_key:
+                        from cryptography.x509 import load_pem_x509_certificate
+                        cert = load_pem_x509_certificate(raw_key.encode("utf-8"))
+                        key = cert.public_key()
+                    else:
+                        key = raw_key
             if not key:
-                key = public_keys
+                raise InvalidCredentialsError(f"No matching public key found for kid: {kid}")
 
             decoded_token = jwt.decode(
                 token,

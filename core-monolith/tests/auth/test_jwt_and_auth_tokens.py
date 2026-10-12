@@ -233,6 +233,56 @@ async def test_firebase_flow_with_pyjwt(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_firebase_flow_with_x509_certificate(monkeypatch):
+    """Verifies Firebase token verification when Google public keys return X.509 certificates."""
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    from cryptography.hazmat.primitives import hashes
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "securetoken.test")])
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.now(timezone.utc) - timedelta(days=1))
+        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=1))
+        .sign(private_key, hashes.SHA256())
+    )
+    cert_pem = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
+
+    project_id = "test-firebase-proj"
+    kid = "cert-key-id-456"
+
+    payload = {
+        "aud": project_id,
+        "iss": f"https://securetoken.google.com/{project_id}",
+        "sub": "firebase-uid-email-user",
+        "email": "googleuser@example.com",
+        "name": "Google User",
+        "iat": int(datetime.now(timezone.utc).timestamp()),
+        "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),
+    }
+
+    token = jwt.encode(payload, private_key, algorithm="RS256", headers={"kid": kid})
+
+    user_repo = AsyncMock(spec=IUserRepository)
+    user_repo.get_by_email.return_value = None  # Auto-register
+    user_repo.create.side_effect = lambda u: u
+
+    strategy = FirebaseManualPhoneStrategy(user_repo=user_repo, project_id=project_id)
+    monkeypatch.setattr(strategy, "_get_google_public_keys", AsyncMock(return_value={kid: cert_pem}))
+    user = await strategy.authenticate({"token": token})
+
+    assert user is not None
+    assert user.email == "googleuser@example.com"
+    assert user.full_name == "Google User"
+    user_repo.create.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_password_reset_flow(token_service, sample_user):
     """Verifies password reset token creation, validation, and execution."""
     user_repo = AsyncMock(spec=IUserRepository)
