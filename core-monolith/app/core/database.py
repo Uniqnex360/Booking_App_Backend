@@ -16,8 +16,8 @@ _connect_args["statement_cache_size"] = 0
 
 engine = create_async_engine(
     DATABASE_URL,
-    pool_size=15,
-    max_overflow=25,
+    pool_size=25,
+    max_overflow=50,
     pool_timeout=30,
     pool_recycle=300,
     pool_pre_ping=True,

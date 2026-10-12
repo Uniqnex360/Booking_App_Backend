@@ -1323,7 +1323,6 @@ async def _fetch_showtimes(client: httpx.AsyncClient, base_url: str, max_retries
                 continue
             raise
 async def _sync_one_provider(
-    session,
     client: httpx.AsyncClient,
     provider: ProviderRegistryModel,
     partner_id: uuid.UUID,
@@ -1348,261 +1347,257 @@ async def _sync_one_provider(
             "skipped": True, "reason": "empty_response",
         }
 
-    # --- Build venue + screen maps scoped to this provider ---
-    venues_by_key: dict[tuple[str, str], Venue] = {}
-    screens_by_key: dict[tuple[str, str, str], Screen] = {}
+    async with AsyncSessionLocal() as session:
+        # --- Build venue + screen maps scoped to this provider ---
+        venues_by_key: dict[tuple[str, str], Venue] = {}
+        screens_by_key: dict[tuple[str, str, str], Screen] = {}
 
-    for st in pvr_showtimes:
-        cinema_name = st.get("cinema_name") or "Unknown Cinema"
-        city = st.get("city") or "Kochi"
-        screen_name = st.get("screen_name") or "Screen 1"
+        for st in pvr_showtimes:
+            cinema_name = st.get("cinema_name") or "Unknown Cinema"
+            city = st.get("city") or "Kochi"
+            screen_name = st.get("screen_name") or "Screen 1"
 
-        vkey = (cinema_name, city)
-        if vkey not in venues_by_key:
-            venue = (await session.execute(
-                select(Venue).where(
-                    Venue.name == cinema_name,
-                    Venue.city == city,
-                    Venue.partner_id == partner_id,
+            vkey = (cinema_name, city)
+            if vkey not in venues_by_key:
+                venue = (await session.execute(
+                    select(Venue).where(
+                        Venue.name == cinema_name,
+                        Venue.city == city,
+                        Venue.partner_id == partner_id,
+                    )
+                )).scalar_one_or_none()
+                if not venue:
+                    venue = Venue(
+                        id=uuid.uuid4(),
+                        name=cinema_name,
+                        city=city,
+                        address=None,
+                        timezone="Asia/Kolkata",
+                        partner_id=partner_id,
+                    )
+                    session.add(venue)
+                    await session.flush()
+                venues_by_key[vkey] = venue
+
+            skey = (cinema_name, city, screen_name)
+            if skey not in screens_by_key:
+                venue = venues_by_key[vkey]
+                screen = (await session.execute(
+                    select(Screen).where(
+                        Screen.venue_id == venue.id,
+                        Screen.name == screen_name,
+                    )
+                )).scalar_one_or_none()
+                if not screen:
+                    screen = Screen(
+                        id=uuid.uuid4(),
+                        venue_id=venue.id,
+                        name=screen_name,
+                        total_seats=0,
+                    )
+                    session.add(screen)
+                    await session.flush()
+                screens_by_key[skey] = screen
+
+        # --- Guarded cancellation ---
+        current_ids = [st["id"] for st in pvr_showtimes]
+        now = datetime.now(timezone.utc)
+
+        live_count = (await session.execute(
+            select(func.count()).select_from(Showtime).where(
+                Showtime.provider_id == provider.id,
+                Showtime.status == "ACTIVE",
+                Showtime.starts_at > now,
+            )
+        )).scalar() or 0
+
+        prospective_cancel_count = (await session.execute(
+            select(func.count()).select_from(Showtime).where(
+                Showtime.provider_id == provider.id,
+                Showtime.status == "ACTIVE",
+                Showtime.starts_at > now,
+                Showtime.provider_showtime_ref.notin_(current_ids),
+            )
+        )).scalar() or 0
+
+        if live_count > 0 and prospective_cancel_count > max(5, int(live_count * 0.2)):
+            print(
+                f"     CANCELLATION REFUSED: would cancel {prospective_cancel_count} of "
+                f"{live_count} live showtimes "
+                f"({prospective_cancel_count * 100 // live_count}%). "
+                f"Threshold is 20%. Treating as a fetch problem, no rows touched."
+            )
+            return {
+                "venues": 0, "screens": 0, "showtimes": 0, "cancelled": 0,
+                "skipped": True, "reason": "cancellation_threshold_exceeded",
+                "would_have_cancelled": prospective_cancel_count,
+            }
+
+        cancel_result = await session.execute(
+            update(Showtime)
+            .where(
+                Showtime.provider_id == provider.id,
+                Showtime.provider_showtime_ref.notin_(current_ids),
+            )
+            .values(status="CANCELLED")
+        )
+        cancelled = cancel_result.rowcount or 0
+
+        titles = {st["movie_title"] for st in pvr_showtimes}
+        existing_movies = (await session.execute(
+            select(Movie).where(Movie.title.in_(titles))
+        )).scalars().all()
+        movies_by_title = {m.title: m for m in existing_movies}
+
+        existing_showtimes = (await session.execute(
+            select(Showtime).where(Showtime.provider_showtime_ref.in_(current_ids))
+        )).scalars().all()
+        showtimes_by_ref = {s.provider_showtime_ref: s for s in existing_showtimes}
+
+        new_movies: list[Movie] = []
+        new_showtimes: list[Showtime] = []
+        synced = 0
+
+        for st in pvr_showtimes:
+            title = st["movie_title"]
+            poster_url = st.get("poster_url") or DEFAULT_POSTER
+            banner_url = st.get("banner_url")
+
+            movie = movies_by_title.get(title)
+            if not movie:
+                release_year = st.get("release_year")
+                release_date = (
+                    datetime(release_year, 1, 1, tzinfo=timezone.utc)
+                    if release_year else None
                 )
-            )).scalar_one_or_none()
-            if not venue:
-                venue = Venue(
+                movie = Movie(
                     id=uuid.uuid4(),
-                    name=cinema_name,
-                    city=city,
-                    address=None,
-                    timezone="Asia/Kolkata",
+                    title=title,
+                    language=st.get("language", "Malayalam"),
+                    duration_min=st.get("duration_min", 150),
+                    certificate=st.get("certificate", "UA"),
+                    status="PUBLISHED",
                     partner_id=partner_id,
+                    poster_url=poster_url,
+                    banner_url=banner_url,
+                    release_date=release_date,
+                    genre=st.get("genre"),
+                    synopsis=f"Now showing: {title}",
+                    cast_json=st.get("cast") or [],
+                    crew_json=st.get("crew") or [],
                 )
-                session.add(venue)
-                await session.flush()
-            venues_by_key[vkey] = venue
+                new_movies.append(movie)
+                movies_by_title[title] = movie
+            else:
+                movie.poster_url = poster_url
+                movie.genre = st.get("genre")
+                release_year = st.get("release_year")
+                if release_year:
+                    movie.release_date = datetime(release_year, 1, 1, tzinfo=timezone.utc)
+                if st.get("cast"):
+                    movie.cast_json = st["cast"]
+                if st.get("crew"):
+                    movie.crew_json = st["crew"]
 
-        skey = (cinema_name, city, screen_name)
-        if skey not in screens_by_key:
-            venue = venues_by_key[vkey]
-            screen = (await session.execute(
-                select(Screen).where(
-                    Screen.venue_id == venue.id,
-                    Screen.name == screen_name,
-                )
-            )).scalar_one_or_none()
-            if not screen:
-                screen = Screen(
+            cinema_name = st.get("cinema_name") or "Unknown Cinema"
+            city = st.get("city") or "Kochi"
+            screen_name = st.get("screen_name") or "Screen 1"
+            screen = screens_by_key[(cinema_name, city, screen_name)]
+            starts_at_dt = datetime.fromisoformat(st["starts_at"].replace("Z", "+00:00"))
+
+            existing_st = showtimes_by_ref.get(st["id"])
+            if not existing_st:
+                new_showtimes.append(Showtime(
                     id=uuid.uuid4(),
-                    venue_id=venue.id,
-                    name=screen_name,
-                    total_seats=0,
-                )
-                session.add(screen)
-                await session.flush()
-            screens_by_key[skey] = screen
+                    screen_id=screen.id,
+                    movie_id=movie.id,
+                    starts_at=starts_at_dt,
+                    language=st.get("language", "Malayalam"),
+                    format="2D",
+                    status="ACTIVE",
+                    partner_id=partner_id,
+                    provider_id=provider.id,
+                    provider_showtime_ref=st["id"],
+                ))
+            else:
+                existing_st.screen_id = screen.id
+                existing_st.starts_at = starts_at_dt
+                existing_st.provider_id = provider.id
+                existing_st.status = "ACTIVE"
 
-    # --- Guarded cancellation ---
-    #
-    # CANCELLATION IS ONLY VALID WHEN ABSENCE IS CONFIRMED.
-    # We confirmed a successful, non-empty fetch above. But to guard against
-    # partial responses from a cold Render instance or a mid-stream timeout,
-    # we refuse to cancel more than 20% of the provider's currently-active
-    # showtimes in one sync. Anything more indicates a fetch problem, not a
-    # real schedule change.
-    current_ids = [st["id"] for st in pvr_showtimes]
+            synced += 1
 
-    now = datetime.now(timezone.utc)
+        if new_movies:
+            session.add_all(new_movies)
+            await session.flush()
+        if new_showtimes:
+            session.add_all(new_showtimes)
+            await session.flush()
 
-    live_count = (await session.execute(
-        select(func.count()).select_from(Showtime).where(
-            Showtime.provider_id == provider.id,
-            Showtime.status == "ACTIVE",
-            Showtime.starts_at > now,
+        expired_result = await session.execute(
+            update(Showtime)
+            .where(
+                Showtime.provider_id == provider.id,
+                Showtime.status == "ACTIVE",
+                Showtime.starts_at < now,
+            )
+            .values(status="CANCELLED")
         )
-    )).scalar() or 0
+        expired = expired_result.rowcount or 0
+        if expired:
+            print(f"     expired {expired} past showtime(s)")
 
-    prospective_cancel_count = (await session.execute(
-        select(func.count()).select_from(Showtime).where(
-            Showtime.provider_id == provider.id,
-            Showtime.status == "ACTIVE",
-            Showtime.starts_at > now,
-            Showtime.provider_showtime_ref.notin_(current_ids),
-        )
-    )).scalar() or 0
+        await session.commit()
 
-    if live_count > 0 and prospective_cancel_count > max(5, int(live_count * 0.2)):
-        print(
-            f"     CANCELLATION REFUSED: would cancel {prospective_cancel_count} of "
-            f"{live_count} live showtimes "
-            f"({prospective_cancel_count * 100 // live_count}%). "
-            f"Threshold is 20%. Treating as a fetch problem, no rows touched."
-        )
         return {
-            "venues": 0, "screens": 0, "showtimes": 0, "cancelled": 0,
-            "skipped": True, "reason": "cancellation_threshold_exceeded",
-            "would_have_cancelled": prospective_cancel_count,
+            "venues": len(venues_by_key),
+            "screens": len(screens_by_key),
+            "showtimes": synced,
+            "cancelled": cancelled,
         }
 
-    cancel_result = await session.execute(
-        update(Showtime)
-        .where(
-            Showtime.provider_id == provider.id,
-            Showtime.provider_showtime_ref.notin_(current_ids),
-        )
-        .values(status="CANCELLED")
-    )
-    cancelled = cancel_result.rowcount or 0
 
-
-    titles = {st["movie_title"] for st in pvr_showtimes}
-    existing_movies = (await session.execute(
-        select(Movie).where(Movie.title.in_(titles))
-    )).scalars().all()
-    movies_by_title = {m.title: m for m in existing_movies}
-
-    existing_showtimes = (await session.execute(
-        select(Showtime).where(Showtime.provider_showtime_ref.in_(current_ids))
-    )).scalars().all()
-    showtimes_by_ref = {s.provider_showtime_ref: s for s in existing_showtimes}
-
-    new_movies: list[Movie] = []
-    new_showtimes: list[Showtime] = []
-    synced = 0
-
-    for st in pvr_showtimes:
-        title = st["movie_title"]
-        poster_url = st.get("poster_url") or DEFAULT_POSTER
-        banner_url = st.get("banner_url")   
-
-        movie = movies_by_title.get(title)
-        if not movie:
-            release_year = st.get("release_year")
-            release_date = (
-                datetime(release_year, 1, 1, tzinfo=timezone.utc)
-                if release_year else None
-            )
-            movie = Movie(
-                id=uuid.uuid4(),
-                title=title,
-                language=st.get("language", "Malayalam"),
-                duration_min=st.get("duration_min", 150),
-                certificate=st.get("certificate", "UA"),
-                status="PUBLISHED",
-                partner_id=partner_id,
-                poster_url=poster_url,
-                banner_url=banner_url,
-                release_date=release_date,
-                genre=st.get("genre"),
-                synopsis=f"Now showing: {title}",
-                cast_json=st.get("cast") or [],
-                crew_json=st.get("crew") or [],
-            )
-            new_movies.append(movie)
-            movies_by_title[title] = movie
-        else:
-            movie.poster_url = poster_url
-            movie.genre = st.get("genre")
-            release_year = st.get("release_year")
-            if release_year:
-                movie.release_date = datetime(release_year, 1, 1, tzinfo=timezone.utc)
-            # Only overwrite cast/crew if the provider actually sends them
-            if st.get("cast"):
-                movie.cast_json = st["cast"]
-            if st.get("crew"):
-                movie.crew_json = st["crew"]
-
-        cinema_name = st.get("cinema_name") or "Unknown Cinema"
-        city = st.get("city") or "Kochi"
-        screen_name = st.get("screen_name") or "Screen 1"
-        screen = screens_by_key[(cinema_name, city, screen_name)]
-        starts_at_dt = datetime.fromisoformat(st["starts_at"].replace("Z", "+00:00"))
-
-        existing_st = showtimes_by_ref.get(st["id"])
-        if not existing_st:
-            new_showtimes.append(Showtime(
-                id=uuid.uuid4(),
-                screen_id=screen.id,
-                movie_id=movie.id,
-                starts_at=starts_at_dt,
-                language=st.get("language", "Malayalam"),
-                format="2D",
-                status="ACTIVE",
-                partner_id=partner_id,
-                provider_id=provider.id,
-                provider_showtime_ref=st["id"],
-            ))
-        else:
-            existing_st.screen_id = screen.id
-            existing_st.starts_at = starts_at_dt
-            existing_st.provider_id = provider.id
-            existing_st.status = "ACTIVE"
-
-        synced += 1
-
-    # Flush new movies first so they get ids, then showtimes that reference them.
-    if new_movies:
-        session.add_all(new_movies)
-        await session.flush()
-    if new_showtimes:
-        session.add_all(new_showtimes)
-        await session.flush()
-
-    # Expire past showtimes so they don't block the guard tomorrow.
-    expired_result = await session.execute(
-        update(Showtime)
-        .where(
-            Showtime.provider_id == provider.id,
-            Showtime.status == "ACTIVE",
-            Showtime.starts_at < now,
-        )
-        .values(status="CANCELLED")
-    )
-    expired = expired_result.rowcount or 0
-    if expired:
-        print(f"     expired {expired} past showtime(s)")
-
-    return {
-        "venues": len(venues_by_key),
-        "screens": len(screens_by_key),
-        "showtimes": synced,
-        "cancelled": cancelled,
-    }
 async def sync_all_providers():
     print("=" * 60)
     print("Vyhbz provider sync")
     print("=" * 60)
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        async with AsyncSessionLocal() as session:
-            partner = await _ensure_partner(session)
+    async with httpx.AsyncClient(timeout=40.0) as client:
+        async with AsyncSessionLocal() as init_session:
+            partner = await _ensure_partner(init_session)
+            partner_id = partner.id
 
-            providers = (await session.execute(
+            providers = (await init_session.execute(
                 select(ProviderRegistryModel)
                 .where(ProviderRegistryModel.enabled == True)
                 .order_by(ProviderRegistryModel.name)
             )).scalars().all()
+            await init_session.commit()
 
-            if not providers:
-                print("No enabled providers in provider_registry. Nothing to do.")
-                return
+        if not providers:
+            print("No enabled providers in provider_registry. Nothing to do.")
+            return
 
-            print(f"Found {len(providers)} enabled provider(s):\n")
+        print(f"Found {len(providers)} enabled provider(s):\n")
 
-            total = {"venues": 0, "screens": 0, "showtimes": 0, "cancelled": 0}
-            for p in providers:
-                stats = await _sync_one_provider(session, client, p, partner.id)
-                for k in total:
-                    total[k] += stats.get(k, 0)
+        total = {"venues": 0, "screens": 0, "showtimes": 0, "cancelled": 0}
+        for p in providers:
+            stats = await _sync_one_provider(client, p, partner_id)
+            for k in total:
+                total[k] += stats.get(k, 0)
 
-            await session.commit()
-
-            print()
-            print("=" * 60)
-            print(
-                f"Totals across {len(providers)} provider(s): "
-                f"{total['venues']} venues, {total['screens']} screens, "
-                f"{total['showtimes']} showtimes, {total['cancelled']} cancelled"
-            )
-            print("=" * 60)
+        print()
+        print("=" * 60)
+        print(
+            f"Totals across {len(providers)} provider(s): "
+            f"{total['venues']} venues, {total['screens']} screens, "
+            f"{total['showtimes']} showtimes, {total['cancelled']} cancelled"
+        )
+        print("=" * 60)
 
 
 if __name__ == "__main__":
-    asyncio.run(sync_all_providers())   
+    try:
+        asyncio.run(sync_all_providers())
+    except Exception as e:
+        print(f"Sync script encountered top-level exception: {e}")   

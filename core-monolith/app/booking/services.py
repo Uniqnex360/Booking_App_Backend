@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+import time
 import uuid
 from datetime import date, datetime, timezone
 from typing import Optional, Any
@@ -54,6 +55,8 @@ from app.shared.providers.registry import ProviderRegistryModel, create_provider
 from app.shared.timeutil import utcnow
 
 logger = logging.getLogger(__name__)
+
+_SEAT_MAP_CACHE: dict[UUID, tuple[float, Optional[Any], bool]] = {}
 
 
 class BookingService:
@@ -1383,12 +1386,21 @@ class BookingService:
     async def get_provider_seat_map(
         self, showtime_id: UUID
     ) -> tuple[Optional[ProviderSeatMap], bool]:
+        now = time.time()
+        cached = _SEAT_MAP_CACHE.get(showtime_id)
+        if cached and (now - cached[0]) < 15.0:
+            return cached[1], cached[2]
+
         st, registry, provider = await self._resolve_provider_and_showtime(showtime_id)
+        if self.session:
+            await self.session.rollback()
         provider_showtime_ref = st.provider_showtime_ref or str(st.id)
         try:
             seat_map = await provider.seat_map(provider_showtime_ref)
+            _SEAT_MAP_CACHE[showtime_id] = (now, seat_map, True)
             return seat_map, True
         except ProviderUnavailable:
+            _SEAT_MAP_CACHE[showtime_id] = (now, None, False)
             return None, False
 
     async def reconcile_bookings(self, target_date: date) -> dict[str, Any]:

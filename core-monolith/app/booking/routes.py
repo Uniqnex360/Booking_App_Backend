@@ -337,6 +337,16 @@ async def get_showtime_seat_map(
         except ShowtimeNotProviderError:
             return await _build_local_seat_map(showtime_id)
 
+        screen_obj = None
+        if booking_service.session and getattr(st, "screen_id", None):
+            from app.movie.models import Screen
+            sc_res = await booking_service.session.execute(select(Screen).where(Screen.id == st.screen_id))
+            screen_obj = sc_res.scalar_one_or_none()
+
+        # Release DB connection back to QueuePool before making outbound HTTP calls
+        if booking_service.session:
+            await booking_service.session.rollback()
+
         try:
             seat_map, is_available = await booking_service.get_provider_seat_map(showtime_id)
             if not is_available or seat_map is None:
@@ -383,11 +393,6 @@ async def get_showtime_seat_map(
                 return False
             lo, hi = col_bounds.get(row, (num, num))
             return lo <= num <= hi
-        screen_obj = None
-        if booking_service.session and getattr(st, "screen_id", None):
-            from app.movie.models import Screen
-            sc_res = await booking_service.session.execute(select(Screen).where(Screen.id == st.screen_id))
-            screen_obj = sc_res.scalar_one_or_none()
 
         first_row_dist = float(screen_obj.first_row_distance_m) if (screen_obj and screen_obj.first_row_distance_m is not None) else 4.0
         is_couple = "couple" in (seat_map.screen_name or "").lower()
