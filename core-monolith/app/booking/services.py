@@ -1404,9 +1404,9 @@ class BookingService:
             seat_map = await provider.seat_map(provider_showtime_ref)
             _SEAT_MAP_CACHE[showtime_id] = (now, seat_map, True)
             return seat_map, True
-        except ProviderUnavailable:
-            _SEAT_MAP_CACHE[showtime_id] = (now, None, False)
-            return None, False
+        except ProviderUnavailable as exc:
+            _SEAT_MAP_CACHE.pop(showtime_id, None)
+            raise exc
 
     async def reconcile_bookings(self, target_date: date) -> dict[str, Any]:
         if not self.session:

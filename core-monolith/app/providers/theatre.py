@@ -81,19 +81,25 @@ class PVRProvider(ITheatreProvider):
     ) -> httpx.Response:
         client = self._get_client()
         last_exc: Exception | None = None
-        for attempt in range(2):
+        for attempt in range(4):
             try:
-                return await client.request(
+                resp = await client.request(
                     method,
                     f"{self._base_url}{path}",
                     headers=self._headers(),
                     timeout=self._timeout,
                     **kwargs,
                 )
+                if resp.status_code in (502, 503, 504):
+                    if attempt < 3:
+                        await asyncio.sleep(1.0 * (attempt + 1))
+                        continue
+                    raise ProviderUnavailable(f"PVR upstream 5xx on {method} {path}: {resp.status_code}")
+                return resp
             except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
                 last_exc = exc
-                if attempt == 0:
-                    await asyncio.sleep(0.5)
+                if attempt < 3:
+                    await asyncio.sleep(1.0 * (attempt + 1))
                     continue
                 raise ProviderUnavailable(
                     f"PVR {method} {path} failed after retry: {last_exc}"
@@ -103,21 +109,26 @@ class PVRProvider(ITheatreProvider):
     async def _get_with_retry(self, path: str, params: dict | None = None) -> httpx.Response:
         client = self._get_client()
         last_exc: Exception | None = None
-        for attempt in range(3):
+        for attempt in range(4):
             try:
                 resp = await client.get(
                     f"{self._base_url}{path}", params=params, headers=self._headers(), timeout=self._timeout
                 )
-                if resp.status_code >= 500:
-                    if attempt < 2:
-                        await asyncio.sleep(0.5 if attempt == 0 else 1.0)
+                if resp.status_code in (502, 503, 504):
+                    if attempt < 3:
+                        await asyncio.sleep(1.5 * (attempt + 1))
+                        continue
+                    raise ProviderUnavailable(f"PVR upstream 5xx on GET {path}: {resp.status_code}")
+                elif resp.status_code >= 500:
+                    if attempt < 1:
+                        await asyncio.sleep(1.0)
                         continue
                     raise ProviderUnavailable(f"PVR upstream 5xx on GET {path}: {resp.status_code}")
                 return resp
             except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
                 last_exc = exc
-                if attempt < 2:
-                    await asyncio.sleep(0.5 if attempt == 0 else 1.0)
+                if attempt < 3:
+                    await asyncio.sleep(1.5 * (attempt + 1))
                     continue
         raise ProviderUnavailable(f"PVR upstream unreachable on GET {path}: {last_exc}")
     async def cancel_booking(self, provider_booking_id: str) -> None:
