@@ -141,7 +141,7 @@ class PhoneEmailStrategy(IAuthenticationStrategy):
         last_name = data.get("user_last_name") or ""
         full_name = f"{first_name} {last_name}".strip()
         if not full_name:
-            full_name = "Phone User"
+            full_name = "User"
         phone = f"{clean_country}{clean_phone}"
         user = await self.user_repo.get_by_phone(phone)
         if not user:
