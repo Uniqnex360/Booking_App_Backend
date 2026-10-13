@@ -823,7 +823,32 @@ class BookingService:
             raise IllegalBookingTransition(
                 fresh.status.value if fresh else "UNKNOWN", BookingStatus.CONFIRMED.value
             )
-        return await self.booking_repo.get_by_id(booking.id)
+        confirmed = await self.booking_repo.get_by_id(booking.id)
+        if confirmed:
+            ref_str = confirmed.ref_code or str(confirmed.id)[:8].upper()
+            if self.session and confirmed.user_id:
+                from app.notification.service import create_user_notification
+                await create_user_notification(
+                    session=self.session,
+                    user_id=confirmed.user_id,
+                    title="Event Booking Confirmed! 🎉",
+                    description=f"Your booking ({ref_str}) for {confirmed.quantity or 1} pass(es) is confirmed. View your pass in Orders.",
+                    notif_type="booking",
+                    link=f"/bookings/{confirmed.id}",
+                    reference_key=f"booking_confirmed:{confirmed.id}",
+                    commit=True,
+                )
+            if self._notification and confirmed.contact_email:
+                try:
+                    await self._notification.send_email(
+                        email=confirmed.contact_email,
+                        subject=f"Your booking is confirmed — {ref_str}",
+                        body=self._ticket_email_body(confirmed),
+                        content_type="html",
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to send event confirmation email for %s: %s", confirmed.id, exc)
+        return confirmed
 
     async def _verify_razorpay_payment(
         self,
@@ -1008,31 +1033,48 @@ class BookingService:
             )
 
         confirmed = await self.booking_repo.get_by_id(booking.id)
-        if self._notification and confirmed and confirmed.contact_email:
-            try:
-                st_row = (await self.session.execute(
-                    select(Showtime).where(Showtime.id == booking.showtime_id)
-                )).scalar_one_or_none()
-                if st_row:
-                    movie_row = (await self.session.execute(
-                        select(Movie).where(Movie.id == st_row.movie_id)
+        if confirmed:
+            st_row = None
+            movie_title = "Movie"
+            if self.session and booking.showtime_id:
+                try:
+                    st_row = (await self.session.execute(
+                        select(Showtime).where(Showtime.id == booking.showtime_id)
                     )).scalar_one_or_none()
-                    movie_title = movie_row.title if movie_row else "Movie"
-                    starts_at = st_row.starts_at.strftime("%a, %d %b %Y %I:%M %p")
-                    html_content = self._build_confirmation_email(
-                        ref_code=confirmed.ref_code,
-                        movie_title=movie_title,
-                        cinema_name="Cinema",
-                        starts_at_ist=starts_at,
-                        booking=confirmed,
-                    )
+                    if st_row:
+                        movie_row = (await self.session.execute(
+                            select(Movie).where(Movie.id == st_row.movie_id)
+                        )).scalar_one_or_none()
+                        if movie_row:
+                            movie_title = movie_row.title
+                except Exception:
+                    pass
+
+            ref_str = confirmed.ref_code or str(confirmed.id)[:8].upper()
+            seats_str = ", ".join(confirmed.seat_codes or confirmed.seat_refs or [])
+            if self.session and confirmed.user_id:
+                from app.notification.service import create_user_notification
+                await create_user_notification(
+                    session=self.session,
+                    user_id=confirmed.user_id,
+                    title=f"Booking Confirmed: {movie_title} 🎉",
+                    description=f"Ref {ref_str} • Seats: {seats_str or 'Confirmed'}. Tap to view your e-ticket.",
+                    notif_type="booking",
+                    link=f"/bookings/{confirmed.id}",
+                    reference_key=f"booking_confirmed:{confirmed.id}",
+                    commit=True,
+                )
+
+            if self._notification and confirmed.contact_email:
+                try:
                     await self._notification.send_email(
-                        to=confirmed.contact_email,
-                        subject=f"Booking Confirmed: {movie_title} ({confirmed.ref_code})",
-                        body=html_content,
+                        email=confirmed.contact_email,
+                        subject=f"Booking Confirmed: {movie_title} ({ref_str})",
+                        body=self._ticket_email_body(confirmed, showtime_at=st_row.starts_at if st_row else None),
+                        content_type="html",
                     )
-            except Exception as e:
-                logger.warning("Failed to send confirmation email for booking %s: %s", booking.id, e)
+                except Exception as e:
+                    logger.warning("Failed to send confirmation email for booking %s: %s", booking.id, e)
 
         return confirmed
 
@@ -1112,11 +1154,27 @@ class BookingService:
                 contact_phone=booking.contact_phone,  
                 ticket_paise=booking.ticket_paise,      # ← add
                 fnb_paise=booking.fnb_paise,            # ← add
-                convenience_fee_paise=booking.convenience_fee_paise, 
+                convenience_fee_paise=booking.convenience_fee_paise,
+                terms_accepted_at=booking.terms_accepted_at,
+                hold_token_hash=booking.hold_token_hash,
+                hold_token_expires_at=booking.hold_token_expires_at,
             )
             await self.booking_repo.update_booking(updated_booking)
             if self.session:
                 await self.session.commit()
+            if self.session and updated_booking.user_id:
+                from app.notification.service import create_user_notification
+                seats_str = ", ".join(updated_booking.seat_codes or updated_booking.seat_refs or [])
+                await create_user_notification(
+                    session=self.session,
+                    user_id=updated_booking.user_id,
+                    title="Booking Confirmed! 🎉",
+                    description=f"Ref {updated_booking.ref_code} • Seats: {seats_str or 'Confirmed'}. Tap to view your e-ticket.",
+                    notif_type="booking",
+                    link=f"/bookings/{updated_booking.id}",
+                    reference_key=f"booking_confirmed:{updated_booking.id}",
+                    commit=True,
+                )
             if self._notification and updated_booking.contact_email:
                 try:
                     await self._notification.send_email(
@@ -1146,6 +1204,9 @@ class BookingService:
                 currency=booking.currency,
                 created_at=booking.created_at,
                 seat_refs=booking.seat_refs,
+                terms_accepted_at=booking.terms_accepted_at,
+                hold_token_hash=booking.hold_token_hash,
+                hold_token_expires_at=booking.hold_token_expires_at,
             )
             await self.booking_repo.update_booking(updated_booking)
             if self.session:
@@ -1174,6 +1235,9 @@ class BookingService:
                 currency=booking.currency,
                 created_at=booking.created_at,
                 seat_refs=booking.seat_refs,
+                terms_accepted_at=booking.terms_accepted_at,
+                hold_token_hash=booking.hold_token_hash,
+                hold_token_expires_at=booking.hold_token_expires_at,
             )
             await self.booking_repo.update_booking(pending_booking)
             if self.session:
@@ -1227,6 +1291,9 @@ class BookingService:
             currency=booking.currency,
             created_at=booking.created_at,
             seat_refs=booking.seat_refs,
+            terms_accepted_at=booking.terms_accepted_at,
+            hold_token_hash=booking.hold_token_hash,
+            hold_token_expires_at=booking.hold_token_expires_at,
         )
         await self.booking_repo.update_booking(cancelled_booking)
         if self.session:

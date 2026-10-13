@@ -636,6 +636,20 @@ async def cancel_legacy_booking(
             )
         except Exception as exc:
             logger.warning("Cancellation email failed for booking %s: %s", booking.id, exc)
+    try:
+        from app.notification.service import create_user_notification
+
+        await create_user_notification(
+            booking_service._session,
+            user_id=current_user.id,
+            title="Booking Cancelled",
+            body=f"Your booking ({booking.ref_code}) has been cancelled.",
+            category="booking",
+            reference_key=f"booking_cancelled:{booking.id}",
+        )
+        await booking_service._session.commit()
+    except Exception as exc:
+        logger.warning("In-app cancellation notification failed for booking %s: %s", booking.id, exc)
     return {"booking": {"id": str(booking.id), "status": "CANCELLED"}}
 @router.get("/bookings", status_code=status.HTTP_200_OK)
 async def list_my_bookings(

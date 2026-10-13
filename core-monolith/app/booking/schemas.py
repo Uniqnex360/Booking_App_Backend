@@ -122,6 +122,7 @@ class MovieBookingDetail(BaseBookingDetail):
     starts_at: datetime | None = None
     screen_name: str | None = None
     cinema_name: str | None = None
+    venue_name: str | None = None
     cinema_city: str | None = None
     cinema_address: str | None = None
     seat_codes: list[str] | None = None
@@ -149,6 +150,7 @@ class MovieBookingDetail(BaseBookingDetail):
             starts_at=st.starts_at,
             screen_name=screen.name if screen else None,
             cinema_name=venue.name if venue else None,
+            venue_name=venue.name if venue else None,
             cinema_city=venue.city if venue else None,
             cinema_address=venue.address if venue else None,
             seat_codes=seats or None,

@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_WINDOW: int = 60
     ALLOWED_HOSTS: List[str] = [""]
     FIREBASE_PROJECT_ID: Optional[str] = None
+    FIREBASE_SERVICE_ACCOUNT_JSON: Optional[str] = None
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: Optional[int] = None
     RESEND_API_KEY: Optional[str] = None

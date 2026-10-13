@@ -20,6 +20,7 @@ from app.payment.routes import router as payment_router
 from app.review.routes import router as review_router
 from app.support.routes import router as support_router
 from app.coupon.routes import partner_coupon_router, checkout_coupon_router
+from app.notification.routes import router as notification_router
 from app.booking.interfaces import BookingNotFoundError
 
 from slowapi.errors import RateLimitExceeded
@@ -163,6 +164,7 @@ def create_app(environment: Optional[str] = None) -> FastAPI:
     application.include_router(admin_router, prefix="/v1")
     application.include_router(review_router, prefix="/v1")
     application.include_router(support_router, prefix="/v1")
+    application.include_router(notification_router, prefix="/v1")
     application.include_router(partner_coupon_router)
     application.include_router(checkout_coupon_router)
 

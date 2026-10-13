@@ -328,7 +328,8 @@ async def update_partner_status_admin(
     admin_user: AuthUserDomain = Depends(require_role(["ADMIN"])),
     service: PartnerService = Depends(get_partner_service),
     user_repo: IUserRepository = Depends(get_user_repo),
-    notification_service: INotificationService = Depends(get_notification_service)
+    notification_service: INotificationService = Depends(get_notification_service),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
         partner = await service.update_partner_status(
@@ -361,6 +362,33 @@ async def update_partner_status_admin(
                     await notification_service.send_email(target_user.email, subject, body)
             except Exception as e:
                 print(f"Notification Error: {e}")
+
+        try:
+            from app.notification.service import create_user_notification
+
+            if data.status == PartnerStatus.APPROVED:
+                await create_user_notification(
+                    db,
+                    user_id=partner.user_id,
+                    title="Partner Application Approved!",
+                    body=f"Your business '{partner.business_name}' is approved. You can now access the Partner Dashboard.",
+                    category="update",
+                    reference_key=f"partner_status:{partner.id}:APPROVED",
+                )
+                await db.commit()
+            elif data.status == PartnerStatus.REJECTED:
+                reason_text = f" Reason: {data.rejection_reason}" if data.rejection_reason else ""
+                await create_user_notification(
+                    db,
+                    user_id=partner.user_id,
+                    title="Partner Application Update",
+                    body=f"Your application for '{partner.business_name}' was not approved.{reason_text}",
+                    category="update",
+                    reference_key=f"partner_status:{partner.id}:REJECTED",
+                )
+                await db.commit()
+        except Exception as e:
+            print(f"In-App Notification Error: {e}")
 
         return success_response(data=partner, message="Partner status updated successfully.")
 

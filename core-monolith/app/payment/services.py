@@ -232,7 +232,7 @@ class PaymentService:
             except Exception as e:
                 logger.exception("Failed to record coupon redemption: %s", e)
 
-        await self.booking_service.commit_booking(
+        committed = await self.booking_service.commit_booking(
             user_id=user_id,
             booking_id=booking_id,
             payment_ref=razorpay_payment_id,
@@ -242,6 +242,7 @@ class PaymentService:
             "payment_id": razorpay_payment_id,
             "amount_paise": payment.amount_paise,
             "booking_id": str(booking_id),
+            "ref_code": getattr(committed, "ref_code", None),
         }
 
     async def handle_webhook(self, raw_body: bytes, signature: str) -> dict[str, Any]:
