@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import delete, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import (
@@ -183,31 +184,52 @@ async def register_device_token(
     if not token_str:
         raise HTTPException(status_code=400, detail="fcm_token is required")
 
-    existing = (
-        await db.execute(
-            select(UserDeviceTokenModel).where(
-                UserDeviceTokenModel.fcm_token == token_str
-            )
-        )
-    ).scalar_one_or_none()
-
+    platform_val = (body.platform or "web").strip()[:32]
     now = utcnow()
-    if existing:
-        existing.user_id = current_user.id
-        existing.platform = body.platform[:32]
-        existing.updated_at = now
-    else:
-        db.add(
-            UserDeviceTokenModel(
+
+    try:
+        stmt = (
+            pg_insert(UserDeviceTokenModel)
+            .values(
                 id=uuid.uuid4(),
                 user_id=current_user.id,
                 fcm_token=token_str,
-                platform=body.platform[:32],
+                platform=platform_val,
                 created_at=now,
                 updated_at=now,
             )
+            .on_conflict_do_update(
+                index_elements=["fcm_token"],
+                set_={
+                    "user_id": current_user.id,
+                    "platform": platform_val,
+                    "updated_at": now,
+                },
+            )
         )
-    await db.commit()
+        await db.execute(stmt)
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        logger.warning(
+            "FCM token upsert encountered contention or error, retrying via select/update: %s",
+            exc,
+        )
+        existing = (
+            await db.execute(
+                select(UserDeviceTokenModel).where(
+                    UserDeviceTokenModel.fcm_token == token_str
+                )
+            )
+        ).scalar_one_or_none()
+        if existing:
+            existing.user_id = current_user.id
+            existing.platform = platform_val
+            existing.updated_at = utcnow()
+            await db.commit()
+        else:
+            raise
+
     return success_response(data={"registered": True})
 
 
