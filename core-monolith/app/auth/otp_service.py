@@ -32,7 +32,7 @@ class NotificationService(INotificationService):
 
         
         if resend_key:
-            sender = f"Vybh <{from_email}>" if "<" not in from_email else from_email
+            sender = f"Vybhz <{from_email}>" if "<" not in from_email else from_email
             payload = {
                 "from": sender,
                 "to": [email],
@@ -64,7 +64,7 @@ class NotificationService(INotificationService):
         if getattr(settings, "SMTP_HOST", None) and getattr(settings, "RESEND_FROM_EMAIL", None):
             import aiosmtplib
             msg = EmailMessage()
-            msg["From"] = getattr(settings, "EMAILS_FROM", from_email)
+            msg["From"] = f"Vybhz <{from_email}>" if "<" not in from_email else from_email
             msg["To"] = email
             msg["Subject"] = subject
             msg.add_alternative(body, subtype="html")
