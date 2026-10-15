@@ -211,7 +211,7 @@ class BookingService:
           <!-- BRAND LOGO & FESTIVE CONFETTI (PNG - NO SVG) -->
           <tr>
             <td align="center" style="padding-bottom: 24px;">
-              <img src="{asset_base}/header.png" alt="Vyhbz - EXPLORE ● BOOK ● ENJOY" width="280" style="display: block; width: 280px; max-width: 100%; height: auto; border: 0; outline: none; margin: 0 auto;" />
+              <img src="{asset_base}/header.png" alt="Vyhbz - EXPLORE ● BOOK ● ENJOY" width="280" style="display: block; width: 280px; max-width: 100%; height: auto; border: 0; outline: none; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif; font-size: 20px; font-weight: 900; color: #EA580C; text-align: center;" />
             </td>
           </tr>
 
@@ -241,7 +241,9 @@ class BookingService:
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
                         <td valign="top" style="width: 44px; padding-right: 16px;">
-                          <img src="{asset_base}/icon-calendar.png" alt="Date" width="44" height="44" style="display: block; width: 44px; height: 44px; border: 0; border-radius: 12px;" />
+                          <div style="width: 44px; height: 44px; background-color: #EFF6FF; border-radius: 12px; overflow: hidden;">
+                            <img src="{asset_base}/icon-calendar.png" alt="📅" width="44" height="44" style="display: block; width: 44px; height: 44px; border: 0; border-radius: 12px; font-size: 24px; text-align: center; line-height: 44px;" />
+                          </div>
                         </td>
                         <td valign="middle">
                           <div class="text-muted" style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 3px;">
@@ -263,7 +265,9 @@ class BookingService:
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
                         <td valign="top" style="width: 44px; padding-right: 16px;">
-                          <img src="{asset_base}/icon-ticket.png" alt="Seats" width="44" height="44" style="display: block; width: 44px; height: 44px; border: 0; border-radius: 12px;" />
+                          <div style="width: 44px; height: 44px; background-color: #FFF1F2; border-radius: 12px; overflow: hidden;">
+                            <img src="{asset_base}/icon-ticket.png" alt="🎟️" width="44" height="44" style="display: block; width: 44px; height: 44px; border: 0; border-radius: 12px; font-size: 24px; text-align: center; line-height: 44px;" />
+                          </div>
                         </td>
                         <td valign="middle">
                           <div class="text-muted" style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 3px;">
@@ -282,7 +286,9 @@ class BookingService:
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
                         <td valign="top" style="width: 44px; padding-right: 16px;">
-                          <img src="{asset_base}/icon-wallet.png" alt="Amount" width="44" height="44" style="display: block; width: 44px; height: 44px; border: 0; border-radius: 12px;" />
+                          <div style="width: 44px; height: 44px; background-color: #F5F3FF; border-radius: 12px; overflow: hidden;">
+                            <img src="{asset_base}/icon-wallet.png" alt="💳" width="44" height="44" style="display: block; width: 44px; height: 44px; border: 0; border-radius: 12px; font-size: 24px; text-align: center; line-height: 44px;" />
+                          </div>
                         </td>
                         <td valign="middle">
                           <div class="text-muted" style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 3px;">
@@ -301,7 +307,9 @@ class BookingService:
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
                         <td valign="top" style="width: 44px; padding-right: 16px;">
-                          <img src="{asset_base}/icon-status.png" alt="Status" width="44" height="44" style="display: block; width: 44px; height: 44px; border: 0; border-radius: 12px;" />
+                          <div style="width: 44px; height: 44px; background-color: #F0FDF4; border-radius: 12px; overflow: hidden;">
+                            <img src="{asset_base}/icon-status.png" alt="✔" width="44" height="44" style="display: block; width: 44px; height: 44px; border: 0; border-radius: 12px; font-size: 20px; font-weight: 900; color: #16A34A; text-align: center; line-height: 44px;" />
+                          </div>
                         </td>
                         <td valign="middle">
                           <div class="text-muted" style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 3px;">
@@ -321,7 +329,7 @@ class BookingService:
                           <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                             <tr>
                               <td valign="top" style="width: 26px; padding-right: 12px;">
-                                <img src="{asset_base}/icon-check.png" alt="✔" width="26" height="26" style="display: block; width: 26px; height: 26px; border: 0;" />
+                                <img src="{asset_base}/icon-check.png" alt="✔" width="26" height="26" style="display: block; width: 26px; height: 26px; border: 0; font-size: 16px; font-weight: 900; color: #10B981; text-align: center; line-height: 26px;" />
                               </td>
                               <td valign="middle">
                                 <div class="notice-title" style="font-size: 14px; font-weight: 800; color: #065F46; margin-bottom: 2px;">
