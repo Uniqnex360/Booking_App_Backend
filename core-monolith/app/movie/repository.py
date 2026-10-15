@@ -1,7 +1,7 @@
 from __future__ import annotations
 import asyncio
 import uuid
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from app.shared.timeutil import utcnow
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -217,6 +217,7 @@ class MovieRepository:
             .where(
                 Showtime.movie_id == movie_id,
                 Showtime.status == ShowtimeStatus.ACTIVE.value,
+                Showtime.starts_at >= utcnow() - timedelta(hours=2),
             )
             .order_by(Venue.name.asc(), Showtime.starts_at.asc())
         )
