@@ -15,6 +15,9 @@ from app.user.interfaces import (
     Address, 
 )
 from app.user.models import UserProfileORM, AddressORM
+from app.auth.models import User, UsedPhoneEmailVerification
+from app.booking.models import BookingModel
+from app.payment.models import PaymentModel
 
 
 class SQLAlchemyUserProfileRepository(IUserProfileRepository):
@@ -81,6 +84,50 @@ class SQLAlchemyUserProfileRepository(IUserProfileRepository):
         except SQLAlchemyError as e:
             await self.db.rollback()
             raise RepositoryError(f"Failed to update profile: {str(e)}")
+
+    async def delete_account(self, user_id: uuid.UUID) -> None:
+        try:
+            # 1. Anonymize payments for bookings belonging to this user (strip raw_event)
+            stmt_payments = (
+                update(PaymentModel)
+                .where(
+                    PaymentModel.booking_id.in_(
+                        select(BookingModel.id).where(BookingModel.user_id == user_id)
+                    )
+                )
+                .values(raw_event=None)
+            )
+            await self.db.execute(stmt_payments)
+
+            # 2. Anonymize bookings: unlink user and strip contact PII while keeping financial/accounting records
+            stmt_bookings = (
+                update(BookingModel)
+                .where(BookingModel.user_id == user_id)
+                .values(user_id=None, contact_email=None, contact_phone=None)
+            )
+            await self.db.execute(stmt_bookings)
+
+            # 3. Anonymize phone/email verification replay tracking without breaking replay defense
+            stmt_verifications = (
+                update(UsedPhoneEmailVerification)
+                .where(UsedPhoneEmailVerification.user_id == user_id)
+                .values(user_id=None)
+            )
+            await self.db.execute(stmt_verifications)
+
+            # 4. Delete user record.
+            # Cascades in DB will automatically delete:
+            # - user_profiles, addresses, user_notifications, user_device_tokens,
+            # - movie_reviews, coupon_redemptions, refresh_tokens, otp_codes, password_resets
+            stmt_user = delete(User).where(User.id == user_id)
+            result = await self.db.execute(stmt_user)
+            if result.rowcount == 0:
+                raise ProfileNotFoundError()
+
+            await self.db.commit()
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            raise RepositoryError(f"Failed to delete account: {str(e)}")
 
 
 class SQLAlchemyAddressRepository(IAddressRepository):

@@ -1,8 +1,13 @@
 
 import uuid
-from typing import List, Optional
-from app.shared.exceptions import UnauthorizedError
+from typing import List, Optional, Any
+from app.shared.exceptions import UnauthorizedError, ForbiddenError
 from app.user.interfaces import AddressNotFoundError
+
+
+class AccountDeletionForbiddenError(ForbiddenError):
+    def __init__(self, message: str = "Partner and Admin accounts cannot be deleted directly from the app. Please contact support at support@vyhbz.com."):
+        super().__init__(message)
 
 from app.user.interfaces import (
     IUserProfileRepository, IAddressRepository, 
@@ -79,3 +84,11 @@ class UserProfileService:
             raise UnauthorizedError("Access Denied")
             
         await self.address_repo.delete(address_id)
+
+    async def delete_account(self, user_id: uuid.UUID, role: Any) -> None:
+        role_str = role.value if hasattr(role, "value") else str(role)
+        if role_str in ("ADMIN", "PARTNER"):
+            raise AccountDeletionForbiddenError(
+                "Partner and Admin accounts cannot be deleted directly from the app. Please contact support at support@vyhbz.com."
+            )
+        await self.profile_repo.delete_account(user_id)

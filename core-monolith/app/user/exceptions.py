@@ -30,3 +30,11 @@ class UnauthorizedAddressHTTP(HTTPException):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this address"
         )
+
+
+class AccountDeletionForbiddenHTTP(HTTPException):
+    def __init__(self, detail: str = "Partner and Admin accounts cannot be deleted directly from the app. Please contact support at support@vyhbz.com."):
+        super().__init__(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=detail
+        )

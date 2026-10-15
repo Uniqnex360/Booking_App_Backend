@@ -13,7 +13,7 @@ from app.auth.interfaces import User as AuthUserDomain
 
 # User logic
 from app.user.dependencies import get_user_service
-from app.user.services import UserProfileService
+from app.user.services import UserProfileService, AccountDeletionForbiddenError
 from app.user.interfaces import ProfileNotFoundError, AddressNotFoundError
 from app.user.schemas import (
     ProfileUpdateRequest,
@@ -24,6 +24,7 @@ from app.user.exceptions import (
     ProfileNotFoundHTTP, 
     AddressNotFoundHTTP, 
     UnauthorizedAddressHTTP,
+    AccountDeletionForbiddenHTTP,
 )
 
 router = APIRouter(prefix="/users", tags=["User"])
@@ -55,6 +56,24 @@ async def update_my_profile(
             data=profile, 
             message="Profile updated successfully."
         )
+    except ProfileNotFoundError:
+        raise ProfileNotFoundHTTP()
+    except RepositoryError as e:
+        raise UserRepositoryHTTP(str(e))
+
+@router.delete("/me")
+async def delete_my_account(
+    current_user: AuthUserDomain = Depends(get_current_user),
+    user_service: UserProfileService = Depends(get_user_service),
+):
+    try:
+        await user_service.delete_account(current_user.id, current_user.role)
+        return success_response(
+            data={"message": "Account successfully deleted."},
+            message="Account successfully deleted."
+        )
+    except AccountDeletionForbiddenError as e:
+        raise AccountDeletionForbiddenHTTP(str(e))
     except ProfileNotFoundError:
         raise ProfileNotFoundHTTP()
     except RepositoryError as e:
