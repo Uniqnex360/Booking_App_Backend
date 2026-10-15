@@ -141,82 +141,298 @@ class BookingService:
         </html>
         """
     def _ticket_email_body(self, booking: Booking, showtime_at=None) -> str:
-
         from datetime import timezone
         from zoneinfo import ZoneInfo
 
-        
+        try:
+            from app.core.config import settings
+            frontend_url = getattr(settings, "FRONTEND_URL", "https://booking-app-frontend-navy.vercel.app") or "https://booking-app-frontend-navy.vercel.app"
+        except Exception:
+            frontend_url = "https://booking-app-frontend-navy.vercel.app"
+        logo_url = f"{frontend_url.rstrip('/')}/logo.png"
 
-        dt = showtime_at or booking.held_until or booking.created_at
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        starts_at_ist = dt.astimezone(ZoneInfo("Asia/Kolkata")).strftime(
-            "%A, %d %B %Y at %I:%M %p"
-        )
+        dt = showtime_at or booking.created_at or booking.held_until
+        if dt is not None:
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            dt_ist = dt.astimezone(ZoneInfo("Asia/Kolkata"))
+            date_str = dt_ist.strftime("%A, %d %B %Y")
+            time_str = dt_ist.strftime("at %I:%M %p")
+        else:
+            date_str = "Confirmed Schedule"
+            time_str = ""
 
-        seat_codes = ", ".join(booking.seat_codes or booking.seat_refs or [])
+        seats_list = booking.seat_codes or booking.seat_refs or []
+        if seats_list:
+            seat_label = f"SEATS ({len(seats_list)})"
+            seat_val = ", ".join(seats_list)
+        else:
+            qty = booking.quantity or 1
+            seat_label = f"PASSES ({qty})" if booking.event_id else f"SEATS ({qty})"
+            seat_val = f"{qty} Confirmed"
+
         amount_formatted = f"₹{booking.total_paise / 100:.2f}"
-        ref_code = booking.ref_code or "—"
+        ref_code = booking.ref_code or "AGS-CONFIRMED"
+        status_val = booking.status.value if hasattr(booking.status, "value") else str(booking.status or "CONFIRMED")
 
-        return f"""\
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta charset="utf-8">
-    <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0a0a0a; color: #f5f5f5; margin: 0; padding: 20px; }}
-        .ticket-card {{ max-width: 520px; margin: 0 auto; background: #171717; border-radius: 16px; border: 1px solid #262626; overflow: hidden; }}
-        .ticket-header {{ background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; padding: 24px; }}
-        .ticket-header h1 {{ margin: 0; font-size: 24px; font-weight: 900; letter-spacing: 1px; }}
-        .ticket-ref {{ font-family: monospace; font-size: 14px; font-weight: bold; opacity: 0.9; margin-top: 4px; }}
-        .ticket-body {{ padding: 24px; }}
-        .movie-title {{ font-size: 22px; font-weight: bold; color: #ffffff; margin: 0 0 4px 0; }}
-        .cinema-name {{ color: #a3a3a3; font-size: 14px; margin-bottom: 20px; }}
-        .info-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; background: #262626; padding: 16px; border-radius: 12px; margin-bottom: 24px; }}
-        .info-label {{ font-size: 11px; text-transform: uppercase; color: #737373; font-weight: bold; }}
-        .info-val {{ font-size: 14px; color: #f5f5f5; font-weight: bold; margin-top: 2px; }}
-        .btn {{ display: block; text-align: center; background: #f59e0b; color: #000; text-decoration: none; font-weight: bold; padding: 14px; border-radius: 10px; font-size: 14px; }}
-        .footer {{ text-align: center; color: #525252; font-size: 12px; margin-top: 20px; }}
-    </style>
-    </head>
-    <body>
-    <div class="info-label">Showtime</div>
-    <div class="ticket-card">
-        <div class="ticket-header">
-        <h1>VYHBZ</h1>
-        <div class="ticket-ref">BOOKING CONFIRMED: {ref_code}</div>
-        </div>
-        <div class="ticket-body">
-        <div class="movie-title">Your tickets are confirmed</div>
-        <div class="cinema-name">Booking reference {ref_code}</div>
+        return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your tickets are confirmed!</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #F8FAFC; padding: 36px 16px 48px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 480px; margin: 0 auto;">
+          
+          <!-- BRAND LOGO & FESTIVE CONFETTI -->
+          <tr>
+            <td align="center" style="padding-bottom: 24px;">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                <tr>
+                  <!-- Left Confetti -->
+                  <td valign="middle" align="right" style="padding-right: 12px; width: 50px;">
+                    <svg width="45" height="75" viewBox="0 0 45 75" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M12 50L2 70" stroke="#00C5E8" stroke-width="7" stroke-linecap="round"/>
+                      <path d="M38 18L18 45" stroke="#06B6D4" stroke-width="7" stroke-linecap="round"/>
+                    </svg>
+                  </td>
 
-        <div class="info-grid">
-            <div>
-            <div class="info-label">Booked on</div>
-            <div class="info-val">{starts_at_ist}</div>
-            </div>
-            <div>
-            <div class="info-label">Seats ({len(booking.seat_codes or booking.seat_refs or [])})</div>
-            <div class="info-val" style="color: #f59e0b;">{seat_codes}</div>
-            </div>
-            <div>
-            <div class="info-label">Total Amount</div>
-            <div class="info-val">{amount_formatted}</div>
-            </div>
-            <div>
-            <div class="info-label">Status</div>
-            <div class="info-val" style="color: #4ade80;">{booking.status.value if hasattr(booking.status, "value") else booking.status}</div>
-            </div>
-        </div>
+                  <!-- Logo -->
+                  <td valign="middle" align="center">
+                    <img src="{logo_url}" alt="Vyhbz" width="170" style="display: block; width: 170px; max-width: 170px; height: auto; border: 0; outline: none; margin: 0 auto;" />
+                    <div style="font-size: 11px; font-weight: 800; letter-spacing: 3px; color: #374151; margin-top: 8px; text-transform: uppercase;">
+                      EXPLORE &nbsp;<span style="color: #00C5E8; font-size: 12px;">●</span>&nbsp; BOOK &nbsp;<span style="color: #F59E0B; font-size: 12px;">●</span>&nbsp; ENJOY &nbsp;<span style="color: #EC4899; font-size: 12px;">●</span>
+                    </div>
+                  </td>
 
-        <div class="footer">
-            Show this reference at the venue. You'll receive a reminder before your show.
-        </div>
-        </div>
-    </div>
-    </body>
-    </html>
-    """
+                  <!-- Right Confetti -->
+                  <td valign="middle" align="left" style="padding-left: 12px; width: 50px;">
+                    <svg width="45" height="75" viewBox="0 0 45 75" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M8 18L28 45" stroke="#F97316" stroke-width="7" stroke-linecap="round"/>
+                      <path d="M34 50L44 70" stroke="#EC4899" stroke-width="7" stroke-linecap="round"/>
+                    </svg>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- HEADER TITLE -->
+          <tr>
+            <td align="center" style="padding-bottom: 24px;">
+              <div style="font-size: 13px; font-weight: 800; color: #EA580C; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px;">
+                BOOKING CONFIRMED
+              </div>
+              <h1 style="font-size: 30px; font-weight: 900; color: #0F172A; margin: 0 0 8px 0; line-height: 1.2; letter-spacing: -0.5px;">
+                Your tickets are confirmed!
+              </h1>
+              <p style="font-size: 15px; color: #4B5563; margin: 0; font-weight: 400;">
+                Get ready to create amazing memories with Vyhbz.
+              </p>
+            </td>
+          </tr>
+
+          <!-- MAIN WHITE CARD -->
+          <tr>
+            <td>
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #FFFFFF; border-radius: 20px; border: 1px solid #E2E8F0; box-shadow: 0 4px 25px rgba(0, 0, 0, 0.04);">
+                <tr>
+                  <td style="padding: 24px;">
+                    
+                    <!-- ROW 1: BOOKED ON -->
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                      <tr>
+                        <td valign="top" style="width: 44px; padding-right: 16px;">
+                          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="44" height="44" style="width: 44px; height: 44px; background-color: #EFF6FF; border-radius: 12px;">
+                            <tr>
+                              <td align="center" valign="middle">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <rect x="3" y="4" width="18" height="18" rx="3" stroke="#2563EB" stroke-width="2"/>
+                                  <line x1="16" y1="2" x2="16" y2="6" stroke="#2563EB" stroke-width="2" stroke-linecap="round"/>
+                                  <line x1="8" y1="2" x2="8" y2="6" stroke="#2563EB" stroke-width="2" stroke-linecap="round"/>
+                                  <line x1="3" y1="10" x2="21" y2="10" stroke="#2563EB" stroke-width="2"/>
+                                  <rect x="7" y="14" width="2.5" height="2.5" rx="0.5" fill="#2563EB"/>
+                                  <rect x="11" y="14" width="2.5" height="2.5" rx="0.5" fill="#2563EB"/>
+                                  <rect x="15" y="14" width="2.5" height="2.5" rx="0.5" fill="#2563EB"/>
+                                </svg>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                        <td valign="middle">
+                          <div style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 3px;">
+                            BOOKED ON
+                          </div>
+                          <div style="font-size: 16px; font-weight: 800; color: #0F172A; line-height: 1.3;">
+                            {date_str}
+                          </div>
+                          <div style="font-size: 15px; font-weight: 700; color: #0F172A; line-height: 1.3;">
+                            {time_str}
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <div style="height: 1px; background-color: #F1F5F9; margin: 18px 0;"></div>
+
+                    <!-- ROW 2: SEATS -->
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                      <tr>
+                        <td valign="top" style="width: 44px; padding-right: 16px;">
+                          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="44" height="44" style="width: 44px; height: 44px; background-color: #FFF1F2; border-radius: 12px;">
+                            <tr>
+                              <td align="center" valign="middle">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <path d="M2 9C3.65685 9 5 7.65685 5 6V5C5 3.89543 5.89543 3 7 3H17C18.1046 3 19 3.89543 19 5V6C19 7.65685 20.3431 9 22 9V15C20.3431 15 19 16.3431 19 18V19C19 20.1046 18.1046 21 17 21H7C5.89543 21 5 20.1046 5 19V18C5 16.3431 3.65685 15 2 15V9Z" stroke="#E11D48" stroke-width="2"/>
+                                  <line x1="12" y1="7" x2="12" y2="9" stroke="#E11D48" stroke-width="2" stroke-linecap="round"/>
+                                  <line x1="12" y1="11" x2="12" y2="13" stroke="#E11D48" stroke-width="2" stroke-linecap="round"/>
+                                  <line x1="12" y1="15" x2="12" y2="17" stroke="#E11D48" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                        <td valign="middle">
+                          <div style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 3px;">
+                            {seat_label}
+                          </div>
+                          <div style="font-size: 17px; font-weight: 800; color: #F97316;">
+                            {seat_val}
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <div style="height: 1px; background-color: #F1F5F9; margin: 18px 0;"></div>
+
+                    <!-- ROW 3: TOTAL AMOUNT -->
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                      <tr>
+                        <td valign="top" style="width: 44px; padding-right: 16px;">
+                          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="44" height="44" style="width: 44px; height: 44px; background-color: #FAF5FF; border-radius: 12px;">
+                            <tr>
+                              <td align="center" valign="middle">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <rect x="2" y="5" width="20" height="14" rx="3" stroke="#9333EA" stroke-width="2"/>
+                                  <line x1="2" y1="9" x2="22" y2="9" stroke="#9333EA" stroke-width="2"/>
+                                  <circle cx="17" cy="14" r="1.5" fill="#9333EA"/>
+                                </svg>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                        <td valign="middle">
+                          <div style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 3px;">
+                            TOTAL AMOUNT
+                          </div>
+                          <div style="font-size: 18px; font-weight: 800; color: #0F172A;">
+                            {amount_formatted}
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <div style="height: 1px; background-color: #F1F5F9; margin: 18px 0;"></div>
+
+                    <!-- ROW 4: STATUS -->
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                      <tr>
+                        <td valign="top" style="width: 44px; padding-right: 16px;">
+                          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="44" height="44" style="width: 44px; height: 44px; background-color: #F0FDF4; border-radius: 12px;">
+                            <tr>
+                              <td align="center" valign="middle">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <circle cx="12" cy="12" r="10" stroke="#16A34A" stroke-width="2"/>
+                                  <polyline points="8 12 11 15 16 9" stroke="#16A34A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                        <td valign="middle">
+                          <div style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 3px;">
+                            STATUS
+                          </div>
+                          <div style="font-size: 16px; font-weight: 800; color: #16A34A; letter-spacing: 0.5px;">
+                            {status_val}
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- GREEN NOTICE BANNER -->
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 14px; margin-top: 22px;">
+                      <tr>
+                        <td style="padding: 14px 16px;">
+                          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                            <tr>
+                              <td valign="top" style="width: 28px; padding-right: 12px;">
+                                <div style="width: 26px; height: 26px; background-color: #10B981; border-radius: 50%; text-align: center; line-height: 26px; display: inline-block;">
+                                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="vertical-align: middle;" xmlns="http://www.w3.org/2000/svg">
+                                    <polyline points="20 6 9 17 4 12" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                                  </svg>
+                                </div>
+                              </td>
+                              <td valign="middle">
+                                <div style="font-size: 14px; font-weight: 800; color: #065F46; margin-bottom: 2px;">
+                                  Booking confirmed!
+                                </div>
+                                <div style="font-size: 12px; color: #047857; line-height: 1.4;">
+                                  Show this reference at the venue. You'll receive a reminder before your show.
+                                </div>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- BOOKING REFERENCE BOX -->
+          <tr>
+            <td style="padding-top: 18px;">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #EEF2F6; border-radius: 14px;">
+                <tr>
+                  <td align="center" style="padding: 16px 20px;">
+                    <div style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px;">
+                      BOOKING REFERENCE
+                    </div>
+                    <div style="font-size: 22px; font-weight: 900; color: #0F172A; letter-spacing: 2px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;">
+                      {ref_code}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td align="center" style="padding-top: 26px; font-size: 12px; color: #64748B; line-height: 1.5;">
+              <div style="font-weight: 700; color: #334155; margin-bottom: 4px; font-size: 13px;">
+                Thanks for choosing Vyhbz!
+              </div>
+              <div>
+                Explore more movies, events, food, experiences and shopping — all in one place.
+              </div>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
     async def get_booking_detail(self, user_id: UUID, booking_id: UUID):
         
         result = await self.booking_repo.get_booking_with_context(booking_id)
