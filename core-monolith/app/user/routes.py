@@ -1,6 +1,6 @@
 import uuid
 from typing import List
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from app.user.exceptions import UserRepositoryHTTP
 
 # Shared logic
@@ -140,11 +140,7 @@ async def delete_address(
 ):
     try:
         await user_service.delete_address(current_user.id, address_id)
-        return success_response(
-            data=None, 
-            message="Address deleted successfully.",
-            code=204
-        )
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     except AddressNotFoundError:
         raise AddressNotFoundHTTP()
     except UnauthorizedError:

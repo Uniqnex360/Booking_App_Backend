@@ -12,7 +12,7 @@ from app.fnb.schemas import ContactUpdateRequest
 from app.booking.interfaces import BookingStatus
 from sqlalchemy import select
 from app.booking.schemas import BookingDetailResponse 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from fastapi.responses import JSONResponse
 from app.auth.routes import limiter
 from app.auth.dependencies import get_current_user,get_current_user_optional,get_notification_service
@@ -244,11 +244,14 @@ async def delete_provider_hold(
         await booking_service.cancel_hold(
             user_id=booking.user_id, booking_id=booking.id
         )
-        return JSONResponse(status_code=status.HTTP_204_NO_CONTENT, content=None)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     except BookingNotFoundError:
-        return error_response("BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
-    except IllegalBookingTransition as exc:
-        return error_response("ILLEGAL_BOOKING_TRANSITION", str(exc), status.HTTP_409_CONFLICT)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except IllegalBookingTransition:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except Exception as exc:
+        logger.warning("Error cancelling hold %s: %s", booking.id, exc)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     
 def _mask_guest_detail(detail: Any) -> Any:
     if hasattr(detail, "contact_email") and detail.contact_email:
@@ -800,6 +803,9 @@ async def delete_self_hosted_seat_hold(
 ):
     try:
         await booking_service.release_seat_hold(booking.user_id, booking.id)
-        return JSONResponse(status_code=status.HTTP_204_NO_CONTENT, content=None)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     except BookingNotFoundError:
-        return error_response("BOOKING_NOT_FOUND", "Booking not found", status.HTTP_404_NOT_FOUND)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except Exception as exc:
+        logger.warning("Error releasing seat hold %s: %s", booking.id, exc)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
