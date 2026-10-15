@@ -13,11 +13,13 @@ from app.user.interfaces import (
     IAddressRepository, 
     UserProfile, 
     Address, 
+    AccountDeletionForbiddenError,
 )
 from app.user.models import UserProfileORM, AddressORM
 from app.auth.models import User, UsedPhoneEmailVerification
 from app.booking.models import BookingModel
 from app.payment.models import PaymentModel
+from app.partner.models import PartnerORM
 
 
 class SQLAlchemyUserProfileRepository(IUserProfileRepository):
@@ -86,6 +88,14 @@ class SQLAlchemyUserProfileRepository(IUserProfileRepository):
             raise RepositoryError(f"Failed to update profile: {str(e)}")
 
     async def delete_account(self, user_id: uuid.UUID) -> None:
+        # Check if the user is a partner in partners table (e.g. organiser, theater partner, restaurant partner)
+        stmt_partner = select(PartnerORM.id).where(PartnerORM.user_id == user_id)
+        partner_res = await self.db.execute(stmt_partner)
+        if partner_res.scalar_one_or_none() is not None:
+            raise AccountDeletionForbiddenError(
+                "Partner and Admin accounts cannot be deleted directly from the app. Please contact support at support@vyhbz.com."
+            )
+
         try:
             # 1. Anonymize payments for bookings belonging to this user (strip raw_event)
             stmt_payments = (

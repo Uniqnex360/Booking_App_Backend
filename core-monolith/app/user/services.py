@@ -1,17 +1,14 @@
 
 import uuid
 from typing import List, Optional, Any
-from app.shared.exceptions import UnauthorizedError, ForbiddenError
-from app.user.interfaces import AddressNotFoundError
-
-
-class AccountDeletionForbiddenError(ForbiddenError):
-    def __init__(self, message: str = "Partner and Admin accounts cannot be deleted directly from the app. Please contact support at support@vyhbz.com."):
-        super().__init__(message)
-
+from app.shared.exceptions import UnauthorizedError
 from app.user.interfaces import (
-    IUserProfileRepository, IAddressRepository, 
-    UserProfile, Address
+    AddressNotFoundError,
+    AccountDeletionForbiddenError,
+    IUserProfileRepository,
+    IAddressRepository, 
+    UserProfile,
+    Address,
 )
 
 

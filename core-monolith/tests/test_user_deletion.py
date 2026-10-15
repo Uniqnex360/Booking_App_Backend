@@ -299,3 +299,74 @@ async def test_admin_and_partner_deletion_blocked(session, client):
     # Verify admin user was NOT deleted
     a_check = await session.execute(select(User).where(User.id == admin_id))
     assert a_check.scalar_one_or_none() is not None
+
+
+@pytest.mark.asyncio
+async def test_partner_with_events_and_user_role_blocked(session, client):
+    from datetime import datetime, timezone
+    from app.partner.models import PartnerORM
+    from app.event.models import EventORM
+
+    user_id = uuid.uuid4()
+    user = User(
+        id=user_id,
+        full_name="Organiser User",
+        email="organiser@example.com",
+        phone="+919876543999",
+        password_hash="mock_hash",
+        role=UserRole.USER,
+        is_verified=True,
+        is_active=True,
+    )
+    session.add(user)
+
+    partner_id = uuid.uuid4()
+    partner = PartnerORM(
+        id=partner_id,
+        user_id=user_id,
+        business_name="My Events Co",
+        partner_type="EVENT_ORGANIZER",
+        contact_name="Organiser User",
+        contact_phone="+919876543999",
+        city="Kochi",
+        status="APPROVED",
+    )
+    session.add(partner)
+    await session.flush()
+
+    event_id = uuid.uuid4()
+    event = EventORM(
+        id=event_id,
+        partner_id=partner_id,
+        title="Music Festival",
+        slug=f"music-fest-{event_id.hex[:8]}",
+        category="music",
+        venue_name="Grand Arena",
+        city="Kochi",
+        starts_at=datetime.now(timezone.utc),
+        ends_at=datetime.now(timezone.utc),
+    )
+    session.add(event)
+    await session.commit()
+
+    user_domain = AuthUserDomain(
+        id=user_id,
+        full_name="Organiser User",
+        email="organiser@example.com",
+        phone="+919876543999",
+        password_hash="mock_hash",
+        role=UserRole.USER,
+        is_active=True,
+        is_verified=True,
+    )
+    token = JWTTokenService().create_access_token(user_domain)
+    res = await client.delete(
+        "/v1/users/me", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert res.status_code == 403
+    assert "support@vyhbz.com" in res.json()["detail"]
+
+    # Verify user and partner were NOT deleted
+    u_check = await session.execute(select(User).where(User.id == user_id))
+    assert u_check.scalar_one_or_none() is not None
+

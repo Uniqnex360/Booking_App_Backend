@@ -2,7 +2,14 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, date
 from typing import Optional, List, Protocol
-from app.shared.exceptions import EntityNotFoundError, UnauthorizedError
+from app.shared.exceptions import EntityNotFoundError, UnauthorizedError, ForbiddenError
+
+
+class AccountDeletionForbiddenError(ForbiddenError):
+    def __init__(self, message: str = "Partner and Admin accounts cannot be deleted directly from the app. Please contact support at support@vyhbz.com."):
+        super().__init__(message)
+
+
 @dataclass
 class UserProfile:
     id: uuid.UUID
@@ -14,6 +21,8 @@ class UserProfile:
     bio: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+
 @dataclass
 class Address:
     id: uuid.UUID
@@ -29,20 +38,30 @@ class Address:
     is_default: bool = False
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+
 class ProfileNotFoundError(EntityNotFoundError):
     def __init__(self):
         super().__init__("User profile not found")
+
+
 class AddressNotFoundError(EntityNotFoundError):
     def __init__(self):
         super().__init__("Address not found")
+
+
 class UnauthorizedAddressAccessError(UnauthorizedError):
     def __init__(self):
         super().__init__("You do not have access to this address")
+
+
 class IUserProfileRepository(Protocol):
     async def get_by_user_id(self, user_id: uuid.UUID) -> Optional[UserProfile]: ...
     async def create(self, profile: UserProfile) -> UserProfile: ...
     async def update(self, profile: UserProfile) -> UserProfile: ...
     async def delete_account(self, user_id: uuid.UUID) -> None: ...
+
+
 class IAddressRepository(Protocol):
     async def get_by_id(self, address_id: uuid.UUID) -> Optional[Address]: ...
     async def list_by_user(self, user_id: uuid.UUID) -> List[Address]: ...
