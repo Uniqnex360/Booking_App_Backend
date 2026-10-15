@@ -56,7 +56,7 @@ async def list_events(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     page: int = Query(1, ge=1),
-    limit: int = Query(10, le=100),
+    limit: int = Query(50, le=100),
     service: EventService = Depends(get_event_service)
 ):
     events, total = await service.list_public(

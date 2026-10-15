@@ -160,13 +160,17 @@ class SQLAlchemyEventRepository(IEventRepository):
         orm = result.scalar_one_or_none()
         return self._to_domain(orm) if orm else None
     async def list_venues(self, city: Optional[str] = None):
+        now_utc = datetime.now(timezone.utc)
         stmt = (
             select(
                 EventORM.venue_name,
                 EventORM.venue_address,
                 EventORM.city,
             )
-            .where(EventORM.status == EventStatus.PUBLISHED.value)
+            .where(
+                EventORM.status == EventStatus.PUBLISHED.value,
+                EventORM.ends_at >= now_utc,
+            )
             .distinct()
         )
         if city:
@@ -204,6 +208,9 @@ class SQLAlchemyEventRepository(IEventRepository):
         **kwargs,
     ) -> Tuple[List[Event], int]:
         filters = [EventORM.status == EventStatus.PUBLISHED.value]
+        # Only return active, non-concluded events by default
+        if not date_from and not date_to:
+            filters.append(EventORM.ends_at >= datetime.now(timezone.utc))
         if city:
             c_low = city.lower().strip()
             if c_low in ("bangalore", "bengaluru"):
