@@ -170,7 +170,15 @@ class SQLAlchemyEventRepository(IEventRepository):
             .distinct()
         )
         if city:
-            stmt = stmt.where(func.lower(EventORM.city) == city.lower())
+            c_low = city.lower().strip()
+            if c_low in ("bangalore", "bengaluru"):
+                stmt = stmt.where(func.lower(EventORM.city).in_(["bangalore", "bengaluru"]))
+            elif c_low in ("kochi", "cochin", "ernakulam"):
+                stmt = stmt.where(func.lower(EventORM.city).in_(["kochi", "cochin", "ernakulam"]))
+            elif c_low in ("chennai", "madras"):
+                stmt = stmt.where(func.lower(EventORM.city).in_(["chennai", "madras"]))
+            else:
+                stmt = stmt.where(func.lower(EventORM.city) == c_low)
         stmt = stmt.order_by(EventORM.venue_name)
         rows = (await self.db.execute(stmt)).all()
         return [
@@ -197,7 +205,15 @@ class SQLAlchemyEventRepository(IEventRepository):
     ) -> Tuple[List[Event], int]:
         filters = [EventORM.status == EventStatus.PUBLISHED.value]
         if city:
-            filters.append(func.lower(EventORM.city) == city.lower().strip())
+            c_low = city.lower().strip()
+            if c_low in ("bangalore", "bengaluru"):
+                filters.append(func.lower(EventORM.city).in_(["bangalore", "bengaluru"]))
+            elif c_low in ("kochi", "cochin", "ernakulam"):
+                filters.append(func.lower(EventORM.city).in_(["kochi", "cochin", "ernakulam"]))
+            elif c_low in ("chennai", "madras"):
+                filters.append(func.lower(EventORM.city).in_(["chennai", "madras"]))
+            else:
+                filters.append(func.lower(EventORM.city) == c_low)
         if category:
             cat_str = category.value.lower() if hasattr(category, "value") else str(category).lower().strip()
             filters.append(func.lower(EventORM.category) == cat_str)
