@@ -28,11 +28,12 @@ class NotificationService(INotificationService):
 
     async def send_email(self, email: str, subject: str, body: str, content_type: str = "text") -> bool: 
         resend_key = getattr(settings, "RESEND_API_KEY", None)
-        from_email = getattr(settings, "RESEND_FROM_EMAIL", None) or getattr(settings, "EMAILS_FROM", None) or "noreply@datavioai.com"
+        from_email = getattr(settings, "RESEND_FROM_EMAIL", None) or getattr(settings, "EMAILS_FROM", None) or "bookings@datavioai.com"
+        if "noreply" in from_email.lower() or "no-reply" in from_email.lower():
+            from_email = from_email.replace("noreply@", "bookings@").replace("no-reply@", "bookings@")
 
-        
         if resend_key:
-            sender = f"Vybhz <{from_email}>" if "<" not in from_email else from_email
+            sender = f"Vyhbz <{from_email}>" if "<" not in from_email else from_email
             payload = {
                 "from": sender,
                 "to": [email],

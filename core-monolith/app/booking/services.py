@@ -149,7 +149,7 @@ class BookingService:
             frontend_url = getattr(settings, "FRONTEND_URL", "https://booking-app-frontend-navy.vercel.app") or "https://booking-app-frontend-navy.vercel.app"
         except Exception:
             frontend_url = "https://booking-app-frontend-navy.vercel.app"
-        logo_url = f"{frontend_url.rstrip('/')}/logo.png"
+        asset_base = f"{frontend_url.rstrip('/')}/email"
 
         dt = showtime_at or booking.created_at or booking.held_until
         if dt is not None:
@@ -176,48 +176,42 @@ class BookingService:
         status_val = booking.status.value if hasattr(booking.status, "value") else str(booking.status or "CONFIRMED")
 
         return f"""<!DOCTYPE html>
-<html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
 <title>Your tickets are confirmed!</title>
+<style>
+  :root {{
+    color-scheme: light dark;
+    supported-color-schemes: light dark;
+  }}
+  @media (prefers-color-scheme: dark) {{
+    .email-bg {{ background-color: #121316 !important; }}
+    .card-bg {{ background-color: #1E2026 !important; border-color: #2E323D !important; }}
+    .text-main {{ color: #F8FAFC !important; }}
+    .text-muted {{ color: #94A3B8 !important; }}
+    .ref-box {{ background-color: #272A34 !important; }}
+    .divider {{ background-color: #2E323D !important; }}
+    .notice-box {{ background-color: #132A1F !important; border-color: #1A4D35 !important; }}
+    .notice-title {{ color: #34D399 !important; }}
+    .notice-text {{ color: #A7F3D0 !important; }}
+  }}
+</style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
-  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #F8FAFC; padding: 36px 16px 48px 16px;">
+<body class="email-bg" style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" class="email-bg" style="background-color: #F8FAFC; padding: 36px 16px 48px 16px;">
     <tr>
       <td align="center">
         <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 480px; margin: 0 auto;">
           
-          <!-- BRAND LOGO & FESTIVE CONFETTI -->
+          <!-- BRAND LOGO & FESTIVE CONFETTI (PNG - NO SVG) -->
           <tr>
             <td align="center" style="padding-bottom: 24px;">
-              <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
-                <tr>
-                  <!-- Left Confetti -->
-                  <td valign="middle" align="right" style="padding-right: 12px; width: 50px;">
-                    <svg width="45" height="75" viewBox="0 0 45 75" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M12 50L2 70" stroke="#00C5E8" stroke-width="7" stroke-linecap="round"/>
-                      <path d="M38 18L18 45" stroke="#06B6D4" stroke-width="7" stroke-linecap="round"/>
-                    </svg>
-                  </td>
-
-                  <!-- Logo -->
-                  <td valign="middle" align="center">
-                    <img src="{logo_url}" alt="Vyhbz" width="170" style="display: block; width: 170px; max-width: 170px; height: auto; border: 0; outline: none; margin: 0 auto;" />
-                    <div style="font-size: 11px; font-weight: 800; letter-spacing: 3px; color: #374151; margin-top: 8px; text-transform: uppercase;">
-                      EXPLORE &nbsp;<span style="color: #00C5E8; font-size: 12px;">●</span>&nbsp; BOOK &nbsp;<span style="color: #F59E0B; font-size: 12px;">●</span>&nbsp; ENJOY &nbsp;<span style="color: #EC4899; font-size: 12px;">●</span>
-                    </div>
-                  </td>
-
-                  <!-- Right Confetti -->
-                  <td valign="middle" align="left" style="padding-left: 12px; width: 50px;">
-                    <svg width="45" height="75" viewBox="0 0 45 75" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M8 18L28 45" stroke="#F97316" stroke-width="7" stroke-linecap="round"/>
-                      <path d="M34 50L44 70" stroke="#EC4899" stroke-width="7" stroke-linecap="round"/>
-                    </svg>
-                  </td>
-                </tr>
-              </table>
+              <img src="{asset_base}/header.png" alt="Vyhbz - EXPLORE ● BOOK ● ENJOY" width="280" style="display: block; width: 280px; max-width: 100%; height: auto; border: 0; outline: none; margin: 0 auto;" />
             </td>
           </tr>
 
@@ -227,19 +221,19 @@ class BookingService:
               <div style="font-size: 13px; font-weight: 800; color: #EA580C; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px;">
                 BOOKING CONFIRMED
               </div>
-              <h1 style="font-size: 30px; font-weight: 900; color: #0F172A; margin: 0 0 8px 0; line-height: 1.2; letter-spacing: -0.5px;">
+              <h1 class="text-main" style="font-size: 30px; font-weight: 900; color: #0F172A; margin: 0 0 8px 0; line-height: 1.2; letter-spacing: -0.5px;">
                 Your tickets are confirmed!
               </h1>
-              <p style="font-size: 15px; color: #4B5563; margin: 0; font-weight: 400;">
+              <p class="text-muted" style="font-size: 15px; color: #4B5563; margin: 0; font-weight: 400;">
                 Get ready to create amazing memories with Vyhbz.
               </p>
             </td>
           </tr>
 
-          <!-- MAIN WHITE CARD -->
+          <!-- MAIN CARD -->
           <tr>
             <td>
-              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #FFFFFF; border-radius: 20px; border: 1px solid #E2E8F0; box-shadow: 0 4px 25px rgba(0, 0, 0, 0.04);">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" class="card-bg" style="background-color: #FFFFFF; border-radius: 20px; border: 1px solid #E2E8F0; box-shadow: 0 4px 25px rgba(0, 0, 0, 0.04);">
                 <tr>
                   <td style="padding: 24px;">
                     
@@ -247,57 +241,32 @@ class BookingService:
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
                         <td valign="top" style="width: 44px; padding-right: 16px;">
-                          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="44" height="44" style="width: 44px; height: 44px; background-color: #EFF6FF; border-radius: 12px;">
-                            <tr>
-                              <td align="center" valign="middle">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <rect x="3" y="4" width="18" height="18" rx="3" stroke="#2563EB" stroke-width="2"/>
-                                  <line x1="16" y1="2" x2="16" y2="6" stroke="#2563EB" stroke-width="2" stroke-linecap="round"/>
-                                  <line x1="8" y1="2" x2="8" y2="6" stroke="#2563EB" stroke-width="2" stroke-linecap="round"/>
-                                  <line x1="3" y1="10" x2="21" y2="10" stroke="#2563EB" stroke-width="2"/>
-                                  <rect x="7" y="14" width="2.5" height="2.5" rx="0.5" fill="#2563EB"/>
-                                  <rect x="11" y="14" width="2.5" height="2.5" rx="0.5" fill="#2563EB"/>
-                                  <rect x="15" y="14" width="2.5" height="2.5" rx="0.5" fill="#2563EB"/>
-                                </svg>
-                              </td>
-                            </tr>
-                          </table>
+                          <img src="{asset_base}/icon-calendar.png" alt="Date" width="44" height="44" style="display: block; width: 44px; height: 44px; border: 0; border-radius: 12px;" />
                         </td>
                         <td valign="middle">
-                          <div style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 3px;">
+                          <div class="text-muted" style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 3px;">
                             BOOKED ON
                           </div>
-                          <div style="font-size: 16px; font-weight: 800; color: #0F172A; line-height: 1.3;">
+                          <div class="text-main" style="font-size: 16px; font-weight: 800; color: #0F172A; line-height: 1.3;">
                             {date_str}
                           </div>
-                          <div style="font-size: 15px; font-weight: 700; color: #0F172A; line-height: 1.3;">
+                          <div class="text-main" style="font-size: 15px; font-weight: 700; color: #0F172A; line-height: 1.3;">
                             {time_str}
                           </div>
                         </td>
                       </tr>
                     </table>
 
-                    <div style="height: 1px; background-color: #F1F5F9; margin: 18px 0;"></div>
+                    <div class="divider" style="height: 1px; background-color: #F1F5F9; margin: 18px 0;"></div>
 
                     <!-- ROW 2: SEATS -->
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
                         <td valign="top" style="width: 44px; padding-right: 16px;">
-                          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="44" height="44" style="width: 44px; height: 44px; background-color: #FFF1F2; border-radius: 12px;">
-                            <tr>
-                              <td align="center" valign="middle">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <path d="M2 9C3.65685 9 5 7.65685 5 6V5C5 3.89543 5.89543 3 7 3H17C18.1046 3 19 3.89543 19 5V6C19 7.65685 20.3431 9 22 9V15C20.3431 15 19 16.3431 19 18V19C19 20.1046 18.1046 21 17 21H7C5.89543 21 5 20.1046 5 19V18C5 16.3431 3.65685 15 2 15V9Z" stroke="#E11D48" stroke-width="2"/>
-                                  <line x1="12" y1="7" x2="12" y2="9" stroke="#E11D48" stroke-width="2" stroke-linecap="round"/>
-                                  <line x1="12" y1="11" x2="12" y2="13" stroke="#E11D48" stroke-width="2" stroke-linecap="round"/>
-                                  <line x1="12" y1="15" x2="12" y2="17" stroke="#E11D48" stroke-width="2" stroke-linecap="round"/>
-                                </svg>
-                              </td>
-                            </tr>
-                          </table>
+                          <img src="{asset_base}/icon-ticket.png" alt="Seats" width="44" height="44" style="display: block; width: 44px; height: 44px; border: 0; border-radius: 12px;" />
                         </td>
                         <td valign="middle">
-                          <div style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 3px;">
+                          <div class="text-muted" style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 3px;">
                             {seat_label}
                           </div>
                           <div style="font-size: 17px; font-weight: 800; color: #F97316;">
@@ -307,54 +276,35 @@ class BookingService:
                       </tr>
                     </table>
 
-                    <div style="height: 1px; background-color: #F1F5F9; margin: 18px 0;"></div>
+                    <div class="divider" style="height: 1px; background-color: #F1F5F9; margin: 18px 0;"></div>
 
                     <!-- ROW 3: TOTAL AMOUNT -->
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
                         <td valign="top" style="width: 44px; padding-right: 16px;">
-                          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="44" height="44" style="width: 44px; height: 44px; background-color: #FAF5FF; border-radius: 12px;">
-                            <tr>
-                              <td align="center" valign="middle">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <rect x="2" y="5" width="20" height="14" rx="3" stroke="#9333EA" stroke-width="2"/>
-                                  <line x1="2" y1="9" x2="22" y2="9" stroke="#9333EA" stroke-width="2"/>
-                                  <circle cx="17" cy="14" r="1.5" fill="#9333EA"/>
-                                </svg>
-                              </td>
-                            </tr>
-                          </table>
+                          <img src="{asset_base}/icon-wallet.png" alt="Amount" width="44" height="44" style="display: block; width: 44px; height: 44px; border: 0; border-radius: 12px;" />
                         </td>
                         <td valign="middle">
-                          <div style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 3px;">
+                          <div class="text-muted" style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 3px;">
                             TOTAL AMOUNT
                           </div>
-                          <div style="font-size: 18px; font-weight: 800; color: #0F172A;">
+                          <div class="text-main" style="font-size: 18px; font-weight: 800; color: #0F172A;">
                             {amount_formatted}
                           </div>
                         </td>
                       </tr>
                     </table>
 
-                    <div style="height: 1px; background-color: #F1F5F9; margin: 18px 0;"></div>
+                    <div class="divider" style="height: 1px; background-color: #F1F5F9; margin: 18px 0;"></div>
 
                     <!-- ROW 4: STATUS -->
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
                         <td valign="top" style="width: 44px; padding-right: 16px;">
-                          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="44" height="44" style="width: 44px; height: 44px; background-color: #F0FDF4; border-radius: 12px;">
-                            <tr>
-                              <td align="center" valign="middle">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <circle cx="12" cy="12" r="10" stroke="#16A34A" stroke-width="2"/>
-                                  <polyline points="8 12 11 15 16 9" stroke="#16A34A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                              </td>
-                            </tr>
-                          </table>
+                          <img src="{asset_base}/icon-status.png" alt="Status" width="44" height="44" style="display: block; width: 44px; height: 44px; border: 0; border-radius: 12px;" />
                         </td>
                         <td valign="middle">
-                          <div style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 3px;">
+                          <div class="text-muted" style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 3px;">
                             STATUS
                           </div>
                           <div style="font-size: 16px; font-weight: 800; color: #16A34A; letter-spacing: 0.5px;">
@@ -365,23 +315,19 @@ class BookingService:
                     </table>
 
                     <!-- GREEN NOTICE BANNER -->
-                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 14px; margin-top: 22px;">
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" class="notice-box" style="background-color: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 14px; margin-top: 22px;">
                       <tr>
                         <td style="padding: 14px 16px;">
                           <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                             <tr>
-                              <td valign="top" style="width: 28px; padding-right: 12px;">
-                                <div style="width: 26px; height: 26px; background-color: #10B981; border-radius: 50%; text-align: center; line-height: 26px; display: inline-block;">
-                                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="vertical-align: middle;" xmlns="http://www.w3.org/2000/svg">
-                                    <polyline points="20 6 9 17 4 12" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                                  </svg>
-                                </div>
+                              <td valign="top" style="width: 26px; padding-right: 12px;">
+                                <img src="{asset_base}/icon-check.png" alt="✔" width="26" height="26" style="display: block; width: 26px; height: 26px; border: 0;" />
                               </td>
                               <td valign="middle">
-                                <div style="font-size: 14px; font-weight: 800; color: #065F46; margin-bottom: 2px;">
+                                <div class="notice-title" style="font-size: 14px; font-weight: 800; color: #065F46; margin-bottom: 2px;">
                                   Booking confirmed!
                                 </div>
-                                <div style="font-size: 12px; color: #047857; line-height: 1.4;">
+                                <div class="notice-text" style="font-size: 12px; color: #047857; line-height: 1.4;">
                                   Show this reference at the venue. You'll receive a reminder before your show.
                                 </div>
                               </td>
@@ -400,13 +346,13 @@ class BookingService:
           <!-- BOOKING REFERENCE BOX -->
           <tr>
             <td style="padding-top: 18px;">
-              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #EEF2F6; border-radius: 14px;">
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" class="ref-box" style="background-color: #EEF2F6; border-radius: 14px;">
                 <tr>
                   <td align="center" style="padding: 16px 20px;">
-                    <div style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px;">
+                    <div class="text-muted" style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px;">
                       BOOKING REFERENCE
                     </div>
-                    <div style="font-size: 22px; font-weight: 900; color: #0F172A; letter-spacing: 2px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;">
+                    <div class="text-main" style="font-size: 22px; font-weight: 900; color: #0F172A; letter-spacing: 2px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;">
                       {ref_code}
                     </div>
                   </td>
@@ -418,10 +364,10 @@ class BookingService:
           <!-- FOOTER -->
           <tr>
             <td align="center" style="padding-top: 26px; font-size: 12px; color: #64748B; line-height: 1.5;">
-              <div style="font-weight: 700; color: #334155; margin-bottom: 4px; font-size: 13px;">
+              <div class="text-main" style="font-weight: 700; color: #334155; margin-bottom: 4px; font-size: 13px;">
                 Thanks for choosing Vyhbz!
               </div>
-              <div>
+              <div class="text-muted">
                 Explore more movies, events, food, experiences and shopping — all in one place.
               </div>
             </td>

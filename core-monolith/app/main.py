@@ -6,6 +6,7 @@ logging.basicConfig(
 import os
 from typing import Optional
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
@@ -167,6 +168,10 @@ def create_app(environment: Optional[str] = None) -> FastAPI:
     application.include_router(notification_router, prefix="/v1")
     application.include_router(partner_coupon_router)
     application.include_router(checkout_coupon_router)
+
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+    if os.path.exists(static_dir):
+        application.mount("/static", StaticFiles(directory=static_dir), name="static")
 
     @application.get("/")
     async def root():
