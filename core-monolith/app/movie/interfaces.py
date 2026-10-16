@@ -162,6 +162,8 @@ class IMovieRepository(Protocol):
         *,
         status: str | None = None,
         search: str | None = None,
+        language: str | None = None,
+        genre: str | None = None,
         page: int = 1,
         limit: int = 20,
     ) -> tuple[list[MovieSummaryDTO], int]: ...

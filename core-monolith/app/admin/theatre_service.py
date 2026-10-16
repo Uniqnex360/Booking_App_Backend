@@ -48,17 +48,26 @@ class TheatreAdminService:
     async def list_theatres(
         db: AsyncSession,
         city: Optional[str] = None,
+        chain_code: Optional[str] = None,
+        payment_model: Optional[str] = None,
+        commission_model: Optional[str] = None,
         search: Optional[str] = None,
         limit: int = 50,
         offset: int = 0
     ) -> List[Dict[str, Any]]:
         # Fetch all venues
         q = select(Venue)
-        if city:
+        if city and city.upper() != "ALL":
             q = q.where(Venue.city.ilike(f"%{city}%"))
         if search:
-            q = q.where(Venue.name.ilike(f"%{search}%"))
-        q = q.order_by(Venue.name.asc()).limit(limit).offset(offset)
+            q = q.where(
+                or_(
+                    Venue.name.ilike(f"%{search}%"),
+                    Venue.city.ilike(f"%{search}%"),
+                    Venue.address.ilike(f"%{search}%"),
+                )
+            )
+        q = q.order_by(Venue.name.asc())
         res = await db.execute(q)
         venues = list(res.scalars().all())
 
@@ -87,6 +96,25 @@ class TheatreAdminService:
                     chain_obj = c
                     break
 
+            item_chain_code = chain_obj.code if chain_obj else None
+            item_payment_model = cfg.customer_payment_model if cfg else "THEATRE_DIRECT"
+            item_commission_model = cfg.commission_model if cfg else "INVOICE_POST_PAY"
+
+            # Apply chain_code filter
+            if chain_code and chain_code.upper() != "ALL":
+                if not item_chain_code or item_chain_code.upper() != chain_code.upper():
+                    continue
+
+            # Apply payment_model filter
+            if payment_model and payment_model.upper() != "ALL":
+                if item_payment_model.upper() != payment_model.upper():
+                    continue
+
+            # Apply commission_model filter
+            if commission_model and commission_model.upper() != "ALL":
+                if item_commission_model.upper() != commission_model.upper():
+                    continue
+
             if not cfg:
                 rate_display = "₹30.00/tix"
             elif (cfg.rate_type or "").upper() in ("PER_TICKET", "FIXED_PER_TICKET"):
@@ -104,15 +132,17 @@ class TheatreAdminService:
                 "city": v.city,
                 "address": v.address,
                 "chain_name": chain_obj.name if chain_obj else None,
-                "chain_code": chain_obj.code if chain_obj else None,
+                "chain_code": item_chain_code,
                 "operational_status": "ACTIVE",
-                "customer_payment_model": cfg.customer_payment_model if cfg else "THEATRE_DIRECT",
-                "commission_model": cfg.commission_model if cfg else "INVOICE_POST_PAY",
+                "customer_payment_model": item_payment_model,
+                "commission_model": item_commission_model,
                 "commission_rate_display": rate_display,
                 "invoice_cycle": cfg.invoice_cycle if cfg else "DAILY",
                 "last_sync_status": "HEALTHY",
             })
-        return results
+
+        # Apply offset and limit after post-join filtering
+        return results[offset : offset + limit]
 
     @staticmethod
     async def get_theatre_config(db: AsyncSession, venue_id: uuid.UUID) -> TheatrePaymentConfigModel:

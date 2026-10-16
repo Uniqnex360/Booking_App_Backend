@@ -72,18 +72,22 @@ async def get_admin_platform_stats(
 async def list_movies_admin(
     status: Optional[str] = None,
     search: Optional[str] = None,
+    language: Optional[str] = None,
+    genre: Optional[str] = None,
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     movie_service: Any = Depends(get_movie_service),
 ):
     """
     List all movies for administration across all statuses.
-    Supports filtering by status (PUBLISHED, DRAFT, PENDING_REVIEW, REJECTED, CANCELLED)
-    and searching by title/genre/language.
+    Supports filtering by status (PUBLISHED, DRAFT, PENDING_REVIEW, REJECTED, CANCELLED),
+    language, genre, and searching by title/genre/language.
     """
     items, total = await movie_service.list_movies_admin(
         status=status if status and status.upper() != "ALL" else None,
         search=search,
+        language=language if language and language.upper() != "ALL" else None,
+        genre=genre if genre and genre.upper() != "ALL" else None,
         page=page,
         limit=limit,
     )
@@ -515,13 +519,25 @@ async def create_theatre_chain(
 @router.get("/theatres")
 async def list_theatres_admin(
     city: Optional[str] = None,
+    chain_code: Optional[str] = None,
+    payment_model: Optional[str] = None,
+    commission_model: Optional[str] = None,
     search: Optional[str] = None,
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db)
 ):
     """List all theatre locations with active payment & commission configuration."""
-    theatres = await TheatreAdminService.list_theatres(db, city=city, search=search, limit=limit, offset=offset)
+    theatres = await TheatreAdminService.list_theatres(
+        db,
+        city=city,
+        chain_code=chain_code,
+        payment_model=payment_model,
+        commission_model=commission_model,
+        search=search,
+        limit=limit,
+        offset=offset
+    )
     return success_response(data={"theatres": theatres, "total": len(theatres)}, message="Theatres fetched successfully")
 
 

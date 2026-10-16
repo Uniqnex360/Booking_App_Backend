@@ -150,12 +150,18 @@ class MovieRepository:
         *,
         status: str | None = None,
         search: str | None = None,
+        language: str | None = None,
+        genre: str | None = None,
         page: int = 1,
         limit: int = 20,
     ) -> tuple[list[MovieSummaryDTO], int]:
         filters = []
         if status:
             filters.append(Movie.status == status)
+        if language and language.upper() != "ALL":
+            filters.append(Movie.language.ilike(f"%{language.strip()}%"))
+        if genre and genre.upper() != "ALL":
+            filters.append(Movie.genre.ilike(f"%{genre.strip()}%"))
         if search:
             term = f"%{search.strip()}%"
             filters.append(

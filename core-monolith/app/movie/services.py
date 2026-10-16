@@ -47,12 +47,16 @@ class MovieService:
         *,
         status: str | None = None,
         search: str | None = None,
+        language: str | None = None,
+        genre: str | None = None,
         page: int = 1,
         limit: int = 20,
     ) -> tuple[list[MovieSummaryDTO], int]:
         return await self._repo.list_movies_admin(
             status=status,
             search=search,
+            language=language,
+            genre=genre,
             page=page,
             limit=limit,
         )
