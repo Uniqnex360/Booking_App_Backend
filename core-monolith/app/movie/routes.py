@@ -64,7 +64,7 @@ async def list_movies(
     format: str | None = Query(None),
     date: date | None = Query(None),
     page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(100, ge=1, le=200),
     movie_service: MovieService = Depends(get_movie_service),
 ):
     items, total = await movie_service.list_movies(
