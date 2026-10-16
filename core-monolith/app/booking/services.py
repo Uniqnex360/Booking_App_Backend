@@ -13,7 +13,7 @@ from datetime import timedelta
 from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.movie.models import Showtime
+from app.movie.models import Movie, Showtime
 from app.booking.models import BookingModel
 
 from app.booking.interfaces import (
@@ -1280,6 +1280,17 @@ class BookingService:
                 select(Showtime).where(Showtime.id == booking.showtime_id)
             )).scalar_one_or_none()
 
+            movie_title = "Movie"
+            if st_row and self.session:
+                try:
+                    m_row = (await self.session.execute(
+                        select(Movie).where(Movie.id == st_row.movie_id)
+                    )).scalar_one_or_none()
+                    if m_row and m_row.title:
+                        movie_title = m_row.title
+                except Exception:
+                    pass
+
             updated_booking = Booking(
                 id=booking.id,
                 user_id=booking.user_id,
@@ -1309,13 +1320,26 @@ class BookingService:
             await self.booking_repo.update_booking(updated_booking)
             if self.session:
                 await self.session.commit()
+
+            # Record transaction in Central Admin Commission Ledger
+            if self.session:
+                try:
+                    from app.admin.commission_service import CommissionAdminService
+                    b_model = (await self.session.execute(
+                        select(BookingModel).where(BookingModel.id == updated_booking.id)
+                    )).scalar_one_or_none()
+                    if b_model:
+                        await CommissionAdminService.record_booking_commission(self.session, b_model)
+                except Exception as comm_err:
+                    logger.warning("Failed to record commission for provider booking %s: %s", updated_booking.id, comm_err)
+
             if self.session and updated_booking.user_id:
                 from app.notification.service import create_user_notification
                 seats_str = ", ".join(updated_booking.seat_codes or updated_booking.seat_refs or [])
                 await create_user_notification(
                     session=self.session,
                     user_id=updated_booking.user_id,
-                    title="Booking Confirmed! 🎉",
+                    title=f"Booking Confirmed: {movie_title} 🎉",
                     description=f"Ref {updated_booking.ref_code} • Seats: {seats_str or 'Confirmed'}. Tap to view your e-ticket.",
                     notif_type="booking",
                     link=f"/bookings/{updated_booking.id}",

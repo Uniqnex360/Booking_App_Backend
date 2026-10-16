@@ -701,6 +701,16 @@ async def resolve_reconciliation_exception(
     return success_response(data=exc, message=f"Exception status updated to {data.status}")
 
 
+@router.post("/reconciliation/sync", dependencies=[Depends(require_ops_admin)])
+async def trigger_reconciliation_sync(
+    venue_id: Optional[uuid.UUID] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """Triggers automated reconciliation check across provider and theatre bookings."""
+    result = await ReconciliationAdminService.reconcile_provider_transactions(db, venue_id=venue_id)
+    return success_response(data=result, message="Reconciliation check completed successfully")
+
+
 # ---------------------------------------------------------------------------
 # Central Admin Portal: Comprehensive Dashboard Stats & Integration Health
 # ---------------------------------------------------------------------------

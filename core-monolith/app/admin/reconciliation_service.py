@@ -202,3 +202,112 @@ class ReconciliationAdminService:
                 "created_at": b.created_at
             })
         return results
+
+    @staticmethod
+    async def reconcile_provider_transactions(
+        db: AsyncSession,
+        venue_id: Optional[uuid.UUID] = None
+    ) -> Dict[str, Any]:
+        """
+        Scans provider and cinema bookings for discrepancies between payments and provider confirmations.
+        Flags any discovered issues in the Central Admin Reconciliation Exceptions queue.
+        """
+        # Fetch bookings with payments
+        q = (
+            select(
+                BookingModel,
+                PaymentModel,
+                Screen.venue_id
+            )
+            .join(PaymentModel, BookingModel.id == PaymentModel.booking_id, isouter=True)
+            .join(Showtime, BookingModel.showtime_id == Showtime.id, isouter=True)
+            .join(Screen, Showtime.screen_id == Screen.id, isouter=True)
+            .where(BookingModel.provider_id.isnot(None))
+        )
+        if venue_id:
+            q = q.where(Screen.venue_id == venue_id)
+
+        res = await db.execute(q)
+        records = res.all()
+
+        scanned_count = len(records)
+        flagged_exceptions = []
+
+        for b, pay, v_id in records:
+            # 1. Payment Captured but Booking Not Confirmed
+            if pay and pay.status == "CAPTURED" and b.status != "CONFIRMED":
+                # Check if exception already exists
+                existing = await db.execute(
+                    select(ReconciliationExceptionModel).where(
+                        ReconciliationExceptionModel.booking_id == b.id,
+                        ReconciliationExceptionModel.exception_type == "PAYMENT_SUCCESS_BOOKING_FAILURE",
+                        ReconciliationExceptionModel.status == "OPEN"
+                    )
+                )
+                if not existing.scalar_one_or_none():
+                    exc = await ReconciliationAdminService.flag_exception(
+                        db=db,
+                        exception_type="PAYMENT_SUCCESS_BOOKING_FAILURE",
+                        discrepancy_details=(
+                            f"Payment {pay.payment_id} captured (amount: {pay.amount_paise} paise) "
+                            f"but provider booking {b.id} status is '{b.status}'."
+                        ),
+                        booking_id=b.id,
+                        venue_id=v_id,
+                        external_ref=pay.payment_id,
+                        severity="HIGH"
+                    )
+                    flagged_exceptions.append(exc.id)
+
+            # 2. Amount Mismatch between Payment and Booking
+            elif pay and pay.status == "CAPTURED" and pay.amount_paise != b.total_paise:
+                existing = await db.execute(
+                    select(ReconciliationExceptionModel).where(
+                        ReconciliationExceptionModel.booking_id == b.id,
+                        ReconciliationExceptionModel.exception_type == "AMOUNT_MISMATCH",
+                        ReconciliationExceptionModel.status == "OPEN"
+                    )
+                )
+                if not existing.scalar_one_or_none():
+                    exc = await ReconciliationAdminService.flag_exception(
+                        db=db,
+                        exception_type="AMOUNT_MISMATCH",
+                        discrepancy_details=(
+                            f"Payment amount ({pay.amount_paise} paise) differs from booking total "
+                            f"({b.total_paise} paise) for booking {b.id}."
+                        ),
+                        booking_id=b.id,
+                        venue_id=v_id,
+                        external_ref=pay.payment_id,
+                        severity="MEDIUM"
+                    )
+                    flagged_exceptions.append(exc.id)
+
+            # 3. Confirmed without Provider Booking ID
+            elif b.status == "CONFIRMED" and not b.provider_booking_id:
+                existing = await db.execute(
+                    select(ReconciliationExceptionModel).where(
+                        ReconciliationExceptionModel.booking_id == b.id,
+                        ReconciliationExceptionModel.exception_type == "MISSING_CONFIRMATION",
+                        ReconciliationExceptionModel.status == "OPEN"
+                    )
+                )
+                if not existing.scalar_one_or_none():
+                    exc = await ReconciliationAdminService.flag_exception(
+                        db=db,
+                        exception_type="MISSING_CONFIRMATION",
+                        discrepancy_details=(
+                            f"Booking {b.id} is marked CONFIRMED but missing provider ticket confirmation reference."
+                        ),
+                        booking_id=b.id,
+                        venue_id=v_id,
+                        external_ref=b.ref_code,
+                        severity="HIGH"
+                    )
+                    flagged_exceptions.append(exc.id)
+
+        return {
+            "scanned_bookings_count": scanned_count,
+            "new_exceptions_flagged": len(flagged_exceptions),
+            "exception_ids": [str(eid) for eid in flagged_exceptions]
+        }
