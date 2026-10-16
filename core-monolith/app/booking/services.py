@@ -930,40 +930,7 @@ class BookingService:
         if booking.status != BookingStatus.HELD:
             raise IllegalBookingTransition(booking.status.value, BookingStatus.CONFIRMED.value)
 
-        expected_paise = booking.total_paise
-        payment_row = None
-        if self.session and booking.total_paise > 0:
-            from app.payment.models import PaymentModel
-            from sqlalchemy import select as _sel
-            stmt = _sel(PaymentModel).where(
-                PaymentModel.booking_id == booking.id,
-                PaymentModel.status == "CAPTURED",
-                PaymentModel.signature_verified.is_(True),
-            ).order_by(PaymentModel.created_at.desc())
-            payment_row = (await self.session.execute(stmt)).scalars().first()
-
-        if booking.total_paise > 0:
-            if not payment_row and payment_ref:
-                payment_row = await self._verify_razorpay_payment(payment_ref, expected_paise, booking.id)
-            elif not payment_row:
-                raise ValidationError("Payment not verified for this booking")
-
-            if payment_row:
-                if payment_row.booking_id != booking.id:
-                    raise ValidationError("Payment is not tied to this booking")
-                expected_amount = booking.total_paise
-                if getattr(payment_row, "raw_event", None):
-                    try:
-                        import json
-                        meta = json.loads(payment_row.raw_event)
-                        if isinstance(meta, dict) and "discount_paise" in meta:
-                            expected_amount -= int(meta["discount_paise"])
-                    except Exception:
-                        pass
-                if payment_row.amount_paise != expected_amount:
-                    raise ValidationError(
-                        f"Payment amount mismatch: expected {expected_amount}, got {payment_row.amount_paise}"
-                    )
+        payment_row = await self._resolve_and_validate_payment(booking, payment_ref)
 
         ok = await self.booking_repo.update_status(
             booking.id, BookingStatus.HELD, BookingStatus.CONFIRMED
@@ -1087,15 +1054,12 @@ class BookingService:
                     return order_payment
         return None
 
-    async def _commit_local_movie_booking(self, booking: Booking, payment_ref: Optional[str]) -> Booking:
-        if booking.status == BookingStatus.CONFIRMED:
-            return booking
-        if booking.status != BookingStatus.HELD:
-            raise IllegalBookingTransition(booking.status.value, BookingStatus.CONFIRMED.value)
+    async def _resolve_and_validate_payment(self, booking: Booking, payment_ref: Optional[str]) -> Any:
+        if booking.total_paise <= 0:
+            return None
 
-        expected_paise = booking.total_paise
         payment_row = None
-        if self.session and booking.total_paise > 0:
+        if self.session:
             from app.payment.models import PaymentModel
             from sqlalchemy import select as _sel
             stmt = _sel(PaymentModel).where(
@@ -1105,28 +1069,36 @@ class BookingService:
             ).order_by(PaymentModel.created_at.desc())
             payment_row = (await self.session.execute(stmt)).scalars().first()
 
-        if booking.total_paise > 0:
-            if not payment_row and payment_ref:
-                payment_row = await self._verify_razorpay_payment(payment_ref, expected_paise, booking.id)
-            elif not payment_row:
-                raise ValidationError("Payment not verified for this booking")
+        if not payment_row and payment_ref:
+            payment_row = await self._verify_razorpay_payment(payment_ref, booking.total_paise, booking.id)
+        elif not payment_row:
+            raise ValidationError("Payment not verified for this booking")
 
-            if payment_row:
-                if payment_row.booking_id != booking.id:
-                    raise ValidationError("Payment is not tied to this booking")
-                expected_amount = booking.total_paise
-                if getattr(payment_row, "raw_event", None):
-                    try:
-                        import json
-                        meta = json.loads(payment_row.raw_event)
-                        if isinstance(meta, dict) and "discount_paise" in meta:
-                            expected_amount -= int(meta["discount_paise"])
-                    except Exception:
-                        pass
-                if payment_row.amount_paise != expected_amount:
-                    raise ValidationError(
-                        f"Payment amount mismatch: expected {expected_amount}, got {payment_row.amount_paise}"
-                    )
+        if payment_row.booking_id != booking.id:
+            raise ValidationError("Payment is not tied to this booking")
+
+        expected_amount = booking.total_paise
+        if getattr(payment_row, "raw_event", None):
+            try:
+                import json
+                meta = json.loads(payment_row.raw_event)
+                if isinstance(meta, dict) and "discount_paise" in meta:
+                    expected_amount -= int(meta["discount_paise"])
+            except Exception:
+                pass
+        if payment_row.amount_paise != expected_amount:
+            raise ValidationError(
+                f"Payment amount mismatch: expected {expected_amount}, got {payment_row.amount_paise}"
+            )
+        return payment_row
+
+    async def _commit_local_movie_booking(self, booking: Booking, payment_ref: Optional[str]) -> Booking:
+        if booking.status == BookingStatus.CONFIRMED:
+            return booking
+        if booking.status != BookingStatus.HELD:
+            raise IllegalBookingTransition(booking.status.value, BookingStatus.CONFIRMED.value)
+
+        payment_row = await self._resolve_and_validate_payment(booking, payment_ref)
 
         import importlib
         from uuid import UUID as _UUID
