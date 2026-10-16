@@ -62,6 +62,8 @@ class MovieService:
         )
     async def get_admin_movie_facets(self) -> dict:
         return await self._repo.get_admin_movie_facets()
+    async def get_public_movie_facets(self, city: str | None = None) -> dict:
+        return await self._repo.get_public_movie_facets(city=city)
     async def get_movie_details(self, movie_id: UUID) -> MovieDetailsDTO:
         movie = await self._repo.get_movie_details(movie_id)
         if movie is None:

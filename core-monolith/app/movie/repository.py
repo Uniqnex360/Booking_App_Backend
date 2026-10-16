@@ -234,6 +234,76 @@ class MovieRepository:
             "genres": [{"name": k, "count": v} for k, v in sorted(genre_counts.items(), key=lambda x: (-x[1], x[0]))],
             "statuses": status_counts,
         }
+
+    async def get_public_movie_facets(self, city: str | None = None) -> dict:
+        stmt = (
+            select(Movie.language, Movie.genre, Movie.certificate, Movie.release_date, Movie.title)
+            .where(Movie.status == MovieStatus.PUBLISHED.value)
+        )
+        if city:
+            city_stmt = (
+                stmt.join(Showtime, Showtime.movie_id == Movie.id)
+                .join(Screen, Showtime.screen_id == Screen.id)
+                .join(Venue, Screen.venue_id == Venue.id)
+                .where(Venue.city.ilike(f"%{city.strip()}%"))
+                .where(Showtime.starts_at > utcnow())
+                .distinct()
+            )
+            city_result = await self._session.execute(city_stmt)
+            rows = city_result.all()
+            if not rows:
+                result = await self._session.execute(stmt)
+                rows = result.all()
+        else:
+            result = await self._session.execute(stmt)
+            rows = result.all()
+
+        lang_counts: dict[str, int] = {}
+        genre_counts: dict[str, int] = {}
+        cert_counts: dict[str, int] = {}
+        new_count = 0
+        rerelease_count = 0
+        curr_year = datetime.now().year
+
+        for lang_val, genre_val, cert_val, rel_date, title_val in rows:
+            if lang_val:
+                for l in [x.strip() for x in re.split(r"[/,&]", lang_val) if x.strip()]:
+                    formatted_l = l.title()
+                    lang_counts[formatted_l] = lang_counts.get(formatted_l, 0) + 1
+
+            if genre_val:
+                for g in [x.strip() for x in re.split(r"[/,&]", genre_val) if x.strip()]:
+                    formatted_g = g.title()
+                    genre_counts[formatted_g] = genre_counts.get(formatted_g, 0) + 1
+
+            if cert_val:
+                formatted_c = cert_val.strip().upper()
+                cert_counts[formatted_c] = cert_counts.get(formatted_c, 0) + 1
+
+            is_re = False
+            if title_val and ("re-release" in title_val.lower() or "rerelease" in title_val.lower()):
+                is_re = True
+            elif rel_date:
+                rel_year = rel_date.year if hasattr(rel_date, "year") else None
+                if rel_year and (curr_year - rel_year >= 1):
+                    is_re = True
+            if is_re:
+                rerelease_count += 1
+            else:
+                new_count += 1
+
+        total_movies = len(rows)
+
+        return {
+            "languages": [{"name": k, "count": v} for k, v in sorted(lang_counts.items(), key=lambda x: (-x[1], x[0]))],
+            "genres": [{"name": k, "count": v} for k, v in sorted(genre_counts.items(), key=lambda x: (-x[1], x[0]))],
+            "certificates": [{"name": k, "count": v} for k, v in sorted(cert_counts.items(), key=lambda x: (-x[1], x[0]))],
+            "release_types": {
+                "all": total_movies,
+                "new": new_count,
+                "re_release": rerelease_count,
+            },
+        }
     
     async def get_movie_details(self, movie_id: UUID) -> MovieDetailsDTO | None:
         stmt = select(Movie).where(

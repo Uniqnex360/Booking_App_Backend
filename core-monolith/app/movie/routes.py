@@ -55,6 +55,7 @@ from app.movie.services import MovieService
 from app.partner.dependencies import required_approved_partner
 from app.partner.interfaces import Partner
 from app.shared.schemas import PaginatedResponse, PaginationMeta
+from app.shared.response import success_response
 movie_router = APIRouter(tags=["Movie"])
 
 @movie_router.get("/movies", response_model=PaginatedResponse[MovieSummaryResponse])
@@ -101,6 +102,18 @@ async def list_movies(
         data=responses,
         meta=PaginationMeta(total=total, page=page, limit=limit, total_pages=total_pages),
     )
+
+@movie_router.get("/movies/filters")
+async def get_movie_filters(
+    city: str | None = Query(None),
+    movie_service: MovieService = Depends(get_movie_service),
+):
+    """
+    Returns dynamic filter facets directly from the database (languages, genres, certificates, release_types).
+    """
+    facets = await movie_service.get_public_movie_facets(city=city)
+    return success_response(data=facets, message="Movie filters fetched successfully")
+
 @movie_router.get("/movies/{id}", response_model=MovieDetailsResponse)
 async def get_movie_details(
     id: UUID,
