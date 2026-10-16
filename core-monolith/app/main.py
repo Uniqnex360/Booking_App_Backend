@@ -76,6 +76,15 @@ async def event_locked_exception_handler(request: Request, exc: EventLockedError
 async def partner_not_approved_exception_handler(request: Request, exc: PartnerNotApprovedError):
     return JSONResponse(status_code=403, content={"error": "PARTNER_NOT_APPROVED", "detail": str(exc), "message": str(exc)})
 
+logger = logging.getLogger("app.main")
+
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(
+        status_code=500,
+        content={"error": "INTERNAL_SERVER_ERROR", "detail": "An internal server error occurred", "message": "An internal server error occurred"},
+    )
+
 
 def create_app(environment: Optional[str] = None) -> FastAPI:
     env = (environment or getattr(settings, "ENVIRONMENT", "development") or "development").lower()
@@ -154,6 +163,7 @@ def create_app(environment: Optional[str] = None) -> FastAPI:
     application.add_exception_handler(BookingValidationError, booking_validation_exception_handler)
     application.add_exception_handler(EventLockedError, event_locked_exception_handler)
     application.add_exception_handler(PartnerNotApprovedError, partner_not_approved_exception_handler)
+    application.add_exception_handler(Exception, unhandled_exception_handler)
 
     application.include_router(auth_router, prefix="/v1")
     application.include_router(user_router, prefix="/v1")
