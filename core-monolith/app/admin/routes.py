@@ -11,8 +11,6 @@ from app.core.database import get_db
 from app.auth.dependencies import get_user_repo, get_refresh_token_repo
 from app.auth.interfaces import IUserRepository, IRefreshTokenRepository
 from app.admin.dependencies import (
-    ALL_ADMIN_ROLES,
-    SUPER_ROLES,
     require_admin,
     require_ops_admin,
     require_super_admin,
@@ -237,6 +235,12 @@ async def list_users_admin(
         message="Users fetched successfully",
     )
 
+def _normalize_role(role: Any) -> str:
+    if hasattr(role, "value"):
+        return str(role.value).upper()
+    return str(role).upper()
+
+
 @router.patch("/users/{user_id}/status")
 async def update_user_status_admin(
     user_id: uuid.UUID,
@@ -253,10 +257,12 @@ async def update_user_status_admin(
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    target_role = target_user.role.value if hasattr(target_user.role, "value") else str(target_user.role).upper()
-    caller_role = admin_user.role.value if hasattr(admin_user.role, "value") else str(admin_user.role).upper()
-    if target_role in {r.value for r in ALL_ADMIN_ROLES} and caller_role not in {r.value for r in SUPER_ROLES}:
-        raise ForbiddenError("Cannot modify admin user accounts")
+    target_role = _normalize_role(target_user.role)
+    caller_role = _normalize_role(admin_user.role)
+
+    # Only SUPER_ADMIN may modify a SUPER_ADMIN target
+    if target_role == UserRole.SUPER_ADMIN.value and caller_role != UserRole.SUPER_ADMIN.value:
+        raise ForbiddenError("Only super administrators can modify super administrator accounts")
 
     if admin_user.id == user_id and not data.is_active:
         raise HTTPException(
@@ -296,7 +302,7 @@ async def update_user_role_admin(
     """
     Update a user's role.
     """
-    new_role = data.role.upper()
+    new_role = _normalize_role(data.role)
     valid_roles = {r.value for r in UserRole}
     if new_role not in valid_roles:
         raise HTTPException(status_code=400, detail="Invalid role specified")
@@ -305,10 +311,12 @@ async def update_user_role_admin(
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    target_role = target_user.role.value if hasattr(target_user.role, "value") else str(target_user.role).upper()
-    caller_role = admin_user.role.value if hasattr(admin_user.role, "value") else str(admin_user.role).upper()
-    if target_role in {r.value for r in ALL_ADMIN_ROLES} and caller_role not in {r.value for r in SUPER_ROLES}:
-        raise ForbiddenError("Cannot modify admin user accounts")
+    target_role = _normalize_role(target_user.role)
+    caller_role = _normalize_role(admin_user.role)
+
+    # Only SUPER_ADMIN may modify a SUPER_ADMIN target or grant SUPER_ADMIN
+    if (target_role == UserRole.SUPER_ADMIN.value or new_role == UserRole.SUPER_ADMIN.value) and caller_role != UserRole.SUPER_ADMIN.value:
+        raise ForbiddenError("Only super administrators can modify or grant super administrator role")
 
     if admin_user.id == user_id and new_role != caller_role:
         raise HTTPException(

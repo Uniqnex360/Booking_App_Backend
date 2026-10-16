@@ -576,38 +576,48 @@ async def test_super_admin_user_role_status_guards(session: AsyncSession):
             assert status_res.status_code == expected, f"{r} got {status_res.status_code} on status update, expected {expected}"
             assert role_res.status_code == expected, f"{r} got {role_res.status_code} on role update, expected {expected}"
 
-        # Check 2: Non-super cannot modify an admin target (target privilege guard)
-        from app.admin.dependencies import require_super_admin
-        from app.auth.interfaces import User as AuthUserDomain, UserRole
-
-        ops_caller = AuthUserDomain(
-            id=users["OPERATIONS_ADMIN"].id,
-            full_name=users["OPERATIONS_ADMIN"].full_name,
-            email=users["OPERATIONS_ADMIN"].email,
-            role=UserRole.OPERATIONS_ADMIN,
-            is_active=True,
+        # Check 2: ADMIN -> SUPER_ADMIN target = 403, SUPER_ADMIN -> same = 200
+        another_super_admin = UserORM(
+            id=uuid.uuid4(),
+            full_name="Another Super Admin",
+            email=f"another_super_{uuid.uuid4().hex[:6]}@portal.com",
             password_hash="hash",
+            role="SUPER_ADMIN",
+            is_active=True,
         )
-        app.dependency_overrides[require_super_admin] = lambda: ops_caller
+        session.add(another_super_admin)
+        await session.commit()
 
-        # Non-super attempting to block admin target -> 403 ForbiddenError
-        status_admin_target = await client.patch(
-            f"/v1/admin/users/{target_admin.id}/status",
-            headers={"Authorization": f"Bearer {tokens['OPERATIONS_ADMIN']}"},
-            json={"is_active": False},
+        # ADMIN modifying SUPER_ADMIN target -> 403 ForbiddenError
+        admin_modify_super_status = await client.patch(
+            f"/v1/admin/users/{another_super_admin.id}/status",
+            headers={"Authorization": f"Bearer {tokens['ADMIN']}"},
+            json={"is_active": True},
         )
-        assert status_admin_target.status_code == 403, "Non-super cannot block admin target"
+        assert admin_modify_super_status.status_code == 403, "ADMIN cannot modify SUPER_ADMIN target status"
 
-        # Non-super attempting to change admin target role -> 403 ForbiddenError
-        role_admin_target = await client.patch(
-            f"/v1/admin/users/{target_admin.id}/role",
-            headers={"Authorization": f"Bearer {tokens['OPERATIONS_ADMIN']}"},
+        admin_modify_super_role = await client.patch(
+            f"/v1/admin/users/{another_super_admin.id}/role",
+            headers={"Authorization": f"Bearer {tokens['ADMIN']}"},
             json={"role": "USER"},
         )
-        assert role_admin_target.status_code == 403, "Non-super cannot modify role of admin target"
+        assert admin_modify_super_role.status_code == 403, "ADMIN cannot modify SUPER_ADMIN target role"
 
-        # Restore dependency overrides
-        del app.dependency_overrides[require_super_admin]
+        # ADMIN granting SUPER_ADMIN role -> 403 ForbiddenError
+        admin_grant_super = await client.patch(
+            f"/v1/admin/users/{regular_user.id}/role",
+            headers={"Authorization": f"Bearer {tokens['ADMIN']}"},
+            json={"role": "SUPER_ADMIN"},
+        )
+        assert admin_grant_super.status_code == 403, "ADMIN cannot grant SUPER_ADMIN role"
+
+        # SUPER_ADMIN modifying SUPER_ADMIN target -> 200 OK
+        super_modify_super_status = await client.patch(
+            f"/v1/admin/users/{another_super_admin.id}/status",
+            headers={"Authorization": f"Bearer {tokens['SUPER_ADMIN']}"},
+            json={"is_active": True},
+        )
+        assert super_modify_super_status.status_code == 200, "SUPER_ADMIN can modify SUPER_ADMIN target status"
 
         # Check 3: Self-block rejected (400)
         self_block_res = await client.patch(
