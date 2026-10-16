@@ -89,3 +89,4 @@ async def remove_movies():
 
 if __name__ == "__main__":
     asyncio.run(remove_movies())
+
