@@ -76,15 +76,33 @@ class CommissionAdminService:
         else:
             eligible_base = ticket_paise
 
+        # Determine ticket quantity for per-ticket calculations
+        ticket_count = booking.quantity if (booking.quantity and booking.quantity > 0) else 0
+        if ticket_count == 0:
+            raw_seats = getattr(booking, "seat_codes_json", None) or getattr(booking, "seat_refs_json", None)
+            if raw_seats:
+                try:
+                    import json
+                    seats = json.loads(raw_seats)
+                    ticket_count = len(seats) if isinstance(seats, list) else 1
+                except Exception:
+                    ticket_count = 1
+        if ticket_count <= 0:
+            ticket_count = 1
+
         # Calculate commission
-        rate_val = float(cfg.rate_value or 5.0)
-        rate_type = (cfg.rate_type or "PERCENTAGE").upper()
+        rate_val = float(cfg.rate_value or 30.0)
+        rate_type = (cfg.rate_type or "PER_TICKET").upper()
         fixed_paise = cfg.fixed_fee_paise or 0
 
-        if rate_type == "FIXED_FEE":
-            commission_paise = fixed_paise
+        if rate_type in ("PER_TICKET", "FIXED_PER_TICKET"):
+            per_ticket_paise = fixed_paise if fixed_paise > 0 else int(round(rate_val * 100))
+            commission_paise = ticket_count * per_ticket_paise
+        elif rate_type == "FIXED_FEE":
+            commission_paise = fixed_paise if fixed_paise > 0 else int(round(rate_val * 100))
         elif rate_type == "HYBRID":
-            commission_paise = int(round(eligible_base * (rate_val / 100.0))) + fixed_paise
+            per_ticket_paise = fixed_paise if fixed_paise > 0 else 0
+            commission_paise = int(round(eligible_base * (rate_val / 100.0))) + (ticket_count * per_ticket_paise)
         else: # PERCENTAGE
             commission_paise = int(round(eligible_base * (rate_val / 100.0)))
 

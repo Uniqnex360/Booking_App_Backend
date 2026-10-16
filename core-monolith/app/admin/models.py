@@ -43,9 +43,9 @@ class TheatrePaymentConfigModel(Base):
     
     # Commission collection model (INVOICE_POST_PAY, AUTOMATED_SPLIT, OTHER)
     commission_model = Column(String(50), nullable=False, default="INVOICE_POST_PAY", server_default="INVOICE_POST_PAY")
-    rate_type = Column(String(50), nullable=False, default="PERCENTAGE", server_default="PERCENTAGE") # PERCENTAGE, FIXED_FEE, HYBRID
-    rate_value = Column(Numeric(10, 4), nullable=False, default=5.0000, server_default="5.0000")
-    fixed_fee_paise = Column(Integer, nullable=False, default=0, server_default="0")
+    rate_type = Column(String(50), nullable=False, default="PER_TICKET", server_default="PER_TICKET") # PER_TICKET, PERCENTAGE, FIXED_FEE, HYBRID
+    rate_value = Column(Numeric(10, 4), nullable=False, default=30.0000, server_default="30.0000")
+    fixed_fee_paise = Column(Integer, nullable=False, default=3000, server_default="3000")
     calculation_base = Column(String(50), nullable=False, default="GROSS_TICKET", server_default="GROSS_TICKET") # GROSS_TICKET, NET_OF_TAX, TICKET_PLUS_FEES
     
     # Invoicing cycle (Default: DAILY 23:59 cutoff, 1 day due)

@@ -20,6 +20,7 @@ from app.admin.models import (
 )
 from app.partner.models import PartnerORM
 from app.shared.timeutil import utcnow
+from app.admin.commission_service import CommissionAdminService
 
 
 def _token_for(user_id: uuid.UUID, role: str = "ADMIN") -> str:
@@ -142,8 +143,9 @@ async def test_per_theatre_config_and_history(session: AsyncSession):
         assert cfg["customer_payment_model"] == "THEATRE_DIRECT"
         assert cfg["commission_model"] == "INVOICE_POST_PAY"
         assert cfg["invoice_cycle"] == "DAILY"
-        assert cfg["due_days"] == 1
-        assert float(cfg["rate_value"]) == 5.0
+        assert cfg["rate_type"] == "PER_TICKET"
+        assert float(cfg["rate_value"]) == 30.0
+        assert cfg["fixed_fee_paise"] == 3000
 
         # 2. Update configuration
         update_res = await client.put(
@@ -695,6 +697,77 @@ async def test_admin_stats_and_integrations_health_smoke(session: AsyncSession):
         assert "latency_ms" in integrations[0]
 
     app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_per_ticket_commission_calculation_and_configuration(session: AsyncSession):
+    app.dependency_overrides[get_db] = lambda: session
+
+    # 1. Seed venue, screen, showtime, user, and default theatre config
+    partner_id = uuid.uuid4()
+    venue = Venue(
+        id=uuid.uuid4(),
+        name="Vybhz Cine Grand",
+        city="Bengaluru",
+        address="MG Road, Bengaluru",
+        timezone="Asia/Kolkata",
+        partner_id=partner_id,
+    )
+    screen = Screen(id=uuid.uuid4(), venue_id=venue.id, name="Screen 1")
+    movie = Movie(
+        id=uuid.uuid4(),
+        title="Dune 2",
+        duration_min=165,
+        language="English",
+        certificate="UA",
+        status="PUBLISHED",
+        partner_id=partner_id,
+    )
+    st = Showtime(
+        id=uuid.uuid4(),
+        screen_id=screen.id,
+        movie_id=movie.id,
+        starts_at=utcnow() + timedelta(days=1),
+        partner_id=partner_id,
+    )
+    user = UserORM(
+        id=uuid.uuid4(),
+        full_name="Movie Goer",
+        email=f"goer_{uuid.uuid4().hex[:6]}@vyhbz.com",
+        password_hash="pwd",
+        role="USER",
+        is_active=True,
+    )
+    session.add_all([venue, screen, movie, st, user])
+    await session.commit()
+
+    # 2. Create a booking for 2 tickets under the default configuration (30 Rs per ticket)
+    booking = BookingModel(
+        id=uuid.uuid4(),
+        user_id=user.id,
+        booking_type="MOVIE",
+        showtime_id=st.id,
+        quantity=2,
+        ticket_paise=50000, # 500 Rs
+        total_paise=50000,
+        status="CONFIRMED",
+        currency="INR",
+        seat_codes_json='["B1", "B2"]',
+        idempotency_key=f"idem-per-tix-{uuid.uuid4().hex[:6]}",
+    )
+    session.add(booking)
+    await session.commit()
+
+    ledger = await CommissionAdminService.record_booking_commission(session, booking)
+    assert ledger is not None
+    assert ledger.rate_type == "PER_TICKET"
+    # 2 tickets * 30 Rs (3,000 paise) = 6,000 paise (60 Rs)
+    assert ledger.commission_paise == 6000
+    # 18% GST on 6,000 paise = 1,080 paise (10.80 Rs)
+    assert ledger.tax_paise == 1080
+
+    app.dependency_overrides.clear()
+
 
 
 

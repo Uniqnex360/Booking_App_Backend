@@ -48,9 +48,9 @@ class TheatrePaymentConfigResponse(BaseModel):
     customer_payment_model: str = "THEATRE_DIRECT"
     payment_provider: str = "THEATRE_GATEWAY"
     commission_model: str = "INVOICE_POST_PAY"
-    rate_type: str = "PERCENTAGE"
-    rate_value: float = 5.0
-    fixed_fee_paise: int = 0
+    rate_type: str = "PER_TICKET"
+    rate_value: float = 30.0
+    fixed_fee_paise: int = 3000
     calculation_base: str = "GROSS_TICKET"
     invoice_cycle: str = "DAILY"
     due_days: int = 1
@@ -68,9 +68,9 @@ class TheatrePaymentConfigUpdate(BaseModel):
     customer_payment_model: Optional[str] = "THEATRE_DIRECT"
     payment_provider: Optional[str] = "THEATRE_GATEWAY"
     commission_model: Optional[str] = "INVOICE_POST_PAY"
-    rate_type: Optional[str] = "PERCENTAGE"
-    rate_value: Optional[float] = 5.0
-    fixed_fee_paise: Optional[int] = 0
+    rate_type: Optional[str] = "PER_TICKET"
+    rate_value: Optional[float] = 30.0
+    fixed_fee_paise: Optional[int] = 3000
     calculation_base: Optional[str] = "GROSS_TICKET"
     invoice_cycle: Optional[str] = "DAILY"
     due_days: Optional[int] = 1
@@ -104,7 +104,7 @@ class TheatreListItemResponse(BaseModel):
     operational_status: str = "ACTIVE"
     customer_payment_model: str = "THEATRE_DIRECT"
     commission_model: str = "INVOICE_POST_PAY"
-    commission_rate_display: str = "5.0%"
+    commission_rate_display: str = "₹30.00/tix"
     invoice_cycle: str = "DAILY"
     last_sync_status: str = "HEALTHY"
 

@@ -87,7 +87,17 @@ class TheatreAdminService:
                     chain_obj = c
                     break
 
-            rate_display = f"{float(cfg.rate_value):.1f}%" if cfg else "5.0%"
+            if not cfg:
+                rate_display = "₹30.00/tix"
+            elif (cfg.rate_type or "").upper() in ("PER_TICKET", "FIXED_PER_TICKET"):
+                rate_display = f"₹{float(cfg.rate_value):.2f}/tix"
+            elif (cfg.rate_type or "").upper() == "FIXED_FEE":
+                rate_display = f"₹{float(cfg.rate_value):.2f}/booking"
+            elif (cfg.rate_type or "").upper() == "HYBRID":
+                rate_display = f"{float(cfg.rate_value):.1f}% + ₹{(cfg.fixed_fee_paise or 0)/100:.2f}"
+            else:
+                rate_display = f"{float(cfg.rate_value):.1f}%"
+
             results.append({
                 "id": v.id,
                 "name": v.name,
@@ -117,14 +127,15 @@ class TheatreAdminService:
         )
         cfg = cfg_res.scalar_one_or_none()
         if not cfg:
-            # Create default configuration (Model A: Theatre Direct + Daily invoice)
+            # Create default configuration (Model A: Theatre Direct + Daily invoice + 30 Rs/ticket)
             cfg = TheatrePaymentConfigModel(
                 venue_id=venue_id,
                 customer_payment_model="THEATRE_DIRECT",
                 payment_provider="THEATRE_GATEWAY",
                 commission_model="INVOICE_POST_PAY",
-                rate_type="PERCENTAGE",
-                rate_value=5.0000,
+                rate_type="PER_TICKET",
+                rate_value=30.0000,
+                fixed_fee_paise=3000,
                 calculation_base="GROSS_TICKET",
                 invoice_cycle="DAILY",
                 due_days=1,
@@ -176,6 +187,8 @@ class TheatreAdminService:
             cfg.rate_type = data.rate_type
         if data.rate_value is not None:
             cfg.rate_value = data.rate_value
+            if (cfg.rate_type or "").upper() in ("PER_TICKET", "FIXED_PER_TICKET") and data.fixed_fee_paise is None:
+                cfg.fixed_fee_paise = int(round(float(data.rate_value) * 100))
         if data.fixed_fee_paise is not None:
             cfg.fixed_fee_paise = data.fixed_fee_paise
         if data.calculation_base:
