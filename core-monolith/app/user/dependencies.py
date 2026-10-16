@@ -5,6 +5,7 @@ from app.user.services import UserProfileService
 from app.user.interfaces import IUserProfileRepository, IAddressRepository
 from app.user.repository import SQLAlchemyUserProfileRepository
 from app.user.repository import SQLAlchemyAddressRepository
+from app.auth.repositories import SQLAlchemyUserRepository
 def get_user_repo(db: AsyncSession = Depends(get_db)):
     return SQLAlchemyUserRepository(db)
 def get_profile_repo(db: AsyncSession = Depends(get_db)) -> IUserProfileRepository:

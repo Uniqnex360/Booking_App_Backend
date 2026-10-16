@@ -648,3 +648,43 @@ async def test_super_admin_user_role_status_guards(session: AsyncSession):
     app.dependency_overrides.clear()
 
 
+@pytest.mark.asyncio
+async def test_admin_stats_and_integrations_health_smoke(session: AsyncSession):
+    app.dependency_overrides[get_db] = lambda: session
+
+    admin_user = UserORM(
+        id=uuid.uuid4(),
+        full_name="Admin Smoke Tester",
+        email=f"smoke_{uuid.uuid4().hex[:6]}@portal.com",
+        password_hash="hash",
+        role="ADMIN",
+        is_active=True,
+    )
+    session.add(admin_user)
+    await session.commit()
+    token = _token_for(admin_user.id, role="ADMIN")
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        stats_res = await client.get(
+            "/v1/admin/stats/comprehensive",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert stats_res.status_code == 200, f"Expected 200, got {stats_res.status_code}: {stats_res.text}"
+        data = stats_res.json()["data"]
+        assert "total_bookings" in data
+        assert "commission_earned_paise" in data
+
+        health_res = await client.get(
+            "/v1/admin/integrations/health",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert health_res.status_code == 200, f"Expected 200, got {health_res.status_code}: {health_res.text}"
+        integrations = health_res.json()["data"]
+        assert isinstance(integrations, list)
+        assert len(integrations) > 0
+        assert "latency_ms" in integrations[0]
+
+    app.dependency_overrides.clear()
+
+
+

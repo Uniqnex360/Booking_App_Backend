@@ -23,6 +23,21 @@ async def search_and_get_rating(
     if not title or not title.strip():
         return None
 
+    def _release_year(item: dict) -> Optional[int]:
+        rd = item.get("release_date") or ""
+        if len(rd) >= 4 and rd[:4].isdigit():
+            return int(rd[:4])
+        return None
+
+    def _pick(results: list[dict]) -> Optional[dict]:
+        if not year:
+            return results[0] if results else None
+        for r in results:
+            ry = _release_year(r)
+            if ry is not None and abs(ry - year) <= 1:
+                return r
+        return None
+
     query = {"query": title.strip()}
 
     try:
