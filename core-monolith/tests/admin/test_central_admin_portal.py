@@ -141,8 +141,8 @@ async def test_per_theatre_config_and_history(session: AsyncSession):
         cfg = cfg_res.json()["data"]
         assert cfg["customer_payment_model"] == "THEATRE_DIRECT"
         assert cfg["commission_model"] == "INVOICE_POST_PAY"
-        assert cfg["invoice_cycle"] == "WEEKLY"
-        assert cfg["due_days"] == 15
+        assert cfg["invoice_cycle"] == "DAILY"
+        assert cfg["due_days"] == 1
         assert float(cfg["rate_value"]) == 5.0
 
         # 2. Update configuration

@@ -99,7 +99,7 @@ class TheatreAdminService:
                 "customer_payment_model": cfg.customer_payment_model if cfg else "THEATRE_DIRECT",
                 "commission_model": cfg.commission_model if cfg else "INVOICE_POST_PAY",
                 "commission_rate_display": rate_display,
-                "invoice_cycle": cfg.invoice_cycle if cfg else "WEEKLY",
+                "invoice_cycle": cfg.invoice_cycle if cfg else "DAILY",
                 "last_sync_status": "HEALTHY",
             })
         return results
@@ -117,7 +117,7 @@ class TheatreAdminService:
         )
         cfg = cfg_res.scalar_one_or_none()
         if not cfg:
-            # Create default configuration (Model A: Theatre Direct + Weekly Monday invoice)
+            # Create default configuration (Model A: Theatre Direct + Daily invoice)
             cfg = TheatrePaymentConfigModel(
                 venue_id=venue_id,
                 customer_payment_model="THEATRE_DIRECT",
@@ -126,8 +126,8 @@ class TheatreAdminService:
                 rate_type="PERCENTAGE",
                 rate_value=5.0000,
                 calculation_base="GROSS_TICKET",
-                invoice_cycle="WEEKLY",
-                due_days=15,
+                invoice_cycle="DAILY",
+                due_days=1,
                 currency="INR",
                 reconciliation_source="API_WEBHOOK",
                 refund_treatment="DEDUCT_COMMISSION",

@@ -48,9 +48,9 @@ class TheatrePaymentConfigModel(Base):
     fixed_fee_paise = Column(Integer, nullable=False, default=0, server_default="0")
     calculation_base = Column(String(50), nullable=False, default="GROSS_TICKET", server_default="GROSS_TICKET") # GROSS_TICKET, NET_OF_TAX, TICKET_PLUS_FEES
     
-    # Invoicing cycle (Default: WEEKLY Monday cutoff, 15 days due)
-    invoice_cycle = Column(String(50), nullable=False, default="WEEKLY", server_default="WEEKLY") # WEEKLY, MONTHLY, BI_WEEKLY
-    due_days = Column(Integer, nullable=False, default=15, server_default="15")
+    # Invoicing cycle (Default: DAILY 23:59 cutoff, 1 day due)
+    invoice_cycle = Column(String(50), nullable=False, default="DAILY", server_default="DAILY") # DAILY, WEEKLY, MONTHLY, BI_WEEKLY
+    due_days = Column(Integer, nullable=False, default=1, server_default="1")
     currency = Column(String(10), nullable=False, default="INR", server_default="INR")
     
     # Reconciliation & Refunds

@@ -52,8 +52,8 @@ class TheatrePaymentConfigResponse(BaseModel):
     rate_value: float = 5.0
     fixed_fee_paise: int = 0
     calculation_base: str = "GROSS_TICKET"
-    invoice_cycle: str = "WEEKLY"
-    due_days: int = 15
+    invoice_cycle: str = "DAILY"
+    due_days: int = 1
     currency: str = "INR"
     reconciliation_source: str = "API_WEBHOOK"
     refund_treatment: str = "DEDUCT_COMMISSION"
@@ -72,8 +72,8 @@ class TheatrePaymentConfigUpdate(BaseModel):
     rate_value: Optional[float] = 5.0
     fixed_fee_paise: Optional[int] = 0
     calculation_base: Optional[str] = "GROSS_TICKET"
-    invoice_cycle: Optional[str] = "WEEKLY"
-    due_days: Optional[int] = 15
+    invoice_cycle: Optional[str] = "DAILY"
+    due_days: Optional[int] = 1
     currency: Optional[str] = "INR"
     reconciliation_source: Optional[str] = "API_WEBHOOK"
     refund_treatment: Optional[str] = "DEDUCT_COMMISSION"
@@ -105,7 +105,7 @@ class TheatreListItemResponse(BaseModel):
     customer_payment_model: str = "THEATRE_DIRECT"
     commission_model: str = "INVOICE_POST_PAY"
     commission_rate_display: str = "5.0%"
-    invoice_cycle: str = "WEEKLY"
+    invoice_cycle: str = "DAILY"
     last_sync_status: str = "HEALTHY"
 
 
@@ -169,6 +169,8 @@ class CommissionLedgerItemResponse(BaseModel):
     rate_value: float
     commission_paise: int
     tax_paise: int
+    cgst_paise: int = 0
+    sgst_paise: int = 0
     status: str
     invoice_id: Optional[uuid.UUID] = None
     invoice_number: Optional[str] = None
@@ -179,7 +181,7 @@ class GenerateInvoiceRequest(BaseModel):
     venue_id: uuid.UUID
     period_start: datetime
     period_end: datetime
-    due_days: Optional[int] = 15
+    due_days: Optional[int] = 1
     notes: Optional[str] = None
 
 
@@ -210,6 +212,8 @@ class CommissionInvoiceResponse(BaseModel):
     commission_paise: int
     adjustments_paise: int
     tax_paise: int
+    cgst_paise: int = 0
+    sgst_paise: int = 0
     total_paise: int
     paid_paise: int
     balance_paise: int

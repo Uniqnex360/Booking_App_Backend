@@ -133,6 +133,9 @@ class CommissionAdminService:
 
         results = []
         for ledger, v_name, b_ref, inv_num in rows:
+            t_paise = ledger.tax_paise or 0
+            cgst = t_paise // 2
+            sgst = t_paise - cgst
             results.append({
                 "id": ledger.id,
                 "booking_id": ledger.booking_id,
@@ -144,7 +147,9 @@ class CommissionAdminService:
                 "rate_type": ledger.rate_type,
                 "rate_value": float(ledger.rate_value),
                 "commission_paise": ledger.commission_paise,
-                "tax_paise": ledger.tax_paise,
+                "tax_paise": t_paise,
+                "cgst_paise": cgst,
+                "sgst_paise": sgst,
                 "status": ledger.status,
                 "invoice_id": ledger.invoice_id,
                 "invoice_number": inv_num,
@@ -158,7 +163,7 @@ class CommissionAdminService:
         venue_id: uuid.UUID,
         period_start: datetime,
         period_end: datetime,
-        due_days: int = 15,
+        due_days: int = 1,
         notes: Optional[str] = None,
         admin_user: Any = None
     ) -> CommissionInvoiceModel:
@@ -257,6 +262,10 @@ class CommissionAdminService:
             if current_status in ("ISSUED", "PARTIALLY_PAID") and inv.due_date < now:
                 current_status = "OVERDUE"
 
+            t_paise = inv.tax_paise or 0
+            cgst = t_paise // 2
+            sgst = t_paise - cgst
+
             results.append({
                 "id": inv.id,
                 "invoice_number": inv.invoice_number,
@@ -269,7 +278,9 @@ class CommissionAdminService:
                 "gross_sales_paise": inv.gross_sales_paise,
                 "commission_paise": inv.commission_paise,
                 "adjustments_paise": inv.adjustments_paise,
-                "tax_paise": inv.tax_paise,
+                "tax_paise": t_paise,
+                "cgst_paise": cgst,
+                "sgst_paise": sgst,
                 "total_paise": inv.total_paise,
                 "paid_paise": inv.paid_paise,
                 "balance_paise": inv.balance_paise,

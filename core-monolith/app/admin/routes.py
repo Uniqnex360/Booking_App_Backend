@@ -608,7 +608,7 @@ async def generate_commission_invoice(
         venue_id=data.venue_id,
         period_start=data.period_start,
         period_end=data.period_end,
-        due_days=data.due_days or 15,
+        due_days=data.due_days if data.due_days is not None else 1,
         notes=data.notes,
         admin_user=admin_user
     )

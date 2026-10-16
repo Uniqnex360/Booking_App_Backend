@@ -174,33 +174,38 @@ class ReconciliationAdminService:
                     pass
 
             ticket_amt = b.ticket_paise or max(0, b.total_paise - (b.fnb_paise or 0) - (b.convenience_fee_paise or 0))
+            comm_amt = comm_earned or int(ticket_amt * 0.05)
+            comm_tax = int(round(comm_amt * 0.18))
 
             results.append({
                 "id": b.id,
                 "ref_code": b.ref_code or "AGS-CONFIRMED",
                 "customer_email": b.contact_email,
-                "customer_phone": b.contact_phone,
-                "booking_type": b.booking_type or "MOVIE",
-                "movie_or_event_title": m_title or "Confirmed Show",
-                "venue_id": v_id,
-                "venue_name": v_name or "Partner Theatre",
-                "showtime_at": st_time or b.created_at,
-                "seats": seats,
-                "quantity": b.quantity or len(seats) or 1,
-                "ticket_paise": ticket_amt,
-                "fnb_paise": b.fnb_paise or 0,
-                "convenience_fee_paise": b.convenience_fee_paise or 0,
-                "total_paise": b.total_paise,
-                "eligible_commission_base_paise": ticket_amt,
-                "commission_earned_paise": comm_earned or int(ticket_amt * 0.05),
-                "booking_status": b.status or "CONFIRMED",
-                "payment_status": p_status or "CAPTURED",
-                "refund_status": "REFUNDED" if ref_id else "NONE",
-                "commission_invoice_status": inv_status or ("INVOICED" if inv_num else "UNINVOICED"),
-                "commission_collection_status": "COLLECTED" if inv_status == "PAID" else "PENDING",
-                "provider_booking_id": b.provider_booking_id,
-                "created_at": b.created_at
-            })
+                    "customer_phone": b.contact_phone,
+                    "booking_type": b.booking_type or "MOVIE",
+                    "movie_or_event_title": m_title or "Confirmed Show",
+                    "venue_id": v_id,
+                    "venue_name": v_name or "Partner Theatre",
+                    "showtime_at": st_time or b.created_at,
+                    "seats": seats,
+                    "quantity": b.quantity or len(seats) or 1,
+                    "ticket_paise": ticket_amt,
+                    "fnb_paise": b.fnb_paise or 0,
+                    "convenience_fee_paise": b.convenience_fee_paise or 0,
+                    "total_paise": b.total_paise,
+                    "eligible_commission_base_paise": ticket_amt,
+                    "commission_earned_paise": comm_amt,
+                    "commission_tax_paise": comm_tax,
+                    "commission_cgst_paise": comm_tax // 2,
+                    "commission_sgst_paise": comm_tax - (comm_tax // 2),
+                    "booking_status": b.status or "CONFIRMED",
+                    "payment_status": p_status or "CAPTURED",
+                    "refund_status": "REFUNDED" if ref_id else "NONE",
+                    "commission_invoice_status": inv_status or ("INVOICED" if inv_num else "UNINVOICED"),
+                    "commission_collection_status": "COLLECTED" if inv_status == "PAID" else "PENDING",
+                    "provider_booking_id": b.provider_booking_id,
+                    "created_at": b.created_at
+                })
         return results
 
     @staticmethod
