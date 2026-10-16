@@ -216,3 +216,4 @@ def downgrade():
     op.execute("DROP TABLE IF EXISTS theatre_config_history")
     op.execute("DROP TABLE IF EXISTS theatre_payment_configs")
     op.execute("DROP TABLE IF EXISTS theatre_chains")
+
