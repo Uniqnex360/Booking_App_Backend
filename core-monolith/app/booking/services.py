@@ -1238,6 +1238,19 @@ class BookingService:
                 except Exception as e:
                     logger.warning("Failed to send confirmation email for booking %s: %s", booking.id, e)
 
+            # Record transaction in Central Admin Commission Ledger
+            if self.session:
+                try:
+                    from app.admin.commission_service import CommissionAdminService
+                    from app.booking.models import BookingModel
+                    b_model = (await self.session.execute(
+                        select(BookingModel).where(BookingModel.id == confirmed.id)
+                    )).scalar_one_or_none()
+                    if b_model:
+                        await CommissionAdminService.record_booking_commission(self.session, b_model)
+                except Exception as comm_err:
+                    logger.warning("Failed to record commission ledger for booking %s: %s", booking.id, comm_err)
+
         return confirmed
 
     async def commit_booking(

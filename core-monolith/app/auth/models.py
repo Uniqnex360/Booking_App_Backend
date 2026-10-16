@@ -7,10 +7,15 @@ from typing import Optional,List
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Enum, Text
 from sqlalchemy.dialects.postgresql import UUID
 
-class UserRole(str,PyEnum):
-    USER="USER"
-    PARTNER='PARTNER'
-    ADMIN='ADMIN'
+class UserRole(str, PyEnum):
+    USER = "USER"
+    PARTNER = "PARTNER"
+    ADMIN = "ADMIN"
+    SUPER_ADMIN = "SUPER_ADMIN"
+    OPERATIONS_ADMIN = "OPERATIONS_ADMIN"
+    FINANCE_ADMIN = "FINANCE_ADMIN"
+    SUPPORT_ADMIN = "SUPPORT_ADMIN"
+    THEATRE_PARTNER = "THEATRE_PARTNER"
 class  User(Base):
     __tablename__='users'
     id:Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)

@@ -23,3 +23,9 @@ class RepositoryError(DomainError):
 
 class DuplicateEntityError(DomainError):
     pass
+
+class ConflictError(DuplicateEntityError):
+    pass
+
+class BadRequestError(ValidationError):
+    pass
