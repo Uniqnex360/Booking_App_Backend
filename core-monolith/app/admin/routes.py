@@ -113,7 +113,9 @@ async def list_movies_admin(
         )
         for m in items
     ]
-    facets = await movie_service.get_admin_movie_facets()
+    facets = await movie_service.get_admin_movie_facets(
+        language=language if language and language.upper() != "ALL" else None
+    )
     return success_response(
         data={"movies": movies_data, "pagination": meta, "facets": facets},
         message="Movies fetched successfully",

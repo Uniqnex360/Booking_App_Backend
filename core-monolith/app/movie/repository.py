@@ -208,26 +208,40 @@ class MovieRepository:
         ]
         return dtos, total
 
-    async def get_admin_movie_facets(self) -> dict:
+    async def get_admin_movie_facets(self, language: str | None = None) -> dict:
         stmt = select(Movie.language, Movie.genre, Movie.status)
         result = await self._session.execute(stmt)
         rows = result.all()
 
         lang_counts: dict[str, int] = {}
         genre_counts: dict[str, int] = {}
-        status_counts: dict[str, int] = {"ALL": len(rows)}
+        status_counts: dict[str, int] = {"ALL": 0}
+
+        lang_filter = language.strip().lower() if language and language.upper() != "ALL" else None
 
         for lang_val, genre_val, status_val in rows:
-            if status_val:
-                status_counts[status_val] = status_counts.get(status_val, 0) + 1
-            if lang_val:
-                for l in [x.strip() for x in re.split(r"[/,&]", lang_val) if x.strip()]:
+            movie_langs = [x.strip() for x in re.split(r"[/,&]", lang_val)] if lang_val else []
+            matches_lang = (
+                True
+                if not lang_filter
+                else any(l.lower() == lang_filter for l in movie_langs)
+            )
+
+            # Languages count across all
+            for l in movie_langs:
+                if l:
                     formatted_l = l.title()
                     lang_counts[formatted_l] = lang_counts.get(formatted_l, 0) + 1
-            if genre_val:
-                for g in [x.strip() for x in re.split(r"[/,&]", genre_val) if x.strip()]:
-                    formatted_g = g.title()
-                    genre_counts[formatted_g] = genre_counts.get(formatted_g, 0) + 1
+
+            # Genres and Statuses reflect the selected language!
+            if matches_lang:
+                status_counts["ALL"] += 1
+                if status_val:
+                    status_counts[status_val] = status_counts.get(status_val, 0) + 1
+                if genre_val:
+                    for g in [x.strip() for x in re.split(r"[/,&]", genre_val) if x.strip()]:
+                        formatted_g = g.title()
+                        genre_counts[formatted_g] = genre_counts.get(formatted_g, 0) + 1
 
         return {
             "languages": [{"name": k, "count": v} for k, v in sorted(lang_counts.items(), key=lambda x: (-x[1], x[0]))],

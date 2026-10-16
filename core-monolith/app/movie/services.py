@@ -60,8 +60,8 @@ class MovieService:
             page=page,
             limit=limit,
         )
-    async def get_admin_movie_facets(self) -> dict:
-        return await self._repo.get_admin_movie_facets()
+    async def get_admin_movie_facets(self, language: str | None = None) -> dict:
+        return await self._repo.get_admin_movie_facets(language=language)
     async def get_public_movie_facets(self, city: str | None = None) -> dict:
         return await self._repo.get_public_movie_facets(city=city)
     async def get_movie_details(self, movie_id: UUID) -> MovieDetailsDTO:
