@@ -9,7 +9,7 @@ from app.shared.timeutil import utcnow
 
 from app.core.database import get_db
 from app.auth.dependencies import get_user_repo, get_refresh_token_repo
-from app.auth.interfaces import IUserRepository, IRefreshTokenRepository
+from app.auth.interfaces import IUserRepository, IRefreshTokenRepository, NotFoundError
 from app.admin.dependencies import (
     require_admin,
     require_ops_admin,
@@ -143,7 +143,7 @@ async def update_movie_status_admin(
             ),
             message="Movie status updated successfully",
         )
-    except Exception as exc:
+    except (EntityNotFoundError, NotFoundError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
 # ---------------------------------------------------------------------------
@@ -189,7 +189,7 @@ async def update_event_status_admin(
             rejection_reason=data.cancellation_reason,
         )
         return success_response(data=event, message="Event status updated successfully")
-    except Exception as exc:
+    except (EntityNotFoundError, NotFoundError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
 # ---------------------------------------------------------------------------
@@ -289,7 +289,7 @@ async def update_user_status_admin(
             },
             message=f"User account has been {action_word} successfully",
         )
-    except Exception as exc:
+    except (EntityNotFoundError, NotFoundError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
 @router.patch("/users/{user_id}/role")
@@ -336,7 +336,7 @@ async def update_user_role_admin(
             },
             message="User role updated successfully",
         )
-    except Exception as exc:
+    except (EntityNotFoundError, NotFoundError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
 # ---------------------------------------------------------------------------
@@ -455,11 +455,8 @@ async def update_event_or_movie_status(
             data.cancellation_reason
         )
         return success_response(data=event, message="Event status updated successfully")
-    except EntityNotFoundError:
+    except (EntityNotFoundError, NotFoundError):
         pass
-    except Exception as exc:
-        if "not found" not in str(exc).lower():
-            raise exc
 
     # Fallback to Movie: return DTO/MovieSummaryResponse matching test_m10 directly
     try:
@@ -476,7 +473,7 @@ async def update_event_or_movie_status(
             poster_url=dto.poster_url,
             status=dto.status,
         )
-    except Exception:
+    except (EntityNotFoundError, NotFoundError):
         raise EntityNotFoundError(f"Content with id '{event_id}' not found")
 
 
