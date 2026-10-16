@@ -2,7 +2,7 @@ import json
 import uuid
 from typing import Optional, List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, insert, func, desc
+from sqlalchemy import select, update, insert, func, desc,or_
 from app.movie.models import Venue
 from app.admin.models import (
     TheatreChainModel,

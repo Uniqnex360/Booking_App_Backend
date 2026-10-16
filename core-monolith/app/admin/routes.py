@@ -113,8 +113,9 @@ async def list_movies_admin(
         )
         for m in items
     ]
+    facets = await movie_service.get_admin_movie_facets()
     return success_response(
-        data={"movies": movies_data, "pagination": meta},
+        data={"movies": movies_data, "pagination": meta, "facets": facets},
         message="Movies fetched successfully",
     )
 

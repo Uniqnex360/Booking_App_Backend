@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+import re
 import uuid
 from datetime import date, datetime, time, timedelta
 from app.shared.timeutil import utcnow
@@ -206,6 +207,33 @@ class MovieRepository:
             for m in movies
         ]
         return dtos, total
+
+    async def get_admin_movie_facets(self) -> dict:
+        stmt = select(Movie.language, Movie.genre, Movie.status)
+        result = await self._session.execute(stmt)
+        rows = result.all()
+
+        lang_counts: dict[str, int] = {}
+        genre_counts: dict[str, int] = {}
+        status_counts: dict[str, int] = {"ALL": len(rows)}
+
+        for lang_val, genre_val, status_val in rows:
+            if status_val:
+                status_counts[status_val] = status_counts.get(status_val, 0) + 1
+            if lang_val:
+                for l in [x.strip() for x in re.split(r"[/,&]", lang_val) if x.strip()]:
+                    formatted_l = l.title()
+                    lang_counts[formatted_l] = lang_counts.get(formatted_l, 0) + 1
+            if genre_val:
+                for g in [x.strip() for x in re.split(r"[/,&]", genre_val) if x.strip()]:
+                    formatted_g = g.title()
+                    genre_counts[formatted_g] = genre_counts.get(formatted_g, 0) + 1
+
+        return {
+            "languages": [{"name": k, "count": v} for k, v in sorted(lang_counts.items(), key=lambda x: (-x[1], x[0]))],
+            "genres": [{"name": k, "count": v} for k, v in sorted(genre_counts.items(), key=lambda x: (-x[1], x[0]))],
+            "statuses": status_counts,
+        }
     
     async def get_movie_details(self, movie_id: UUID) -> MovieDetailsDTO | None:
         stmt = select(Movie).where(
