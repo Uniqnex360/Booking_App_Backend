@@ -20,6 +20,7 @@ from app.event.models import EventORM, TicketCategoryORM
 from app.booking.models import BookingModel, TicketSoldCountModel
 import app.movie.models
 import app.providers.registry
+import app.admin.models
 config = context.config
 
 if config.config_file_name is not None:
