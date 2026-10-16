@@ -18,6 +18,7 @@ from app.admin.models import (
     CommissionInvoiceModel,
     ReconciliationExceptionModel
 )
+from app.partner.models import PartnerORM
 from app.shared.timeutil import utcnow
 
 
@@ -389,3 +390,261 @@ async def test_rbac_security_restriction(session: AsyncSession):
         assert config_res.status_code == 403, "Support admin must be forbidden from updating financial terms"
 
     app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_ops_admin_endpoint_authorization(session: AsyncSession):
+    app.dependency_overrides[get_db] = lambda: session
+
+    venue = Venue(
+        id=uuid.uuid4(),
+        name="Test Ops Venue",
+        city="Bengaluru",
+        address="Koramangala",
+        timezone="Asia/Kolkata"
+    )
+    session.add(venue)
+    await session.flush()
+
+    screen = Screen(
+        id=uuid.uuid4(),
+        venue_id=venue.id,
+        name="Screen 1",
+        total_seats=0
+    )
+    session.add(screen)
+
+    roles = ["SUPER_ADMIN", "OPERATIONS_ADMIN", "FINANCE_ADMIN", "SUPPORT_ADMIN"]
+    tokens = {}
+    for r in roles:
+        u = UserORM(
+            id=uuid.uuid4(),
+            full_name=f"{r} User",
+            email=f"{r.lower()}_{uuid.uuid4().hex[:6]}@vyhbz.com",
+            password_hash="hash",
+            role=r,
+            is_active=True,
+        )
+        session.add(u)
+        tokens[r] = _token_for(u.id, role=r)
+
+    partner_owner = UserORM(
+        id=uuid.uuid4(),
+        full_name="Partner Owner",
+        email=f"owner_{uuid.uuid4().hex[:6]}@partner.com",
+        password_hash="hash",
+        role="PARTNER",
+        is_active=True,
+    )
+    session.add(partner_owner)
+    await session.flush()
+
+    partner = PartnerORM(
+        id=uuid.uuid4(),
+        user_id=partner_owner.id,
+        business_name="Test Partner Ops",
+        partner_type="cinema",
+        contact_name="Owner Name",
+        contact_phone="9988776655",
+        city="Bengaluru",
+        status="PENDING_APPROVAL"
+    )
+    session.add(partner)
+
+    await session.commit()
+
+    layout_payload = {
+        "text_grid": "A: 1111",
+        "default_price_paise": 20000,
+        "override_reason": "Ops layout verification"
+    }
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # Test 1: POST /v1/admin/screens/{id}/layout
+        for role in roles:
+            res = await client.post(
+                f"/v1/admin/screens/{screen.id}/layout",
+                headers={"Authorization": f"Bearer {tokens[role]}"},
+                json=layout_payload,
+            )
+            expected = 200 if role in ("SUPER_ADMIN", "OPERATIONS_ADMIN") else 403
+            assert res.status_code == expected, f"Role {role} got {res.status_code}, expected {expected} on screen layout"
+
+        # Test 2: GET /v1/partner/admin
+        for role in roles:
+            res = await client.get(
+                "/v1/partner/admin",
+                headers={"Authorization": f"Bearer {tokens[role]}"},
+            )
+            expected = 200 if role in ("SUPER_ADMIN", "OPERATIONS_ADMIN") else 403
+            assert res.status_code == expected, f"Role {role} got {res.status_code}, expected {expected} on partner listing"
+
+        # Test 3: PATCH /v1/admin/partners/{id}/status
+        for role in roles:
+            p_owner = UserORM(
+                id=uuid.uuid4(),
+                full_name=f"Partner Owner {role}",
+                email=f"owner_{role.lower()}_{uuid.uuid4().hex[:6]}@partner.com",
+                password_hash="hash",
+                role="PARTNER",
+                is_active=True,
+            )
+            session.add(p_owner)
+            await session.flush()
+            p_inst = PartnerORM(
+                id=uuid.uuid4(),
+                user_id=p_owner.id,
+                business_name=f"Partner {role}",
+                partner_type="cinema",
+                contact_name="Owner",
+                contact_phone="9988776655",
+                city="Bengaluru",
+                status="PENDING_APPROVAL"
+            )
+            session.add(p_inst)
+            await session.commit()
+
+            res = await client.patch(
+                f"/v1/admin/partners/{p_inst.id}/status",
+                headers={"Authorization": f"Bearer {tokens[role]}"},
+                json={"status": "APPROVED"},
+            )
+            expected = 200 if role in ("SUPER_ADMIN", "OPERATIONS_ADMIN") else 403
+            assert res.status_code == expected, f"Role {role} got {res.status_code}, expected {expected} on partner status update"
+
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_super_admin_user_role_status_guards(session: AsyncSession):
+    app.dependency_overrides[get_db] = lambda: session
+
+    # 1. Create caller users for all admin roles
+    all_roles = ["SUPER_ADMIN", "ADMIN", "OPERATIONS_ADMIN", "FINANCE_ADMIN", "SUPPORT_ADMIN"]
+    users = {}
+    tokens = {}
+    for r in all_roles:
+        u = UserORM(
+            id=uuid.uuid4(),
+            full_name=f"{r} Caller",
+            email=f"{r.lower()}_{uuid.uuid4().hex[:6]}@portal.com",
+            password_hash="hash",
+            role=r,
+            is_active=True,
+        )
+        session.add(u)
+        users[r] = u
+        tokens[r] = _token_for(u.id, role=r)
+
+    # 2. Target regular user
+    regular_user = UserORM(
+        id=uuid.uuid4(),
+        full_name="Regular User",
+        email=f"regular_{uuid.uuid4().hex[:6]}@example.com",
+        password_hash="hash",
+        role="USER",
+        is_active=True,
+    )
+    session.add(regular_user)
+
+    # 3. Target admin user (for target privilege protection check)
+    target_admin = UserORM(
+        id=uuid.uuid4(),
+        full_name="Target Admin",
+        email=f"target_admin_{uuid.uuid4().hex[:6]}@portal.com",
+        password_hash="hash",
+        role="OPERATIONS_ADMIN",
+        is_active=True,
+    )
+    session.add(target_admin)
+    await session.commit()
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # Check 1: SUPER_ADMIN and ADMIN get 200; OPERATIONS, FINANCE, SUPPORT get 403
+        for r in all_roles:
+            status_res = await client.patch(
+                f"/v1/admin/users/{regular_user.id}/status",
+                headers={"Authorization": f"Bearer {tokens[r]}"},
+                json={"is_active": True},
+            )
+            role_res = await client.patch(
+                f"/v1/admin/users/{regular_user.id}/role",
+                headers={"Authorization": f"Bearer {tokens[r]}"},
+                json={"role": "USER"},
+            )
+            expected = 200 if r in ("SUPER_ADMIN", "ADMIN") else 403
+            assert status_res.status_code == expected, f"{r} got {status_res.status_code} on status update, expected {expected}"
+            assert role_res.status_code == expected, f"{r} got {role_res.status_code} on role update, expected {expected}"
+
+        # Check 2: Non-super cannot modify an admin target (target privilege guard)
+        from app.admin.dependencies import require_super_admin
+        from app.auth.interfaces import User as AuthUserDomain, UserRole
+
+        ops_caller = AuthUserDomain(
+            id=users["OPERATIONS_ADMIN"].id,
+            full_name=users["OPERATIONS_ADMIN"].full_name,
+            email=users["OPERATIONS_ADMIN"].email,
+            role=UserRole.OPERATIONS_ADMIN,
+            is_active=True,
+            password_hash="hash",
+        )
+        app.dependency_overrides[require_super_admin] = lambda: ops_caller
+
+        # Non-super attempting to block admin target -> 403 ForbiddenError
+        status_admin_target = await client.patch(
+            f"/v1/admin/users/{target_admin.id}/status",
+            headers={"Authorization": f"Bearer {tokens['OPERATIONS_ADMIN']}"},
+            json={"is_active": False},
+        )
+        assert status_admin_target.status_code == 403, "Non-super cannot block admin target"
+
+        # Non-super attempting to change admin target role -> 403 ForbiddenError
+        role_admin_target = await client.patch(
+            f"/v1/admin/users/{target_admin.id}/role",
+            headers={"Authorization": f"Bearer {tokens['OPERATIONS_ADMIN']}"},
+            json={"role": "USER"},
+        )
+        assert role_admin_target.status_code == 403, "Non-super cannot modify role of admin target"
+
+        # Restore dependency overrides
+        del app.dependency_overrides[require_super_admin]
+
+        # Check 3: Self-block rejected (400)
+        self_block_res = await client.patch(
+            f"/v1/admin/users/{users['SUPER_ADMIN'].id}/status",
+            headers={"Authorization": f"Bearer {tokens['SUPER_ADMIN']}"},
+            json={"is_active": False},
+        )
+        assert self_block_res.status_code == 400
+        assert "cannot block their own account" in self_block_res.json()["detail"]
+
+        # Check 4: Self-demote rejected (400)
+        # SUPER_ADMIN attempting self-demote to ADMIN or USER
+        self_demote_res = await client.patch(
+            f"/v1/admin/users/{users['SUPER_ADMIN'].id}/role",
+            headers={"Authorization": f"Bearer {tokens['SUPER_ADMIN']}"},
+            json={"role": "USER"},
+        )
+        assert self_demote_res.status_code == 400
+        assert "cannot demote their own account" in self_demote_res.json()["detail"]
+
+        self_demote_admin_res = await client.patch(
+            f"/v1/admin/users/{users['SUPER_ADMIN'].id}/role",
+            headers={"Authorization": f"Bearer {tokens['SUPER_ADMIN']}"},
+            json={"role": "ADMIN"},
+        )
+        assert self_demote_admin_res.status_code == 400
+        assert "cannot demote their own account" in self_demote_admin_res.json()["detail"]
+
+        # ADMIN attempting self-demote to USER
+        admin_self_demote = await client.patch(
+            f"/v1/admin/users/{users['ADMIN'].id}/role",
+            headers={"Authorization": f"Bearer {tokens['ADMIN']}"},
+            json={"role": "USER"},
+        )
+        assert admin_self_demote.status_code == 400
+        assert "cannot demote their own account" in admin_self_demote.json()["detail"]
+
+    app.dependency_overrides.clear()
+
+

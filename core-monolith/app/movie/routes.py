@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import date
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
-from app.auth.dependencies import require_role
+from app.admin.dependencies import require_ops_admin
 from app.auth.interfaces import User as AuthUserDomain
 from app.movie.dependencies import get_movie_service
 from app.movie.exceptions import (
@@ -318,7 +318,7 @@ async def apply_screen_layout(
 async def admin_override_screen_layout(
     id: UUID,
     body: AdminApplyLayoutRequest,
-    admin_user: AuthUserDomain = Depends(require_role("ADMIN")),
+    admin_user: AuthUserDomain = Depends(require_ops_admin),
     movie_service: MovieService = Depends(get_movie_service),
 ):
     try:

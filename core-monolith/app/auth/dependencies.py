@@ -137,11 +137,3 @@ def get_auth_service(
         token_service=token_service,
         auth_strategy=strategy
     )
-
-def require_role(allowed_roles: list[str]):
-    async def checker(user: UserDomain = Depends(get_current_user)) -> UserDomain:
-        user_role_str=user.role.value if hasattr(user.role,'value')else user.role 
-        if user_role_str not in allowed_roles:
-            raise ForbiddenError("Insufficient permissions")
-        return user
-    return checker

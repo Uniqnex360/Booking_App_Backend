@@ -11,10 +11,10 @@ from app.shared.exceptions import DuplicateEntityError, EntityNotFoundError, Rep
 from app.auth.interfaces import User as AuthUserDomain, IUserRepository, INotificationService
 from app.auth.dependencies import (
     get_current_user, 
-    require_role, 
     get_user_repo, 
     get_notification_service
 )
+from app.admin.dependencies import require_ops_admin
 
 
 from app.partner.dependencies import get_partner_service
@@ -67,7 +67,7 @@ async def list_partners_admin(
     partner_type: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     limit: int = Query(10, le=100),
-    admin_user: AuthUserDomain = Depends(require_role(['ADMIN'])),
+    admin_user: AuthUserDomain = Depends(require_ops_admin),
     service: PartnerService = Depends(get_partner_service)
 ):
     try:

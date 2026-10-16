@@ -8,21 +8,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.auth.dependencies import get_user_repo, get_refresh_token_repo
 from app.auth.interfaces import IUserRepository, IRefreshTokenRepository
-from app.admin.dependencies import require_admin
-from app.auth.interfaces import User as AuthUserDomain
+from app.admin.dependencies import (
+    ALL_ADMIN_ROLES,
+    SUPER_ROLES,
+    require_admin,
+    require_ops_admin,
+    require_super_admin,
+)
+from app.auth.interfaces import User as AuthUserDomain, UserRole
 from app.partner.dependencies import get_partner_service
 from app.shared.pagination import calculate_pagination_meta
 
 from app.partner.services import PartnerService
 from app.shared.response import success_response
 from app.partner.schemas import PartnerStatusUpdateRequest
-from app.auth.dependencies import require_role
 from app.auth.interfaces import INotificationService
 from app.auth.dependencies import get_notification_service
 from app.partner.interfaces import PartnerStatus
 from app.event.schemas import EventStatusUpdateRequest
 from app.event.dependencies import get_event_service
-from app.shared.exceptions import EntityNotFoundError
+from app.shared.exceptions import EntityNotFoundError, ForbiddenError
 from app.partner.exceptions import InvalidStatusTransitionHTTP, PartnerNotFoundHTTP, PartnerRepositoryHTTP
 from app.auth.exceptions import RepositoryError
 from app.partner.interfaces import InvalidStatusTransitionError
@@ -234,7 +239,7 @@ async def list_users_admin(
 async def update_user_status_admin(
     user_id: uuid.UUID,
     data: UserStatusUpdateRequest,
-    admin_user: AuthUserDomain = Depends(require_admin),
+    admin_user: AuthUserDomain = Depends(require_super_admin),
     user_repo: IUserRepository = Depends(get_user_repo),
     refresh_repo: IRefreshTokenRepository = Depends(get_refresh_token_repo),
 ):
@@ -242,6 +247,15 @@ async def update_user_status_admin(
     Block or unblock a user account.
     When blocking, all active refresh tokens for the user are immediately revoked.
     """
+    target_user = await user_repo.get_by_id(user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    target_role = target_user.role.value if hasattr(target_user.role, "value") else str(target_user.role).upper()
+    caller_role = admin_user.role.value if hasattr(admin_user.role, "value") else str(admin_user.role).upper()
+    if target_role in {r.value for r in ALL_ADMIN_ROLES} and caller_role not in {r.value for r in SUPER_ROLES}:
+        raise ForbiddenError("Cannot modify admin user accounts")
+
     if admin_user.id == user_id and not data.is_active:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -274,17 +288,27 @@ async def update_user_status_admin(
 async def update_user_role_admin(
     user_id: uuid.UUID,
     data: UserRoleUpdateRequest,
-    admin_user: AuthUserDomain = Depends(require_admin),
+    admin_user: AuthUserDomain = Depends(require_super_admin),
     user_repo: IUserRepository = Depends(get_user_repo),
 ):
     """
-    Update a user's role (USER, PARTNER, ADMIN).
+    Update a user's role.
     """
     new_role = data.role.upper()
-    if new_role not in ("USER", "PARTNER", "ADMIN"):
+    valid_roles = {r.value for r in UserRole}
+    if new_role not in valid_roles:
         raise HTTPException(status_code=400, detail="Invalid role specified")
 
-    if admin_user.id == user_id and new_role != "ADMIN":
+    target_user = await user_repo.get_by_id(user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    target_role = target_user.role.value if hasattr(target_user.role, "value") else str(target_user.role).upper()
+    caller_role = admin_user.role.value if hasattr(admin_user.role, "value") else str(admin_user.role).upper()
+    if target_role in {r.value for r in ALL_ADMIN_ROLES} and caller_role not in {r.value for r in SUPER_ROLES}:
+        raise ForbiddenError("Cannot modify admin user accounts")
+
+    if admin_user.id == user_id and new_role != caller_role:
         raise HTTPException(
             status_code=400,
             detail="Administrators cannot demote their own account",
@@ -325,7 +349,7 @@ async def list_partners(
 async def update_partner_status_admin(
     partner_id: uuid.UUID,
     data: PartnerStatusUpdateRequest,
-    admin_user: AuthUserDomain = Depends(require_role(["ADMIN"])),
+    admin_user: AuthUserDomain = Depends(require_ops_admin),
     service: PartnerService = Depends(get_partner_service),
     user_repo: IUserRepository = Depends(get_user_repo),
     notification_service: INotificationService = Depends(get_notification_service),
